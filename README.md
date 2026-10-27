@@ -45,6 +45,16 @@ can be built in slices without starting from a blank folder.
   own leads only; viewings/EMD/contracts marked Slice 3, not faked).
   NOT run locally (dependencies not installed, Supabase not configured),
   NOT pushed to GitHub yet.
+- Slice 3 (Oct 27, 2026, local only, not yet pushed): `lib/contracts.ts`
+  + `components/Contracts.tsx` (A-B price-only seller view, JV before
+  marketing, B-C locked until A-B Signed with full breakdown + EMD,
+  title package via email handoff, attorney-review labels, mailto +
+  manual status only, no real e-sign), `components/Viewings.tsx`
+  (buyer + seller manual confirmation; both Yes = cleared, otherwise
+  HOLD; seller message never reveals buyer or fee),
+  `components/Escrow.tsx` (6 manual milestones, EMD countdown from a
+  user-set deadline, payout price + fee − referral = net).
+  NOT run locally, NOT pushed to GitHub yet.
 - `capacitor.config.ts` — placeholder app id / name. REPLACE the app
   id with the real bundle id / application id before any store build.
 - `fastlane/` — `Fastfile` lanes: `beta` and `appstore` (iOS),

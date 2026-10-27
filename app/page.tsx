@@ -5,6 +5,9 @@ import DealAnalyzer from '../components/DealAnalyzer';
 import AuthPanel from '../components/AuthPanel';
 import Leads from '../components/Leads';
 import TodayCenter from '../components/TodayCenter';
+import Contracts from '../components/Contracts';
+import Viewings from '../components/Viewings';
+import Escrow from '../components/Escrow';
 import { supabaseConfigured } from '../lib/supabase';
 import type { Lead } from '../lib/leads';
 
@@ -16,12 +19,12 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 2</h1>
+      <h1>WholesalingOS — Production Build, Slice 3</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
-        → Show → Close → Track. Slice 1 was the foundation + Deal Analyzer.
-        Slice 2 adds sign-in and the Lead CRM + Today Center. Contracts,
-        viewings, and escrow are Slice 3.
+        → Show → Close → Track. Slice 3 ports the old prototype's contracts,
+        signature pipeline, viewings, and escrow into the new full-stack app.
+        Buyer CRM, title directory, counties, watchlist, and P&L are later slices.
       </p>
 
       <section style={{ background: supabaseConfigured ? '#052e16' : '#422006', padding: 16, borderRadius: 12 }}>
@@ -54,6 +57,10 @@ export default function Home() {
         and leads are yours only — Row Level Security in schema.sql blocks
         other users from reading them.
       </p>
+
+      <Contracts />
+      <Viewings />
+      <Escrow />
 
       <DealAnalyzer />
     </div>
