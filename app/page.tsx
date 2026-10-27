@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DealAnalyzer from '../components/DealAnalyzer';
 import AuthPanel from '../components/AuthPanel';
 import Leads from '../components/Leads';
@@ -15,19 +15,23 @@ import WatchlistProbate from '../components/WatchlistProbate';
 import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
 import type { Lead } from '../lib/leads';
+import SubscribeButton from '../components/SubscribeButton';
+import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 
 const STAGES = ['Find', 'Qualify', 'Contract', 'Market', 'Show', 'Close', 'Track'];
 
 export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [access, setAccess] = useState<ProfileAccess | null>(null);
+  useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 6</h1>
+      <h1>WholesalingOS — Production Build, Slice 7</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
-        → Show → Close → Track. Slice 6 links viewings and escrow to a selected saved deal in Supabase. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
+        → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
         title directory, county records, watchlist, probate guardrail, and
         business P&L into the new full-stack app.
       </p>
@@ -45,6 +49,7 @@ export default function Home() {
       <div style={{ marginTop: 16 }}>
         <AuthPanel onUser={(id) => setUserId(id)} />
       </div>
+      {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
 
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

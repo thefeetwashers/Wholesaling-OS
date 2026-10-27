@@ -136,3 +136,11 @@ can be built in slices without starting from a blank folder.
 - Viewings: pick a saved deal, then "Save viewing to selected deal" writes viewing_slots + confirmed_viewing on that deals row (both-Yes = cleared, else HOLD, same rule as before).
 - Escrow: pick a saved deal, then "Save escrow file to Supabase" creates a marketplace listing (total = price + fee), then an escrow file, then append-only milestone rows for the steps marked done. EMD amount on the file comes from the selected deal's emd_amount (0 if the deal has none) — never invented in the escrow form.
 - privacy_blocklist is still NOT touched from the app (service-role only, no server code yet).
+
+
+## Slice 7 — Stripe code + trial access + blocklist server route (Oct 27, 2026)
+- lib/access.ts: reads the user's profiles row and mirrors has_access() (active, or trialing with trial_ends_at in the future).
+- components/SubscribeButton.tsx: CORRECTED version. No supabaseClient import, no generic stripe.com URLs, no fake portal link. Checkout = owner-pasted NEXT_PUBLIC_STRIPE_PAYMENT_LINK + client_reference_id. Manage = honest "portal session not wired yet" (Stripe Portal needs a server-generated session). Payment link must be the FOR-PROFIT link, NOT the NC GOD INC link verified Oct 27, 2026.
+- app/api/stripe/webhook/route.ts: SERVER ONLY. Verifies Stripe signature, updates profiles subscription_status + stripe_customer_id and mirrors subscriptions. Requires STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY in hosting env only. Webhook does NOT work until the owner creates the Stripe account (THE FEET WASHERS, INC.), product, Payment Link, and webhook endpoint in Stripe.
+- app/api/check-blocklist/route.ts: SERVER ONLY. Takes SHA-256 hashes, checks privacy_blocklist via service role, returns blocked true/false only. Outreach UI calling it before sending is still future work — do not claim outreach is blocked in-app yet.
+- Google owner steps (done by owner Oct 27, 2026, pending sign-in test): OAuth client created + enabled, test-users restricted, redirect URI https://nabztcwabkqhxyxcxarx.supabase.co/auth/v1/callback, Client ID/secret pasted by owner into Supabase Auth > Providers > Google. Sign-in test with a test user is still the verification step.
