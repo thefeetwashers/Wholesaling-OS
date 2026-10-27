@@ -1,0 +1,7 @@
+# PLACEHOLDER — REPLACE before any store build.
+# app_identifier must match the real bundle id in App Store Connect
+# and the application id in Google Play Console. Do not use the
+# example value below for a real submission.
+app_identifier("com.example.wholesalingos")
+apple_id("REPLACE_WITH_APPLE_ID_EMAIL")
+team_id("REPLACE_WITH_APPLE_TEAM_ID")

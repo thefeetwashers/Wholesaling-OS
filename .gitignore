@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+ios/
+android/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+*.keystore
+*.jks
+*.p12
+*.mobileprovision

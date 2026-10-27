@@ -1,0 +1,38 @@
+name: iOS build (Fastlane)
+
+# NOT RUN YET — no GitHub repo is connected from this chat and no
+# signing secrets have been provided. This workflow is a starter
+# for Phase 2. Do not run it until: (1) the repo is pushed to
+# GitHub, (2) the iOS native project exists via `npx cap add ios`,
+# (3) App Store Connect API key + provisioning secrets are stored
+# in GitHub Secrets (never in this file).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build web app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      - name: Sync Capacitor iOS project
+        run: npx cap sync ios
+      - name: Fastlane beta (TestFlight)
+        run: bundle exec fastlane ios beta
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}

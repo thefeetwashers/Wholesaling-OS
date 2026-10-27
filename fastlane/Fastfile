@@ -1,0 +1,53 @@
+# Fastlane lanes for WholesalingOS — Phase 2 store builds.
+# All secrets come from environment variables / GitHub Secrets.
+# No secret, certificate, password, or API key is in this file.
+# Run via GitHub Actions (see .github/workflows/), not by hand
+# with secrets pasted into a terminal.
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload a beta to TestFlight"
+  lane :beta do
+    # Requires, as GitHub Secrets / env:
+    # APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
+    # APP_STORE_CONNECT_API_KEY_CONTENT, MATCH_PASSWORD (if using match)
+    increment_build_number
+    build_app(scheme: "App")
+    upload_to_testflight
+  end
+
+  desc "Build and submit to the App Store for review"
+  lane :appstore do
+    increment_build_number
+    build_app(scheme: "App")
+    upload_to_app_store(
+      submit_for_review: true,
+      automatic_release: false
+    )
+  end
+end
+
+platform :android do
+  desc "Build and upload a beta to Play Internal testing"
+  lane :beta do
+    # Requires, as GitHub Secrets / env:
+    # ANDROID_KEYSTORE, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
+    # PLAY_SERVICE_ACCOUNT_JSON (path or content, via secret)
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(
+      track: "internal",
+      aab: "android/app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+
+  desc "Build and upload to Play production track (manual release)"
+  lane :internal do
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(
+      track: "production",
+      release_status: "draft",
+      aab: "android/app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+end
