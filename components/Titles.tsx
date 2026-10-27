@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabaseConfigured } from '../lib/supabase';
+import { loadTitleCompanies, type TitleCompanyRow } from '../lib/directories';
 
 // Title directory, ported from the old prototype. Seeds match production/schema.sql exactly.
 // Only CLOSED Title carries verified Handles badges in the prototype; all others are
@@ -15,15 +17,24 @@ const SEEDS = [
   { name: '24 Hour Closing', states: 'NC, SC', website: 'https://24hourclose.com/wholesaling-real-estate/4/', note: 'Closing law firm serving NC/SC; investor-friendly per their site.' },
 ];
 
-export default function Titles() {
+export default function Titles({ userId }: { userId: string | null }) {
   const [added, setAdded] = useState<{ name: string; states: string }[]>([]);
+  const [rows, setRows] = useState<TitleCompanyRow[] | null>(null);
+  useEffect(() => {
+    if (userId && supabaseConfigured) {
+      loadTitleCompanies().then((r) => { if (r) setRows(r); }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+  const shown = rows ?? SEEDS.map((s) => ({ name: s.name, states: s.states.split(',').map((x) => x.trim()).filter(Boolean), website: s.website || null, notes: s.note }));
   const [name, setName] = useState(''); const [states, setStates] = useState('');
 
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Title Companies — Verified Seeds + Your Additions</h2>
+      <p style={{ fontSize: 13, color: '#94a3b8' }}>Source: {rows ? 'Supabase title_companies (seed rows + your own)' : 'Built-in seeds — sign in with Supabase configured to read them from the database.'}</p>
       <ul>
-        {SEEDS.map((t) => <li key={t.name}><strong>{t.name}</strong> {t.states ? `— ${t.states}` : ''} {t.website ? <a href={t.website} target="_blank" rel="noreferrer">{t.website}</a> : ''} — {t.note}</li>)}
+        {shown.map((t) => <li key={t.name}><strong>{t.name}</strong> {t.states.length ? `— ${t.states.join(', ')}` : ''} {t.website ? <a href={t.website} target="_blank" rel="noreferrer">{t.website}</a> : ''} — {t.notes}</li>)}
         {added.map((t) => <li key={t.name}><strong>{t.name}</strong> — {t.states} — <em>unverified user addition</em></li>)}
       </ul>
       <input placeholder="Add a title company you verified yourself" value={name} onChange={(e) => setName(e.target.value)} style={{ marginRight: 8 }} />

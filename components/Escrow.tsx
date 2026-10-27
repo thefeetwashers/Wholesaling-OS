@@ -22,7 +22,7 @@ export default function Escrow() {
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Title Escrow Tracker</h2>
-      <p style={{ fontSize: 13, color: '#94a3b8' }}>Milestones are advanced by you, by hand. Nothing here talks to a title company system.</p>
+      <p style={{ fontSize: 13, color: '#94a3b8' }}>Milestones are advanced by you, by hand. Nothing here talks to a title company system. This tracker is still local-only in Slice 5 — saving escrow files/milestones to Supabase is Slice 6, once a deal and listing exist.</p>
       <label>Contract price $ <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} /></label>{' '}
       <label>Assignment fee $ <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value))} /></label>{' '}
       <label>Referral $ <input type="number" value={referral} onChange={(e) => setReferral(Number(e.target.value))} /></label>

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabaseConfigured } from '../lib/supabase';
+import { dealFromContract, loadDeals, saveDeal, type DealRow } from '../lib/deals';
 import { sellerView, buyerView, titlePackage, canSignBC, type DealContract, type SigStatus } from '../lib/contracts';
 
 const EMPTY: DealContract = {
@@ -10,8 +12,25 @@ const EMPTY: DealContract = {
   ab_status: 'Draft', jv_status: 'Not a JV deal', bc_status: 'Draft',
 };
 
-export default function Contracts() {
+export default function Contracts({ userId }: { userId: string | null }) {
   const [c, setC] = useState<DealContract>(EMPTY);
+  const [deals, setDeals] = useState<DealRow[]>([]);
+  const [mode, setMode] = useState<'local' | 'synced'>('local');
+  const [savedMsg, setSavedMsg] = useState('');
+
+  useEffect(() => {
+    if (userId && supabaseConfigured) {
+      loadDeals(userId).then((rows) => { if (rows) { setDeals(rows); setMode('synced'); } }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const saveCurrentDeal = async () => {
+    if (!c.property_address.trim()) { setSavedMsg('Enter a property address first.'); return; }
+    if (!userId || !supabaseConfigured) { setSavedMsg('Sign in with Supabase configured to save this deal.'); return; }
+    const row = await saveDeal(dealFromContract(userId, c)).catch(() => null);
+    if (row) { setDeals([row, ...deals]); setSavedMsg('Deal saved to Supabase.'); } else { setSavedMsg('Save failed — check sign-in and try again.'); }
+  };
   const [view, setView] = useState<'seller' | 'buyer' | 'title' | null>(null);
   const bcLocked = !canSignBC(c);
 
@@ -43,6 +62,7 @@ export default function Contracts() {
         <p>B-C status: {c.bc_status} {bcLocked && '(locked until A-B is Signed)'} — <button disabled={bcLocked} onClick={() => setStatus('bc_status', 'Sent')}>Mark Sent</button> <button disabled={bcLocked} onClick={() => setStatus('bc_status', 'Signed')}>Mark Signed</button></p>
       </div>
       <div style={{ marginTop: 12 }}>
+        <button onClick={saveCurrentDeal}>Save deal to Supabase</button>{' '}
         <button onClick={() => setView('seller')}>Show A-B (seller view)</button>{' '}
         <button onClick={() => setView('buyer')} disabled={bcLocked}>Show B-C (buyer view)</button>{' '}
         <button onClick={() => setView('title')}>Show title package</button>
@@ -50,6 +70,8 @@ export default function Contracts() {
       {view === 'seller' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{sellerView(c)}</pre>}
       {view === 'buyer' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{buyerView(c)}</pre>}
       {view === 'title' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{titlePackage(c)}</pre>}
+      <p style={{ fontSize: 13, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Deals synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to save deals.'}{savedMsg ? ` ${savedMsg}` : ''}</p>
+      {deals.length > 0 && <ul>{deals.map((d) => <li key={d.id || ''}>{(d.documents as { property_address?: string } | undefined)?.property_address || 'Deal'} — {d.contract_type}, ${d.contract_price ?? 0}, fee ${d.assignment_fee ?? 0}, status {d.status}</li>)}</ul>}
     </section>
   );
 }

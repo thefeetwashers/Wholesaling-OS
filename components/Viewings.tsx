@@ -20,7 +20,7 @@ export default function Viewings() {
       <h2>Viewings — Walkthrough Verification</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         The seller message uses partner/inspector language only — it never reveals the buyer or the fee.
-        Confirmations below are manual statuses you set yourself.
+        Confirmations below are manual statuses you set yourself. This section is still local-only in Slice 5 — saving a viewing to a deal's viewing_slots is Slice 6, once a deal is selected.
       </p>
       <input placeholder="Property address" value={address} onChange={(e) => setAddress(e.target.value)} style={{ marginRight: 8 }} />
       <input placeholder="Slot, e.g. Oct 28, 2-4pm" value={slot} onChange={(e) => setSlot(e.target.value)} />

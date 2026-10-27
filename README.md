@@ -119,3 +119,13 @@ can be built in slices without starting from a blank folder.
   provisioned, no Stripe account created, no Apple/Google developer
   accounts enrolled, no store submission, no Apple approval.
   Anyone claiming otherwise is wrong.
+
+
+## Slice 5 — Supabase sync for buyers, deals, directories (Oct 27, 2026)
+- lib/buyers.ts + lib/deals.ts + lib/directories.ts: RLS-scoped load/save matching schema.sql / schema-v2-additions.sql exactly.
+- Buyers: load/save to public.buyers when signed in, else local-only labeled.
+- Contracts: "Save deal to Supabase" writes a public.deals row (contract_type purchase/assignment, price/ARV/repairs/fee/EMD, signature statuses in documents JSON); saved deals list loads on sign-in.
+- Titles: reads public.title_companies from Supabase when signed in, else built-in seeds.
+- Counties: reads public.county_portal_links St. Lucie seed from Supabase when signed in, else built-in links.
+- Viewings and Escrow remain local-only in Slice 5, labeled as such; deal-linked viewing_slots and escrow_files/milestones saving is Slice 6.
+- Still NOT synced: WatchlistProbate lead_events, call_logs, BusinessPL actuals, marketplace_listings lifecycle, privacy_blocklist enforcement (service-role only, no server code yet).
