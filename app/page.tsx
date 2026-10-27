@@ -24,10 +24,10 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 5</h1>
+      <h1>WholesalingOS — Production Build, Slice 6</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
-        → Show → Close → Track. Slice 5 syncs buyers, deals, and directories to Supabase; viewings and escrow deal-linking is Slice 6. Slice 4 ported the old prototype's buyer CRM,
+        → Show → Close → Track. Slice 6 links viewings and escrow to a selected saved deal in Supabase. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
         title directory, county records, watchlist, probate guardrail, and
         business P&L into the new full-stack app.
       </p>
@@ -64,8 +64,8 @@ export default function Home() {
       </p>
 
       <Contracts userId={userId} />
-      <Viewings />
-      <Escrow />
+      <Viewings userId={userId} />
+      <Escrow userId={userId} />
       <Buyers userId={userId} />
       <Titles userId={userId} />
       <Counties userId={userId} />

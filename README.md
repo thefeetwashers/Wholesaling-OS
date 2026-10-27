@@ -129,3 +129,10 @@ can be built in slices without starting from a blank folder.
 - Counties: reads public.county_portal_links St. Lucie seed from Supabase when signed in, else built-in links.
 - Viewings and Escrow remain local-only in Slice 5, labeled as such; deal-linked viewing_slots and escrow_files/milestones saving is Slice 6.
 - Still NOT synced: WatchlistProbate lead_events, call_logs, BusinessPL actuals, marketplace_listings lifecycle, privacy_blocklist enforcement (service-role only, no server code yet).
+
+
+## Slice 6 — Deal-linked viewings and escrow (Oct 27, 2026)
+- lib/escrow.ts: marketplace_listings -> escrow_files -> escrow_milestones, matching schema-v2-additions.sql.
+- Viewings: pick a saved deal, then "Save viewing to selected deal" writes viewing_slots + confirmed_viewing on that deals row (both-Yes = cleared, else HOLD, same rule as before).
+- Escrow: pick a saved deal, then "Save escrow file to Supabase" creates a marketplace listing (total = price + fee), then an escrow file, then append-only milestone rows for the steps marked done. EMD amount on the file comes from the selected deal's emd_amount (0 if the deal has none) — never invented in the escrow form.
+- privacy_blocklist is still NOT touched from the app (service-role only, no server code yet).
