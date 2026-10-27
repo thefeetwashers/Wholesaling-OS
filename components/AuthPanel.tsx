@@ -13,6 +13,13 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
   const [password, setPassword] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  // Fallback for the profiles row: the Supabase signup trigger normally
+  // creates it, but if it ever misses, a lead save would fail on the
+  // profiles foreign key. This upserts only the signed-in user's own row.
+  const ensureProfile = async (id: string, email: string | null) => {
+    if (!supabase || !email) return;
+    await supabase.from('profiles').upsert({ id, email }, { onConflict: 'id', ignoreDuplicates: true });
+  };
 
   useEffect(() => {
     if (!supabase) return;
@@ -20,11 +27,13 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
       const u = data.session?.user;
       setUserEmail(u?.email ?? null);
       onUser(u?.id ?? null, u?.email ?? null);
+      if (u) void ensureProfile(u.id, u.email ?? null);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user;
       setUserEmail(u?.email ?? null);
       onUser(u?.id ?? null, u?.email ?? null);
+      if (u) void ensureProfile(u.id, u.email ?? null);
     });
     return () => sub.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
