@@ -1,0 +1,34 @@
+'use client';
+
+import { useState } from 'react';
+
+// Title directory, ported from the old prototype. Seeds match production/schema.sql exactly.
+// Only CLOSED Title carries verified Handles badges in the prototype; all others are
+// "advertises investor services — confirm directly." User additions are labeled unverified.
+const SEEDS = [
+  { name: 'CLOSED Title', states: 'FL, TN, TX, OH, OK, UT', website: 'https://www.closedtitle.com/investors', note: 'Advertises assignments, double closings, subject-to. Confirm directly.' },
+  { name: 'Empora Title', states: 'OH, KY, IN, MI, MO, PA, FL', website: '', note: 'Investor-focused; confirm your transaction structure directly.' },
+  { name: 'Marina Title', states: 'FL', website: 'https://marinatitle.com', note: 'Attorney-owned; serving wholesalers since 2014 per their site.' },
+  { name: 'FL Title', states: 'FL', website: '', note: 'Advertises A-to-B / B-to-C back-to-back closings. Verify.' },
+  { name: 'Shield Title Agency', states: 'AZ', website: '', note: 'Phoenix-based; investors-and-wholesalers desk per publisher listing. Verify.' },
+  { name: 'Title One USA', states: '', website: 'https://titleoneusa.com/for-local-investors/', note: 'Investor-centric; assignments, double closings, subject-to per their site.' },
+  { name: '24 Hour Closing', states: 'NC, SC', website: 'https://24hourclose.com/wholesaling-real-estate/4/', note: 'Closing law firm serving NC/SC; investor-friendly per their site.' },
+];
+
+export default function Titles() {
+  const [added, setAdded] = useState<{ name: string; states: string }[]>([]);
+  const [name, setName] = useState(''); const [states, setStates] = useState('');
+
+  return (
+    <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
+      <h2>Title Companies — Verified Seeds + Your Additions</h2>
+      <ul>
+        {SEEDS.map((t) => <li key={t.name}><strong>{t.name}</strong> {t.states ? `— ${t.states}` : ''} {t.website ? <a href={t.website} target="_blank" rel="noreferrer">{t.website}</a> : ''} — {t.note}</li>)}
+        {added.map((t) => <li key={t.name}><strong>{t.name}</strong> — {t.states} — <em>unverified user addition</em></li>)}
+      </ul>
+      <input placeholder="Add a title company you verified yourself" value={name} onChange={(e) => setName(e.target.value)} style={{ marginRight: 8 }} />
+      <input placeholder="States" value={states} onChange={(e) => setStates(e.target.value)} style={{ marginRight: 8 }} />
+      <button onClick={() => { if (name.trim()) { setAdded([{ name, states }, ...added]); setName(''); setStates(''); } }}>Add (unverified)</button>
+    </section>
+  );
+}

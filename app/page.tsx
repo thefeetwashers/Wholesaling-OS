@@ -8,6 +8,11 @@ import TodayCenter from '../components/TodayCenter';
 import Contracts from '../components/Contracts';
 import Viewings from '../components/Viewings';
 import Escrow from '../components/Escrow';
+import Buyers from '../components/Buyers';
+import Titles from '../components/Titles';
+import Counties from '../components/Counties';
+import WatchlistProbate from '../components/WatchlistProbate';
+import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
 import type { Lead } from '../lib/leads';
 
@@ -19,12 +24,12 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 3</h1>
+      <h1>WholesalingOS — Production Build, Slice 4</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
-        → Show → Close → Track. Slice 3 ports the old prototype's contracts,
-        signature pipeline, viewings, and escrow into the new full-stack app.
-        Buyer CRM, title directory, counties, watchlist, and P&L are later slices.
+        → Show → Close → Track. Slice 4 ports the old prototype's buyer CRM,
+        title directory, county records, watchlist, probate guardrail, and
+        business P&L into the new full-stack app.
       </p>
 
       <section style={{ background: supabaseConfigured ? '#052e16' : '#422006', padding: 16, borderRadius: 12 }}>
@@ -61,6 +66,11 @@ export default function Home() {
       <Contracts />
       <Viewings />
       <Escrow />
+      <Buyers />
+      <Titles />
+      <Counties />
+      <WatchlistProbate />
+      <BusinessPL />
 
       <DealAnalyzer />
     </div>

@@ -55,6 +55,16 @@ can be built in slices without starting from a blank folder.
   `components/Escrow.tsx` (6 manual milestones, EMD countdown from a
   user-set deadline, payout price + fee − referral = net).
   NOT run locally, NOT pushed to GitHub yet.
+- Slice 4 (Oct 27, 2026, local only, not yet pushed): `components/Buyers.tsx`
+  (own buyer list only, demand count from your buyers only, not live orders),
+  `components/Titles.tsx` (7 verified seeds matching schema.sql; user additions
+  labeled unverified), `components/Counties.tsx` (St. Lucie FL FIPS 12111 only,
+  5 verified URLs; other counties user-added, no guessed URLs; import yields
+  owner name + mailing address only), `components/WatchlistProbate.tsx`
+  (manual re-check resurrection, probate do-not-contact guardrail, no obituary
+  scraping, no auto-contacting heirs), `components/BusinessPL.tsx`
+  (own deals only: fee − referral − expenses; $10,000 − $500 − $300 = $9,200).
+  NOT run locally, NOT pushed to GitHub yet.
 - `capacitor.config.ts` — placeholder app id / name. REPLACE the app
   id with the real bundle id / application id before any store build.
 - `fastlane/` — `Fastfile` lanes: `beta` and `appstore` (iOS),
