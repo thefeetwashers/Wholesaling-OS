@@ -360,14 +360,15 @@ export async function loadAllBuyBoxes(): Promise<BuyBox[]> {
 // only allows claiming rows that are still unlinked.
 export async function claimDeal(dealId: string, userId: string): Promise<void> {
   if (!supabaseConfigured || !supabase) return;
-  const { data, error } = await supabase
-    .from('deals')
-    .update({ seller_user: userId })
-    .eq('id', dealId.trim())
-    .is('seller_user', null)
-    .select('id');
+  // Slice 16: claim via the claim_deal security-definer RPC (schema v3.5).
+  // The direct RLS update silently matched 0 rows in production (E2E test,
+  // Oct 29) despite a correct-looking policy; the RPC has identical
+  // semantics — claim only an unlinked deal, only to yourself — and
+  // returns whether the claim actually landed.
+  void userId;
+  const { data, error } = await supabase.rpc('claim_deal', { p_deal_id: dealId.trim() });
   if (error) throw error;
-  if (!data || data.length === 0) {
+  if (data !== true) {
     throw new Error('No unlinked deal found with that ID. Check the ID with your wholesaler.');
   }
 }
