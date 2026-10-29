@@ -13,6 +13,14 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
   const [password, setPassword] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  // OAuth errors come back in the URL, not through supabase.auth — surface them.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error_description') || params.get('error');
+    if (err) setMessage(decodeURIComponent(err.replace(/\+/g, ' ')));
+  }, []);
+
   // Fallback for the profiles row: the Supabase signup trigger normally
   // creates it, but if it ever misses, a lead save would fail on the
   // profiles foreign key. This upserts only the signed-in user's own row.
@@ -76,7 +84,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
         setMessage(error ? error.message : 'Check your email to confirm, if confirmation is enabled.');
       }}>Create account</button>{' '}
       <button onClick={async () => {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
         setMessage(error ? error.message : '');
       }}>Continue with Google</button>
       {message && <p style={{ fontSize: 13, color: '#f87171' }}>{message}</p>}

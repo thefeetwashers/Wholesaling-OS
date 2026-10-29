@@ -144,3 +144,9 @@ can be built in slices without starting from a blank folder.
 - app/api/stripe/webhook/route.ts: SERVER ONLY. Verifies Stripe signature, updates profiles subscription_status + stripe_customer_id and mirrors subscriptions. Requires STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY in hosting env only. Webhook does NOT work until the owner creates the Stripe account (THE FEET WASHERS, INC.), product, Payment Link, and webhook endpoint in Stripe.
 - app/api/check-blocklist/route.ts: SERVER ONLY. Takes SHA-256 hashes, checks privacy_blocklist via service role, returns blocked true/false only. Outreach UI calling it before sending is still future work — do not claim outreach is blocked in-app yet.
 - Google owner steps (done by owner Oct 27, 2026, pending sign-in test): OAuth client created + enabled, test-users restricted, redirect URI https://nabztcwabkqhxyxcxarx.supabase.co/auth/v1/callback, Client ID/secret pasted by owner into Supabase Auth > Providers > Google. Sign-in test with a test user is still the verification step.
+
+
+## Slice 8 — Google OAuth redirect fix (Oct 27, 2026)
+- AuthPanel: signInWithOAuth now passes redirectTo: window.location.origin, so a deployed app redirects to its own URL instead of Supabase's fallback localhost:3000 Site URL.
+- AuthPanel: OAuth callback errors in the URL (?error= / ?error_description=) are now shown in the panel, instead of a blank sign-in screen.
+- This does NOT fix a mismatched Client ID/Secret in Supabase's Google provider — the Oct 27, 2026 test failed at "Unable to exchange external code" after Google accepted, which still needs the owner to re-check/re-paste the provider credentials in Supabase.
