@@ -16,7 +16,7 @@ import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
 import type { Lead } from '../lib/leads';
 import SubscribeButton from '../components/SubscribeButton';
-import PortalHome from '../components/PortalHome';
+import PortalHome, { PublicDealsSection } from '../components/PortalHome';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 
 const STAGES = ['Find', 'Qualify', 'Contract', 'Market', 'Show', 'Close', 'Track'];
@@ -29,7 +29,7 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 9</h1>
+      <h1>WholesalingOS — Production Build, Slice 10</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
         → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
@@ -53,6 +53,7 @@ export default function Home() {
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
       <PortalHome userId={userId} />
 
+      <PublicDealsSection />
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {STAGES.map((s) => (

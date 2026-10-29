@@ -157,3 +157,10 @@ can be built in slices without starting from a blank folder.
 - Registration: AuthPanel role picker ("I am a…") stashed at Create account and applied to the user's own profile on first sign-in; Google sign-ups default to wholesaler; any signed-in user can switch role in Your Portal (roles are self-selected at launch, honestly labeled).
 - Your Portal (role-routed home): Wholesaler Dashboard strip (real counts: leads by stage, follow-ups due, deals, assignment fees in pipeline, active listings, new offers — all from the user's own rows); Buyer Portal (buy-box builder saved to buy_boxes, deal feed of active public listings with a price + address-text match badge); Seller Portal (deals linked via deals.seller_user); Title Portal (companies linked via title_companies.portal_user + their escrow files).
 - Offers table exists (schema v3); the make-an-offer UI and wholesaler offers inbox actions are Slice 10. In-portal signing is Slice 11.
+
+
+## Slice 10 — Offers, public deals, buyer demand (Oct 29, 2026)
+- Buyers make offers from the deal feed (offers table, schema v3); "My offers" tracks status and counters, with withdraw.
+- Wholesaler offers inbox: Accept writes the accepted amount into the deal's documents (bc_status 'offer_accepted') so Contracts shows it; Counter (with amount) and Decline set offer status. No auto-send anywhere.
+- Public deals page on the home page: visible signed-out, mandatory assignment-of-equitable-interest disclosure, shareable /?deal=<id> links with a copy button; reads only listings marked public + active (schema v3.2 adds narrowly scoped anon SELECT policies for those listings and the deals behind them — run in Supabase Oct 29, 2026).
+- Buyer Demand in the wholesaler dashboard: aggregates of active buy boxes (most-wanted places, criteria list) — buyer identities are never displayed.

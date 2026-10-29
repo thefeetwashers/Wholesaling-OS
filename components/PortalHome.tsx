@@ -14,24 +14,32 @@ import {
   loadDashboard,
   loadSellerDeals,
   loadTitleLink,
+  createOffer,
+  loadBuyerOffers,
+  loadIncomingOffers,
+  setOfferStatus,
+  acceptOffer,
+  loadAllBuyBoxes,
   type PortalRole,
   type BuyBox,
   type FeedListing,
   type DashboardData,
   type LinkedDeal,
   type TitleLink,
+  type OfferRow,
 } from '../lib/portals';
 
-// Slice 9 — Full Portals home. One signed-in home, routed by profiles.role:
-// wholesaler command dashboard, buyer buy-box + deal feed, seller linked
-// deals, title company files. Roles are self-selected at launch (the owner
-// can correct them); every list below is real data under RLS, with honest
-// empty states — nothing is simulated.
+// Full Portals home (Slices 9-10). One signed-in home, routed by
+// profiles.role: wholesaler command dashboard + offers inbox + buyer
+// demand, buyer buy-box + deal feed + offers, seller linked deals, title
+// company files. Every list is real data under RLS with honest empty
+// states — nothing is simulated.
 
 const card: React.CSSProperties = { background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 };
 const stat: React.CSSProperties = { background: '#0f172a', padding: 12, borderRadius: 10, minWidth: 130, flex: '1 1 130px' };
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
+const offerAddress = (o: OfferRow) => o.listing?.deals?.documents?.property_address || 'Property';
 
 export default function PortalHome({ userId }: { userId: string | null }) {
   const [role, setRole] = useState<PortalRole | null>(null);
@@ -115,10 +123,83 @@ function WholesalerDashboard({ userId }: { userId: string }) {
         {stages.map((s) => `${s}: ${dash.leadsByStatus[s] || 0}`).join(' · ')}
         {dash.leadsByStatus.dead ? ` · dead: ${dash.leadsByStatus.dead}` : ''}
       </p>
+      <OffersInbox userId={userId} />
+      <BuyerDemand />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Every number above is counted from your own leads, deals, listings, and offers in Supabase.
-        Offers inbox actions arrive in Slice 10; the full KPI scorecard in Slice 14.
+        The full KPI scorecard arrives in Slice 14.
       </p>
+    </div>
+  );
+}
+
+function OffersInbox({ userId }: { userId: string }) {
+  const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [counter, setCounter] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState('');
+  const refresh = () => { void loadIncomingOffers(userId).then(setOffers).catch(() => {}); };
+  useEffect(refresh, [userId]);
+  return (
+    <div>
+      <h4>Offers inbox</h4>
+      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
+      {offers.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No offers yet. When a buyer offers on one of your listings, it lands here.</p>
+      ) : (
+        <ul style={{ fontSize: 13 }}>
+          {offers.map((o) => (
+            <li key={o.id} style={{ marginBottom: 8 }}>
+              <strong>{offerAddress(o)}</strong> — offer {money(Number(o.amount))}
+              {o.counter_amount != null ? ` · your counter: ${money(Number(o.counter_amount))}` : ''}
+              {' '}· status: {o.status}
+              {o.message ? <><br />Buyer note: {o.message}</> : null}
+              {o.status === 'sent' && (
+                <>
+                  <br />
+                  <button onClick={async () => { await acceptOffer(o); setMsg('Offer accepted — the deal\u2019s B\u2013C status in Contracts now shows the accepted amount.'); refresh(); }}>Accept</button>{' '}
+                  <input placeholder="Counter $" style={{ width: 90 }} value={counter[o.id] || ''} onChange={(e) => setCounter({ ...counter, [o.id]: e.target.value })} />{' '}
+                  <button onClick={async () => { const v = Number(counter[o.id]); if (v > 0) { await setOfferStatus(o.id, 'countered', v); setMsg('Counter sent.'); refresh(); } }}>Counter</button>{' '}
+                  <button onClick={async () => { await setOfferStatus(o.id, 'declined'); setMsg('Offer declined.'); refresh(); }}>Decline</button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function BuyerDemand() {
+  const [boxes, setBoxes] = useState<BuyBox[] | null>(null);
+  useEffect(() => { loadAllBuyBoxes().then(setBoxes).catch(() => setBoxes([])); }, []);
+  if (boxes === null) return null;
+  const places = new Map<string, number>();
+  for (const b of boxes) for (const p of [...b.cities, ...b.states]) places.set(p, (places.get(p) || 0) + 1);
+  const topList: [string, number][] = [];
+  places.forEach((n, p) => topList.push([p, n]));
+  const top = topList.sort((a, b) => b[1] - a[1]).slice(0, 8);
+  return (
+    <div>
+      <h4>Buyer demand — active buy boxes ({boxes.length})</h4>
+      {boxes.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No buyer buy boxes yet. Demand appears here as buyers publish them.</p>
+      ) : (
+        <>
+          {top.length > 0 && <p style={{ fontSize: 13 }}>Most wanted: {top.map(([p, n]) => `${p} (${n})`).join(' · ')}</p>}
+          <ul style={{ fontSize: 13 }}>
+            {boxes.slice(0, 10).map((b) => (
+              <li key={b.id}>
+                {[...b.cities, ...b.states].join(', ') || 'Anywhere'}
+                {b.property_types.length ? ` · ${b.property_types.join(', ')}` : ''}
+                {b.price_max != null ? ` · up to ${money(Number(b.price_max))}` : ''}
+                {b.min_beds != null ? ` · ${b.min_beds}+ beds` : ''}
+              </li>
+            ))}
+          </ul>
+          <p style={{ fontSize: 12, color: '#94a3b8' }}>Criteria only — buyer identities are never shown here.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -126,12 +207,15 @@ function WholesalerDashboard({ userId }: { userId: string }) {
 function BuyerPortal({ userId }: { userId: string }) {
   const [boxes, setBoxes] = useState<BuyBox[]>([]);
   const [feed, setFeed] = useState<FeedListing[]>([]);
+  const [myOffers, setMyOffers] = useState<OfferRow[]>([]);
+  const [offerForm, setOfferForm] = useState<Record<string, { amount: string; message: string }>>({});
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ label: 'My Buy Box', states: '', counties: '', cities: '', types: '', min: '', max: '', beds: '' });
 
   const refresh = () => {
     loadMyBuyBoxes(userId).then(setBoxes).catch((e) => setErr(e instanceof Error ? e.message : 'Load failed'));
     loadFeed().then(setFeed).catch(() => {});
+    loadBuyerOffers(userId).then(setMyOffers).catch(() => {});
   };
   useEffect(refresh, [userId]);
 
@@ -182,19 +266,44 @@ function BuyerPortal({ userId }: { userId: string }) {
         <ul style={{ fontSize: 13 }}>
           {feed.map((l) => {
             const mine = boxes.some((b) => listingMatchesBox(l, b));
+            const f = offerForm[l.id] || { amount: '', message: '' };
             return (
-              <li key={l.id}>
+              <li key={l.id} style={{ marginBottom: 10 }}>
                 <strong>{l.deals?.documents?.property_address || 'Address in deal file'}</strong> — total cost {money(Number(l.total_marketplace_cost))}
                 {l.deals?.assignment_fee != null ? ` · fee ${money(Number(l.deals.assignment_fee))}` : ''}
                 {mine ? ' · Matches your buy box' : ''}
+                <br />
+                <input placeholder="Your offer $" style={{ width: 110 }} value={f.amount} onChange={(e) => setOfferForm({ ...offerForm, [l.id]: { ...f, amount: e.target.value } })} />{' '}
+                <input placeholder="Message (optional)" value={f.message} onChange={(e) => setOfferForm({ ...offerForm, [l.id]: { ...f, message: e.target.value } })} />{' '}
+                <button onClick={async () => {
+                  const amt = Number(f.amount);
+                  if (!(amt > 0)) { setErr('Enter an offer amount first.'); return; }
+                  try { await createOffer(userId, l, amt, f.message); setErr(''); refresh(); }
+                  catch (e) { setErr(e instanceof Error ? e.message : 'Offer failed'); }
+                }}>Make offer</button>
               </li>
             );
           })}
         </ul>
       )}
+      <h4>My offers</h4>
+      {myOffers.length === 0 ? (
+        <p style={{ fontSize: 13 }}>You have not made any offers yet.</p>
+      ) : (
+        <ul style={{ fontSize: 13 }}>
+          {myOffers.map((o) => (
+            <li key={o.id}>
+              <strong>{offerAddress(o)}</strong> — your offer {money(Number(o.amount))} · status: {o.status}
+              {o.counter_amount != null ? ` · wholesaler counter: ${money(Number(o.counter_amount))}` : ''}
+              {o.status === 'sent' || o.status === 'countered' ? (
+                <> <button onClick={async () => { await setOfferStatus(o.id, 'withdrawn'); refresh(); }}>Withdraw</button></>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Match = your price range plus a plain text match of your cities/states against the property address.
-        Making an offer from the feed arrives in Slice 10.
       </p>
     </div>
   );
@@ -254,5 +363,51 @@ function TitlePortal({ userId }: { userId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Public deals page (Slice 10) — visible signed-out. Reads only listings a
+// wholesaler deliberately marked public + active (schema v3.2 anon policy);
+// signed-in users see the same feed through the v3 policy.
+export function PublicDealsSection() {
+  const [feed, setFeed] = useState<FeedListing[] | null>(null);
+  const [sharedId, setSharedId] = useState<string | null>(null);
+  const [copied, setCopied] = useState('');
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSharedId(new URLSearchParams(window.location.search).get('deal'));
+    }
+    loadFeed().then(setFeed).catch(() => setFeed([]));
+  }, []);
+  const ordered = feed ? [...feed].sort((a, b) => (a.id === sharedId ? -1 : b.id === sharedId ? 1 : 0)) : null;
+  return (
+    <section style={{ background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 }}>
+      <h2>Public Deals</h2>
+      <p style={{ fontSize: 13 }}>
+        <strong>Disclosure:</strong> listings here are assignments of equitable interest — a buyer is
+        purchasing the wholesaler's contract rights, not the property itself. Verify all figures
+        with the wholesaler and the title company before sending any funds.
+      </p>
+      {ordered === null ? (
+        <p style={{ fontSize: 13 }}>Loading public deals…</p>
+      ) : ordered.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No public listings right now. Sign in to see the full buyer feed.</p>
+      ) : (
+        <ul style={{ fontSize: 13 }}>
+          {ordered.map((l) => (
+            <li key={l.id} style={{ marginBottom: 8 }}>
+              {l.id === sharedId ? <strong>Shared deal: </strong> : null}
+              <strong>{l.deals?.documents?.property_address || 'Address in deal file'}</strong> — total cost {money(Number(l.total_marketplace_cost))}
+              {l.deals?.assignment_fee != null ? ` · assignment fee ${money(Number(l.deals.assignment_fee))}` : ''}
+              {' '}<button onClick={async () => {
+                const url = `${window.location.origin}/?deal=${l.id}`;
+                try { await navigator.clipboard.writeText(url); setCopied(l.id); } catch { setCopied(''); }
+              }}>Copy share link</button>
+              {copied === l.id ? ' Link copied.' : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -218,3 +218,119 @@ export async function loadTitleLink(userId: string): Promise<TitleLink> {
     .order('created_at', { ascending: false });
   return { companies: list, files: (files || []) as TitleLink['files'] };
 }
+
+// ---- Slice 10: offers ----
+
+export type OfferStatus = 'sent' | 'countered' | 'accepted' | 'declined' | 'withdrawn';
+
+export interface OfferRow {
+  id: string;
+  listing_id: string;
+  buyer_user: string;
+  wholesaler_user: string;
+  amount: number;
+  message?: string | null;
+  status: OfferStatus;
+  counter_amount?: number | null;
+  created_at: string;
+  listing?: {
+    deal_id?: string;
+    total_marketplace_cost?: number;
+    deals?: { documents?: { property_address?: string } | null; contract_price?: number | null } | null;
+  } | null;
+}
+
+const OFFER_SELECT =
+  'id, listing_id, buyer_user, wholesaler_user, amount, message, status, counter_amount, created_at, marketplace_listings:listing_id ( deal_id, total_marketplace_cost, deals:deal_id ( documents, contract_price ) )';
+
+export async function createOffer(
+  buyerId: string,
+  listing: FeedListing,
+  amount: number,
+  message: string
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase.from('offers').insert({
+    listing_id: listing.id,
+    buyer_user: buyerId,
+    wholesaler_user: listing.owner_id,
+    amount,
+    message: message || null,
+    status: 'sent',
+  });
+  if (error) throw error;
+}
+
+export async function loadBuyerOffers(buyerId: string): Promise<OfferRow[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('buyer_user', buyerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as OfferRow[];
+}
+
+export async function loadIncomingOffers(wholesalerId: string): Promise<OfferRow[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('wholesaler_user', wholesalerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as OfferRow[];
+}
+
+export async function setOfferStatus(
+  offerId: string,
+  status: OfferStatus,
+  counterAmount?: number | null
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const patch: Record<string, unknown> = { status };
+  if (counterAmount !== undefined) patch.counter_amount = counterAmount;
+  const { error } = await supabase.from('offers').update(patch).eq('id', offerId);
+  if (error) throw error;
+}
+
+// Accepting an offer also writes the outcome into the underlying deal's
+// documents (B–C status + accepted amount), so the Contracts section shows
+// it. The wholesaler owns that deal, so RLS allows the update.
+export async function acceptOffer(offer: OfferRow): Promise<void> {
+  await setOfferStatus(offer.id, 'accepted');
+  if (!supabaseConfigured || !supabase) return;
+  const dealId = offer.listing?.deal_id;
+  if (!dealId) return;
+  const { data } = await supabase.from('deals').select('documents').eq('id', dealId).single();
+  const docs = (data?.documents || {}) as Record<string, unknown>;
+  const { error } = await supabase
+    .from('deals')
+    .update({
+      documents: {
+        ...docs,
+        bc_status: 'offer_accepted',
+        accepted_offer_amount: offer.amount,
+        accepted_offer_id: offer.id,
+        buyer_user: offer.buyer_user,
+      },
+    })
+    .eq('id', dealId);
+  if (error) throw error;
+}
+
+// All buy boxes are readable by signed-in users (schema v3 policy) — the
+// wholesaler demand view aggregates criteria only; buyer identities are
+// never displayed.
+export async function loadAllBuyBoxes(): Promise<BuyBox[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('buy_boxes')
+    .select('*')
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data || []) as BuyBox[];
+}
