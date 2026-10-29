@@ -34,7 +34,7 @@ export default function Titles({ userId }: { userId: string | null }) {
       <h2>Title Companies — Verified Seeds + Your Additions</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Source: {rows ? 'Supabase title_companies (seed rows + your own)' : 'Built-in seeds — sign in with Supabase configured to read them from the database.'}</p>
       <ul>
-        {shown.map((t) => <li key={t.name}><strong>{t.name}</strong> {t.states.length ? `— ${t.states.join(', ')}` : ''} {t.website ? <a href={t.website} target="_blank" rel="noreferrer">{t.website}</a> : ''} — {t.notes}</li>)}
+        {shown.map((t) => <li key={t.name}><strong>{t.name}</strong> {t.states.length ? `— ${t.states.join(', ')}` : ''} {t.website ? <a href={t.website} target="_blank" rel="noreferrer">{t.website}</a> : ''} — {t.notes}{(t as { id?: string }).id ? <><br /><span style={{ fontSize: 12, color: '#94a3b8' }}>Portal link ID: {(t as { id?: string }).id} — the title company uses this to link its portal account.</span></> : ''}</li>)}
         {added.map((t) => <li key={t.name}><strong>{t.name}</strong> — {t.states} — <em>unverified user addition</em></li>)}
       </ul>
       <input placeholder="Add a title company you verified yourself" value={name} onChange={(e) => setName(e.target.value)} style={{ marginRight: 8 }} />

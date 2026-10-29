@@ -439,3 +439,38 @@ export async function loadFileMilestones(fileId: string): Promise<MilestoneRow[]
   if (error) throw error;
   return (data || []) as MilestoneRow[];
 }
+
+// ---- Slice 15: listing activation (found missing by the Oct 29 E2E test) ----
+// Escrow creates listings as visibility 'public' + status 'draft', and
+// nothing could activate them — so the buyer feed and public page could
+// never show a listing. The wholesaler activates/pauses their own
+// listings here (owners-manage RLS covers the update).
+
+export interface MyListing {
+  id: string;
+  deal_id: string;
+  listing_status: string;
+  visibility: string;
+  total_marketplace_cost: number;
+  deals?: { documents?: { property_address?: string } | null } | null;
+}
+
+export async function loadMyListings(userId: string): Promise<MyListing[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('marketplace_listings')
+    .select('id, deal_id, listing_status, visibility, total_marketplace_cost, deals:deal_id ( documents )')
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as MyListing[];
+}
+
+export async function setListingStatus(listingId: string, status: 'active' | 'draft'): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('marketplace_listings')
+    .update({ listing_status: status })
+    .eq('id', listingId);
+  if (error) throw error;
+}

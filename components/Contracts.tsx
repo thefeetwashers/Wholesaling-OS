@@ -85,7 +85,7 @@ export default function Contracts({ userId }: { userId: string | null }) {
       {view === 'buyer' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{buyerView(c)}</pre>}
       {view === 'title' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{titlePackage(c)}</pre>}
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Deals synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to save deals.'}{savedMsg ? ` ${savedMsg}` : ''}</p>
-      {deals.length > 0 && <ul>{deals.map((d) => <li key={d.id || ''}>{(d.documents as { property_address?: string } | undefined)?.property_address || 'Deal'} — {d.contract_type}, ${d.contract_price ?? 0}, fee ${d.assignment_fee ?? 0}, status {d.status}</li>)}</ul>}
+      {deals.length > 0 && <ul>{deals.map((d) => <li key={d.id || ''}>{(d.documents as { property_address?: string } | undefined)?.property_address || 'Deal'} — {d.contract_type}, ${d.contract_price ?? 0}, fee ${d.assignment_fee ?? 0}, status {d.status}<br /><span style={{ fontSize: 12, color: '#94a3b8' }}>Deal ID: {d.id} — share this with your seller so they can link and sign in their portal.</span></li>)}</ul>}
     </section>
   );
 }

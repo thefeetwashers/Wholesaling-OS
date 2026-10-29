@@ -20,6 +20,9 @@ import {
   setOfferStatus,
   acceptOffer,
   loadAllBuyBoxes,
+  loadMyListings,
+  setListingStatus,
+  type MyListing,
   claimDeal,
   claimTitleCompany,
   signDealDocument,
@@ -129,6 +132,7 @@ function WholesalerDashboard({ userId }: { userId: string }) {
         {dash.leadsByStatus.dead ? ` · dead: ${dash.leadsByStatus.dead}` : ''}
       </p>
       <OffersInbox userId={userId} />
+      <MyListings userId={userId} />
       <BuyerDemand />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Every number above is counted from your own leads, deals, listings, and offers in Supabase.
@@ -171,6 +175,35 @@ function OffersInbox({ userId }: { userId: string }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function MyListings({ userId }: { userId: string }) {
+  const [listings, setListings] = useState<MyListing[]>([]);
+  const [msg, setMsg] = useState('');
+  const refresh = () => { loadMyListings(userId).then(setListings).catch(() => {}); };
+  useEffect(refresh, [userId]);
+  if (listings.length === 0) return null;
+  return (
+    <div>
+      <h4>My listings</h4>
+      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
+      <ul style={{ fontSize: 13 }}>
+        {listings.map((l) => (
+          <li key={l.id} style={{ marginBottom: 6 }}>
+            <strong>{l.deals?.documents?.property_address || 'Property'}</strong> — total {money(Number(l.total_marketplace_cost))} · {l.visibility} · status: {l.listing_status}
+            {l.listing_status !== 'active' ? (
+              <> <button onClick={async () => { await setListingStatus(l.id, 'active'); setMsg('Listing activated — it now appears in the buyer feed and on the public deals page.'); refresh(); }}>Activate listing</button></>
+            ) : (
+              <> <button onClick={async () => { await setListingStatus(l.id, 'draft'); setMsg('Listing paused back to draft — hidden from the feed and public page.'); refresh(); }}>Pause listing</button></>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>
+        Escrow creates listings as drafts. Nothing is public until you activate it here.
+      </p>
     </div>
   );
 }
