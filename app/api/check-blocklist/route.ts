@@ -6,9 +6,9 @@ import { createClient } from '@supabase/supabase-js';
 // phone, never raw PII in this payload beyond the hash itself. The server
 // checks privacy_blocklist (which has NO user policies on purpose) and
 // returns only blocked: true/false. No raw entries are ever returned.
-// This route exists so outreach can be blocked; the outreach composer
-// wiring that calls it before sending is still a future UI step — do not
-// claim the app already blocks outreach until that call is wired in.
+// The outreach composer (Slice 12) calls this before preparing any
+// outreach and fails closed: a blocked result hard-stops, and an
+// unconfigured/failed check pauses the composer instead of skipping it.
 export async function POST(req: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
