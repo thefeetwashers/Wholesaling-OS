@@ -19,19 +19,22 @@ import SubscribeButton from '../components/SubscribeButton';
 import PortalHome, { PublicDealsSection } from '../components/PortalHome';
 import Outreach from '../components/Outreach';
 import StaleDollars from '../components/StaleDollars';
+import MoneyScoreboard from '../components/MoneyScoreboard';
+import AdminConsole from '../components/AdminConsole';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 
 const STAGES = ['Find', 'Qualify', 'Contract', 'Market', 'Show', 'Close', 'Track'];
 
 export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 13</h1>
+      <h1>WholesalingOS — Production Build, Slice 14</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
         → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
@@ -50,10 +53,11 @@ export default function Home() {
       </section>
 
       <div style={{ marginTop: 16 }}>
-        <AuthPanel onUser={(id) => setUserId(id)} />
+        <AuthPanel onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
       <PortalHome userId={userId} />
+      <AdminConsole userId={userId} userEmail={userEmail} />
 
       <PublicDealsSection />
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>
@@ -81,6 +85,7 @@ export default function Home() {
       <Counties userId={userId} />
       <Outreach userId={userId} />
       <StaleDollars userId={userId} />
+      <MoneyScoreboard userId={userId} />
       <WatchlistProbate />
       <BusinessPL />
 
