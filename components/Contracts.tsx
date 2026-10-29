@@ -6,7 +6,7 @@ import { dealFromContract, loadDeals, saveDeal, type DealRow } from '../lib/deal
 import { sellerView, buyerView, titlePackage, canSignBC, type DealContract, type SigStatus } from '../lib/contracts';
 
 const EMPTY: DealContract = {
-  property_address: '', seller_name: '', buyer_name: '',
+  property_address: '', city: '', state: '', seller_name: '', buyer_name: '',
   contract_price: 150000, arv: 300000, repairs: 50000,
   assignment_fee: 10000, emd_amount: 1000,
   ab_status: 'Draft', jv_status: 'Not a JV deal', bc_status: 'Draft',
@@ -62,6 +62,8 @@ export default function Contracts({ userId }: { userId: string | null }) {
       <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
         <input placeholder="Property address" value={c.property_address} onChange={(e) => setC({ ...c, property_address: e.target.value })} />
         <input placeholder="Seller name" value={c.seller_name} onChange={(e) => setC({ ...c, seller_name: e.target.value })} />
+        <input placeholder="City" value={c.city || ''} onChange={(e) => setC({ ...c, city: e.target.value })} />
+        <input placeholder="State" value={c.state || ''} onChange={(e) => setC({ ...c, state: e.target.value })} />
         <input placeholder="Buyer name" value={c.buyer_name} onChange={(e) => setC({ ...c, buyer_name: e.target.value })} />
         <label>Contract price $ <input type="number" value={c.contract_price} onChange={(e) => setC({ ...c, contract_price: Number(e.target.value) })} /></label>
         <label>ARV $ <input type="number" value={c.arv} onChange={(e) => setC({ ...c, arv: Number(e.target.value) })} /></label>

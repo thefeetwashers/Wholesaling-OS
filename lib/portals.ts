@@ -76,7 +76,7 @@ export interface FeedDeal {
   contract_price?: number | null;
   assignment_fee?: number | null;
   status?: string;
-  documents?: { property_address?: string } | null;
+  documents?: { property_address?: string; city?: string; state?: string } | null;
 }
 
 export interface FeedListing {
@@ -116,8 +116,9 @@ export function listingMatchesBox(listing: FeedListing, box: BuyBox): boolean {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   if (places.length) {
-    const addr = (listing.deals?.documents?.property_address || '').toLowerCase();
-    if (!places.some((p) => addr.includes(p))) return false;
+    const docs = listing.deals?.documents;
+    const hay = [docs?.property_address || '', docs?.city || '', docs?.state || ''].join(' ').toLowerCase();
+    if (!places.some((p) => hay.includes(p))) return false;
   }
   return true;
 }
@@ -259,7 +260,41 @@ export interface OfferRow {
 }
 
 const OFFER_SELECT =
-  'id, listing_id, buyer_user, wholesaler_user, amount, message, status, counter_amount, created_at, marketplace_listings:listing_id ( deal_id, total_marketplace_cost, deals:deal_id ( documents, contract_price ) )';
+  'id, listing_id, buyer_user, wholesaler_user, amount, message, status, counter_amount, created_at';
+
+// The nested PostgREST embed (offers -> listings -> deals) silently
+// returned no listing in production (E2E, Oct 29), which broke both the
+// address display and acceptOffer's deal write. Offers are therefore
+// stitched from flat queries, which RLS handles predictably.
+async function stitchOfferAddresses(rows: OfferRow[]): Promise<OfferRow[]> {
+  if (!supabase || rows.length === 0) return rows;
+  const listingIds = Array.from(new Set(rows.map((r) => r.listing_id)));
+  const { data: listings } = await supabase
+    .from('marketplace_listings')
+    .select('id, deal_id, total_marketplace_cost')
+    .in('id', listingIds);
+  const dealIds = Array.from(
+    new Set(((listings || []) as { deal_id?: string }[]).map((l) => l.deal_id).filter(Boolean) as string[])
+  );
+  const { data: deals } = dealIds.length
+    ? await supabase.from('deals').select('id, documents, contract_price').in('id', dealIds)
+    : { data: [] as { id: string; documents?: unknown; contract_price?: number | null }[] };
+  const dealById = new Map(((deals || []) as { id: string; documents?: unknown; contract_price?: number | null }[]).map((d) => [d.id, d]));
+  const listingById = new Map(((listings || []) as { id: string; deal_id?: string; total_marketplace_cost?: number }[]).map((l) => [l.id, l]));
+  for (const r of rows) {
+    const l = listingById.get(r.listing_id);
+    if (!l) continue;
+    const d = l.deal_id ? dealById.get(l.deal_id) : undefined;
+    r.listing = {
+      deal_id: l.deal_id,
+      total_marketplace_cost: l.total_marketplace_cost,
+      deals: d
+        ? { documents: d.documents as { property_address?: string } | null, contract_price: d.contract_price }
+        : null,
+    };
+  }
+  return rows;
+}
 
 export async function createOffer(
   buyerId: string,
@@ -287,7 +322,7 @@ export async function loadBuyerOffers(buyerId: string): Promise<OfferRow[]> {
     .eq('buyer_user', buyerId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []) as unknown as OfferRow[];
+  return stitchOfferAddresses((data || []) as unknown as OfferRow[]);
 }
 
 export async function loadIncomingOffers(wholesalerId: string): Promise<OfferRow[]> {
@@ -298,7 +333,7 @@ export async function loadIncomingOffers(wholesalerId: string): Promise<OfferRow
     .eq('wholesaler_user', wholesalerId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []) as unknown as OfferRow[];
+  return stitchOfferAddresses((data || []) as unknown as OfferRow[]);
 }
 
 export async function setOfferStatus(
@@ -317,13 +352,28 @@ export async function setOfferStatus(
 // documents (B–C status + accepted amount), so the Contracts section shows
 // it. The wholesaler owns that deal, so RLS allows the update.
 export async function acceptOffer(offer: OfferRow): Promise<void> {
-  await setOfferStatus(offer.id, 'accepted');
   if (!supabaseConfigured || !supabase) return;
-  const dealId = offer.listing?.deal_id;
-  if (!dealId) return;
-  const { data } = await supabase.from('deals').select('documents').eq('id', dealId).single();
-  const docs = (data?.documents || {}) as Record<string, unknown>;
-  const { error } = await supabase
+  // Slice 17: resolve the deal with flat queries and THROW on any
+  // failure. The Slice 10 version read deal_id from a nested embed
+  // that silently returned nothing, so the deal write was skipped
+  // while the UI reported success (E2E, Oct 29 — offer showed
+  // 'accepted' but the deal was never stamped). The deal is stamped
+  // first; the offer status flips last, so a failure stays retryable.
+  const { data: listing, error: lErr } = await supabase
+    .from('marketplace_listings')
+    .select('deal_id')
+    .eq('id', offer.listing_id)
+    .single();
+  if (lErr || !listing?.deal_id) throw new Error('Accept failed: could not resolve the deal for this offer. The offer was not accepted.');
+  const dealId = listing.deal_id as string;
+  const { data: deal, error: dErr } = await supabase
+    .from('deals')
+    .select('documents')
+    .eq('id', dealId)
+    .single();
+  if (dErr || !deal) throw new Error('Accept failed: could not load the deal for this offer. The offer was not accepted.');
+  const docs = (deal.documents || {}) as Record<string, unknown>;
+  const { error: uErr } = await supabase
     .from('deals')
     .update({
       documents: {
@@ -335,7 +385,8 @@ export async function acceptOffer(offer: OfferRow): Promise<void> {
       },
     })
     .eq('id', dealId);
-  if (error) throw error;
+  if (uErr) throw uErr;
+  await setOfferStatus(offer.id, 'accepted');
 }
 
 // All buy boxes are readable by signed-in users (schema v3 policy) — the

@@ -165,7 +165,7 @@ function OffersInbox({ userId }: { userId: string }) {
               {o.status === 'sent' && (
                 <>
                   <br />
-                  <button onClick={async () => { await acceptOffer(o); setMsg('Offer accepted — the deal\u2019s B\u2013C status in Contracts now shows the accepted amount.'); refresh(); }}>Accept</button>{' '}
+                  <button onClick={async () => { try { await acceptOffer(o); setMsg('Offer accepted \u2014 the deal\u2019s B\u2013C status in Contracts now shows the accepted amount.'); } catch (e) { setMsg(e instanceof Error ? e.message : 'Accept failed \u2014 the offer was not accepted.'); } refresh(); }}>Accept</button>{' '}
                   <input placeholder="Counter $" style={{ width: 90 }} value={counter[o.id] || ''} onChange={(e) => setCounter({ ...counter, [o.id]: e.target.value })} />{' '}
                   <button onClick={async () => { const v = Number(counter[o.id]); if (v > 0) { await setOfferStatus(o.id, 'countered', v); setMsg('Counter sent.'); refresh(); } }}>Counter</button>{' '}
                   <button onClick={async () => { await setOfferStatus(o.id, 'declined'); setMsg('Offer declined.'); refresh(); }}>Decline</button>

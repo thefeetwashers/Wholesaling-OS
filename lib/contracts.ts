@@ -10,6 +10,8 @@ export type SigStatus = 'Draft' | 'Sent' | 'Signed';
 
 export interface DealContract {
   property_address: string;
+  city?: string;
+  state?: string;
   seller_name: string;
   buyer_name: string;
   contract_price: number;

@@ -32,6 +32,8 @@ export function dealFromContract(userId: string, c: DealContract): DealRow {
     status: c.ab_status === 'Signed' ? 'signed' : 'draft',
     documents: {
       property_address: c.property_address,
+      city: c.city ?? null,
+      state: c.state ?? null,
       seller_name: c.seller_name,
       buyer_name: c.buyer_name,
       ab_status: c.ab_status,
