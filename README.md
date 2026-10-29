@@ -150,3 +150,10 @@ can be built in slices without starting from a blank folder.
 - AuthPanel: signInWithOAuth now passes redirectTo: window.location.origin, so a deployed app redirects to its own URL instead of Supabase's fallback localhost:3000 Site URL.
 - AuthPanel: OAuth callback errors in the URL (?error= / ?error_description=) are now shown in the panel, instead of a blank sign-in screen.
 - This does NOT fix a mismatched Client ID/Secret in Supabase's Google provider — the Oct 27, 2026 test failed at "Unable to exchange external code" after Google accepted, which still needs the owner to re-check/re-paste the provider credentials in Supabase.
+
+
+## Slice 9 — Full Portals foundation (Oct 29, 2026)
+- Owner decision Oct 29, 2026: FULL PORTALS (supersedes the Oct 19 seller/title no-portal verdicts). Every party registers with a role: wholesaler / buyer / seller / title (profiles.role, schema v3 + v3.1 read policies, run in Supabase Oct 29, 2026).
+- Registration: AuthPanel role picker ("I am a…") stashed at Create account and applied to the user's own profile on first sign-in; Google sign-ups default to wholesaler; any signed-in user can switch role in Your Portal (roles are self-selected at launch, honestly labeled).
+- Your Portal (role-routed home): Wholesaler Dashboard strip (real counts: leads by stage, follow-ups due, deals, assignment fees in pipeline, active listings, new offers — all from the user's own rows); Buyer Portal (buy-box builder saved to buy_boxes, deal feed of active public listings with a price + address-text match badge); Seller Portal (deals linked via deals.seller_user); Title Portal (companies linked via title_companies.portal_user + their escrow files).
+- Offers table exists (schema v3); the make-an-offer UI and wholesaler offers inbox actions are Slice 10. In-portal signing is Slice 11.

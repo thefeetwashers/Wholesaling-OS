@@ -12,6 +12,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [role, setRole] = useState('wholesaler');
   const [message, setMessage] = useState('');
   // OAuth errors come back in the URL, not through supabase.auth — surface them.
   useEffect(() => {
@@ -27,6 +28,17 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
   const ensureProfile = async (id: string, email: string | null) => {
     if (!supabase || !email) return;
     await supabase.from('profiles').upsert({ id, email }, { onConflict: 'id', ignoreDuplicates: true });
+    // Slice 9: a role picked at Create-account time is stashed locally and
+    // applied to the user's own profile row on first sign-in (RLS allows
+    // updating your own profile). Google sign-ups default to wholesaler and
+    // can switch role in Your Portal.
+    try {
+      const pending = localStorage.getItem('ws_pending_role');
+      if (pending && ['wholesaler', 'buyer', 'seller', 'title'].includes(pending)) {
+        await supabase.from('profiles').update({ role: pending }).eq('id', id);
+        localStorage.removeItem('ws_pending_role');
+      }
+    } catch { /* role stays at the default; switchable in Your Portal */ }
   };
 
   useEffect(() => {
@@ -75,11 +87,21 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
       <h2>Sign in</h2>
       <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginRight: 8 }} />
       <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginRight: 8 }} />
+      <label style={{ fontSize: 13, marginRight: 8 }}>
+        I am a:{' '}
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="wholesaler">Wholesaler</option>
+          <option value="buyer">Cash Buyer</option>
+          <option value="seller">Seller</option>
+          <option value="title">Title Company</option>
+        </select>
+      </label>
       <button onClick={async () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         setMessage(error ? error.message : '');
       }}>Sign in</button>{' '}
       <button onClick={async () => {
+        try { localStorage.setItem('ws_pending_role', role); } catch { /* ignore */ }
         const { error } = await supabase.auth.signUp({ email, password });
         setMessage(error ? error.message : 'Check your email to confirm, if confirmation is enabled.');
       }}>Create account</button>{' '}
