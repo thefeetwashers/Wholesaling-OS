@@ -29,7 +29,7 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 10</h1>
+      <h1>WholesalingOS — Production Build, Slice 11</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
         → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,

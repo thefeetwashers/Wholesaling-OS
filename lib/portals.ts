@@ -175,12 +175,30 @@ export async function loadDashboard(userId: string): Promise<DashboardData | nul
   };
 }
 
+export interface SignatureEntry {
+  party: string;
+  name: string;
+  document: string;
+  signed_at: string;
+}
+
+export interface DealDocuments {
+  property_address?: string;
+  ab_status?: string;
+  bc_status?: string;
+  jv_status?: string;
+  buyer_user?: string;
+  accepted_offer_amount?: number;
+  signatures?: SignatureEntry[];
+  [key: string]: unknown;
+}
+
 export interface LinkedDeal {
   id: string;
   contract_price?: number | null;
   assignment_fee?: number | null;
   status: string;
-  documents?: { property_address?: string } | null;
+  documents?: DealDocuments | null;
 }
 
 export async function loadSellerDeals(userId: string): Promise<LinkedDeal[]> {
@@ -196,7 +214,7 @@ export async function loadSellerDeals(userId: string): Promise<LinkedDeal[]> {
 
 export interface TitleLink {
   companies: { id: string; name: string }[];
-  files: { id: string; file_status: string; emd_status: string; created_at: string }[];
+  files: { id: string; file_status: string; emd_status: string; created_at: string; target_closing_date?: string | null; emd_amount_required?: number | null }[];
 }
 
 export async function loadTitleLink(userId: string): Promise<TitleLink> {
@@ -210,7 +228,7 @@ export async function loadTitleLink(userId: string): Promise<TitleLink> {
   if (!list.length) return { companies: [], files: [] };
   const { data: files } = await supabase
     .from('escrow_files')
-    .select('id, file_status, emd_status, created_at')
+    .select('id, file_status, emd_status, created_at, target_closing_date, emd_amount_required')
     .in(
       'title_company_id',
       list.map((c) => c.id)
@@ -333,4 +351,91 @@ export async function loadAllBuyBoxes(): Promise<BuyBox[]> {
     .limit(200);
   if (error) throw error;
   return (data || []) as BuyBox[];
+}
+
+// ---- Slice 11: claiming + in-portal signing ----
+
+// Claim-by-ID: the wholesaler reads the deal/company ID from their own
+// lists and gives it to the other party, who claims it here. RLS (v3.3)
+// only allows claiming rows that are still unlinked.
+export async function claimDeal(dealId: string, userId: string): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { data, error } = await supabase
+    .from('deals')
+    .update({ seller_user: userId })
+    .eq('id', dealId.trim())
+    .is('seller_user', null)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No unlinked deal found with that ID. Check the ID with your wholesaler.');
+  }
+}
+
+export async function claimTitleCompany(companyId: string, userId: string): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { data, error } = await supabase
+    .from('title_companies')
+    .update({ portal_user: userId })
+    .eq('id', companyId.trim())
+    .is('portal_user', null)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No unlinked title company found with that ID.');
+  }
+}
+
+// Typed-name signature with a timestamp audit trail in documents.signatures.
+// The contract status vocabulary ('Signed') matches lib/contracts.ts.
+export async function signDealDocument(
+  dealId: string,
+  currentDocs: DealDocuments | null | undefined,
+  which: 'ab' | 'bc',
+  signerName: string,
+  party: string
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const docs: DealDocuments = { ...(currentDocs || {}) };
+  const entry: SignatureEntry = {
+    party,
+    name: signerName,
+    document: which === 'ab' ? 'A-B purchase agreement' : 'B-C assignment',
+    signed_at: new Date().toISOString(),
+  };
+  docs.signatures = [...(docs.signatures || []), entry];
+  if (which === 'ab') docs.ab_status = 'Signed';
+  else docs.bc_status = 'Signed';
+  const { error } = await supabase.from('deals').update({ documents: docs }).eq('id', dealId);
+  if (error) throw error;
+}
+
+// Deals where this buyer had an offer accepted (Slice 10 accept flow stamps
+// documents.buyer_user). The B-C assignment can only be signed after the
+// seller's A-B is 'Signed' — the gate lib/contracts.ts enforces wholesaler-side.
+export async function loadBuyerDeals(userId: string): Promise<LinkedDeal[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('deals')
+    .select('id, contract_price, assignment_fee, status, documents')
+    .filter('documents->>buyer_user', 'eq', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as LinkedDeal[];
+}
+
+export interface MilestoneRow {
+  milestone_name: string;
+  logged_at: string;
+}
+
+export async function loadFileMilestones(fileId: string): Promise<MilestoneRow[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('escrow_milestones')
+    .select('milestone_name, logged_at')
+    .eq('file_id', fileId)
+    .order('logged_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as MilestoneRow[];
 }

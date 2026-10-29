@@ -20,6 +20,11 @@ import {
   setOfferStatus,
   acceptOffer,
   loadAllBuyBoxes,
+  claimDeal,
+  claimTitleCompany,
+  signDealDocument,
+  loadBuyerDeals,
+  loadFileMilestones,
   type PortalRole,
   type BuyBox,
   type FeedListing,
@@ -204,6 +209,51 @@ function BuyerDemand() {
   );
 }
 
+function BuyerSignatures({ userId }: { userId: string }) {
+  const [deals, setDeals] = useState<LinkedDeal[]>([]);
+  const [signName, setSignName] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState('');
+  const refresh = () => { loadBuyerDeals(userId).then(setDeals).catch(() => {}); };
+  useEffect(refresh, [userId]);
+  if (deals.length === 0) return null;
+  return (
+    <div>
+      <h4>Assignments awaiting your signature</h4>
+      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
+      <ul style={{ fontSize: 13 }}>
+        {deals.map((d) => {
+          const docs = d.documents || {};
+          const abSigned = docs.ab_status === 'Signed';
+          const bcSigned = docs.bc_status === 'Signed';
+          return (
+            <li key={d.id} style={{ marginBottom: 8 }}>
+              <strong>{docs.property_address || 'Property'}</strong> — price {d.contract_price != null ? money(Number(d.contract_price)) : '—'}
+              {d.assignment_fee != null ? ` · assignment fee ${money(Number(d.assignment_fee))}` : ''}
+              <br />A–B agreement: {abSigned ? 'Signed' : 'not signed yet'} · B–C assignment: {bcSigned ? 'Signed' : (docs.bc_status || 'pending')}
+              {!abSigned && <><br />Waiting on the seller's A–B signature first — the B–C assignment cannot be signed before it.</>}
+              {abSigned && !bcSigned && (
+                <>
+                  <br />
+                  <input placeholder="Type your full name to sign" value={signName[d.id] || ''} onChange={(e) => setSignName({ ...signName, [d.id]: e.target.value })} />{' '}
+                  <button onClick={async () => {
+                    const name = (signName[d.id] || '').trim();
+                    if (name.length < 3) { setMsg('Type your full name to sign.'); return; }
+                    try { await signDealDocument(d.id, docs, 'bc', name, 'buyer'); setMsg('B–C assignment signed — timestamp recorded in the deal audit trail.'); refresh(); }
+                    catch (e) { setMsg(e instanceof Error ? e.message : 'Signing failed'); }
+                  }}>Sign B–C assignment</button>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>
+        Signatures are typed-name with a recorded timestamp. Contract wording is pending attorney review — not for live transactions yet.
+      </p>
+    </div>
+  );
+}
+
 function BuyerPortal({ userId }: { userId: string }) {
   const [boxes, setBoxes] = useState<BuyBox[]>([]);
   const [feed, setFeed] = useState<FeedListing[]>([]);
@@ -302,6 +352,7 @@ function BuyerPortal({ userId }: { userId: string }) {
           ))}
         </ul>
       )}
+      <BuyerSignatures userId={userId} />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Match = your price range plus a plain text match of your cities/states against the property address.
       </p>
@@ -311,43 +362,87 @@ function BuyerPortal({ userId }: { userId: string }) {
 
 function SellerPortal({ userId }: { userId: string }) {
   const [deals, setDeals] = useState<LinkedDeal[] | null>(null);
-  useEffect(() => { loadSellerDeals(userId).then(setDeals).catch(() => setDeals([])); }, [userId]);
+  const [claimId, setClaimId] = useState('');
+  const [signName, setSignName] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState('');
+  const refresh = () => { loadSellerDeals(userId).then(setDeals).catch(() => setDeals([])); };
+  useEffect(refresh, [userId]);
   return (
     <div>
       <h3>Seller Portal</h3>
+      <p style={{ fontSize: 13 }}>
+        Link a contract your wholesaler sent you: paste the deal ID they gave you.{' '}
+        <input placeholder="Deal ID" value={claimId} onChange={(e) => setClaimId(e.target.value)} style={{ width: 280 }} />{' '}
+        <button onClick={async () => {
+          try { await claimDeal(claimId, userId); setMsg('Deal linked to your account.'); setClaimId(''); refresh(); }
+          catch (e) { setMsg(e instanceof Error ? e.message : 'Could not link that deal.'); }
+        }}>Link deal</button>
+      </p>
+      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
       {deals === null ? (
         <p style={{ fontSize: 13 }}>Loading your deals…</p>
       ) : deals.length === 0 ? (
-        <p style={{ fontSize: 13 }}>
-          No deals are linked to your account yet. When a wholesaler links a contract to your account,
-          it appears here for review. In-portal signing arrives in Slice 11.
-        </p>
+        <p style={{ fontSize: 13 }}>No deals are linked to your account yet. Link one above with its deal ID.</p>
       ) : (
         <ul style={{ fontSize: 13 }}>
-          {deals.map((d) => (
-            <li key={d.id}>
-              <strong>{d.documents?.property_address || 'Property'}</strong> — price {d.contract_price != null ? money(Number(d.contract_price)) : '—'} · status {d.status}
-            </li>
-          ))}
+          {deals.map((d) => {
+            const docs = d.documents || {};
+            const signed = docs.ab_status === 'Signed';
+            return (
+              <li key={d.id} style={{ marginBottom: 10 }}>
+                <strong>{docs.property_address || 'Property'}</strong> — purchase price {d.contract_price != null ? money(Number(d.contract_price)) : '—'}
+                <br />A–B purchase agreement: {signed ? 'Signed' : 'awaiting your signature'}
+                {!signed && (
+                  <>
+                    <br />
+                    <input placeholder="Type your full name to sign" value={signName[d.id] || ''} onChange={(e) => setSignName({ ...signName, [d.id]: e.target.value })} />{' '}
+                    <button onClick={async () => {
+                      const name = (signName[d.id] || '').trim();
+                      if (name.length < 3) { setMsg('Type your full name to sign.'); return; }
+                      try { await signDealDocument(d.id, docs, 'ab', name, 'seller'); setMsg('A–B agreement signed — timestamp recorded in the deal audit trail.'); refresh(); }
+                      catch (e) { setMsg(e instanceof Error ? e.message : 'Signing failed'); }
+                    }}>Sign A–B agreement</button>
+                  </>
+                )}
+                {docs.signatures && docs.signatures.length > 0 && (
+                  <><br />Signatures on file: {docs.signatures.map((s) => `${s.party} (${s.name}) — ${s.document}, ${new Date(s.signed_at).toLocaleString()}`).join(' · ')}</>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>
+        You see your purchase price only — the wholesaler's assignment fee is not part of your agreement.
+        Signatures are typed-name with a recorded timestamp. Contract wording is pending attorney review — not for live transactions yet.
+      </p>
     </div>
   );
 }
 
 function TitlePortal({ userId }: { userId: string }) {
   const [link, setLink] = useState<TitleLink | null>(null);
-  useEffect(() => { loadTitleLink(userId).then(setLink).catch(() => setLink({ companies: [], files: [] })); }, [userId]);
+  const [claimId, setClaimId] = useState('');
+  const [msg, setMsg] = useState('');
+  const [milestones, setMilestones] = useState<Record<string, { milestone_name: string; logged_at: string }[]>>({});
+  const refresh = () => { loadTitleLink(userId).then(setLink).catch(() => setLink({ companies: [], files: [] })); };
+  useEffect(refresh, [userId]);
   return (
     <div>
       <h3>Title Company Portal</h3>
+      <p style={{ fontSize: 13 }}>
+        Link your company listing: paste the company ID from the Titles directory.{' '}
+        <input placeholder="Title company ID" value={claimId} onChange={(e) => setClaimId(e.target.value)} style={{ width: 280 }} />{' '}
+        <button onClick={async () => {
+          try { await claimTitleCompany(claimId, userId); setMsg('Company linked to your account.'); setClaimId(''); refresh(); }
+          catch (e) { setMsg(e instanceof Error ? e.message : 'Could not link that company.'); }
+        }}>Link company</button>
+      </p>
+      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
       {link === null ? (
         <p style={{ fontSize: 13 }}>Loading your files…</p>
       ) : link.companies.length === 0 ? (
-        <p style={{ fontSize: 13 }}>
-          Your account is not linked to a title company listing yet. Once a wholesaler links your
-          company, its escrow files appear here.
-        </p>
+        <p style={{ fontSize: 13 }}>Your account is not linked to a title company listing yet. Link one above with its company ID.</p>
       ) : (
         <div style={{ fontSize: 13 }}>
           <p>Linked company: {link.companies.map((c) => c.name).join(', ')}</p>
@@ -356,7 +451,21 @@ function TitlePortal({ userId }: { userId: string }) {
           ) : (
             <ul>
               {link.files.map((f) => (
-                <li key={f.id}>File {f.id.slice(0, 8)} — {f.file_status} · EMD {f.emd_status}</li>
+                <li key={f.id} style={{ marginBottom: 8 }}>
+                  File {f.id.slice(0, 8)} — {f.file_status} · EMD {f.emd_status}
+                  {f.emd_amount_required != null ? ` · EMD required ${money(Number(f.emd_amount_required))}` : ''}
+                  {f.target_closing_date ? ` · target closing ${f.target_closing_date}` : ''}
+                  {' '}<button onClick={async () => {
+                    try { const ms = await loadFileMilestones(f.id); setMilestones({ ...milestones, [f.id]: ms }); }
+                    catch { setMsg('Could not load milestones for that file.'); }
+                  }}>View milestones</button>
+                  {milestones[f.id] && (
+                    <ul>
+                      {milestones[f.id].length === 0 ? <li>No milestones logged yet.</li> :
+                        milestones[f.id].map((m, i) => <li key={i}>{m.milestone_name} — {new Date(m.logged_at).toLocaleString()}</li>)}
+                    </ul>
+                  )}
+                </li>
               ))}
             </ul>
           )}

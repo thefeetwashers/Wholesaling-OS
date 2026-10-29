@@ -164,3 +164,10 @@ can be built in slices without starting from a blank folder.
 - Wholesaler offers inbox: Accept writes the accepted amount into the deal's documents (bc_status 'offer_accepted') so Contracts shows it; Counter (with amount) and Decline set offer status. No auto-send anywhere.
 - Public deals page on the home page: visible signed-out, mandatory assignment-of-equitable-interest disclosure, shareable /?deal=<id> links with a copy button; reads only listings marked public + active (schema v3.2 adds narrowly scoped anon SELECT policies for those listings and the deals behind them — run in Supabase Oct 29, 2026).
 - Buyer Demand in the wholesaler dashboard: aggregates of active buy boxes (most-wanted places, criteria list) — buyer identities are never displayed.
+
+
+## Slice 11 — Seller + Title portals, in-portal signing (Oct 29, 2026)
+- Claim-by-ID linking (schema v3.3): a seller claims an unlinked deal by its ID, a title user claims an unlinked company by its ID; RLS allows claiming only rows still unlinked, and updates only to rows linked to you (buyers: deals whose documents.buyer_user is you, stamped by the Slice 10 accept flow).
+- In-portal signing with a typed name + timestamp audit trail in documents.signatures: sellers sign the A-B agreement (seller view shows the purchase price ONLY, never the fee); buyers sign the B-C assignment ONLY after A-B reads 'Signed' (same gate as lib/contracts.ts). Statuses use the contracts vocabulary ('Signed').
+- Title portal: escrow files with EMD requirement + target closing date and a per-file milestone timeline (v3.3 lets title users read milestones on their own company's files).
+- Honest limits: contract wording is still pending attorney review (labeled in the signing UI — not for live transactions yet). No-login signing links are NOT built: they need the Supabase service-role key in the hosting environment (owner step, same bucket as the Stripe webhook secrets); without it there is no safe server-side token read, so nothing is faked.
