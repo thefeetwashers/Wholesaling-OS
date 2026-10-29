@@ -22,6 +22,20 @@ export default function Contracts({ userId }: { userId: string | null }) {
     if (userId && supabaseConfigured) {
       loadDeals(userId).then((rows) => { if (rows) { setDeals(rows); setMode('synced'); } }).catch(() => {});
     }
+    // Slice 13: one-click prefill from Stale Listings / Driving for Dollars.
+    try {
+      const raw = localStorage.getItem('ws_prefill_lead');
+      if (raw) {
+        const pf = JSON.parse(raw) as { property_address?: string; seller_name?: string };
+        setC((prev) => ({
+          ...prev,
+          property_address: pf.property_address || prev.property_address,
+          seller_name: pf.seller_name || prev.seller_name,
+        }));
+        localStorage.removeItem('ws_prefill_lead');
+        setSavedMsg('Contract prefilled from the lead you picked below.');
+      }
+    } catch { /* prefill is best-effort */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
