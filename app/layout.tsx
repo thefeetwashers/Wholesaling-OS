@@ -18,6 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="ws-footer">
           WholesalingOS is operated by THE FEET WASHERS, INC. Contracts in this app carry attorney-review labels.
           This app does not scrape, auto-dial, or auto-send messages.
+          <br />
+          <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a>
         </footer>
       </body>
     </html>
