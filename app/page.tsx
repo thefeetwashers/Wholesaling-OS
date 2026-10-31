@@ -14,7 +14,7 @@ import Counties from '../components/Counties';
 import WatchlistProbate from '../components/WatchlistProbate';
 import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
-import type { Lead } from '../lib/leads';
+import { loadLeads, type Lead } from '../lib/leads';
 import SubscribeButton from '../components/SubscribeButton';
 import PortalHome, { PublicDealsSection } from '../components/PortalHome';
 import Outreach from '../components/Outreach';
@@ -23,6 +23,7 @@ import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
+import Sidebar from '../components/Sidebar';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
 
@@ -32,11 +33,23 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [view, setView] = useState('dashboard');
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
   const [role, setRole] = useState<string | null>(null);
   useEffect(() => { if (userId) { loadMyProfile(userId).then((p) => setRole(p?.role ?? null)).catch(() => {}); } }, [userId]);
+  // Slice 25: the Today view reads the page-level lead list. The Leads
+  // component also reports its list up (onLeads) when it mounts; this
+  // direct load keeps Today correct even before the Leads view opens.
+  useEffect(() => {
+    if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
+  }, [userId]);
 
+  // Slice 18 access lock. Suspension locks every role; a lapsed trial or
+  // subscription locks wholesalers only (buyers, sellers, and title
+  // companies never pay, so their portals never lock for billing). The
+  // owner account is exempt, and nothing locks while the profile is
+  // still loading. A locked user's data stays saved and RLS-protected.
   const OWNER_EMAIL = 'thefeetwashers@gmail.com';
   const suspended = !!access?.admin_suspended;
   const locked = !!userId && userEmail !== OWNER_EMAIL && access !== null &&
@@ -44,7 +57,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 24</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 25</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -78,7 +91,6 @@ export default function Home() {
         <AuthPanel onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
-      <AdminConsole userId={userId} userEmail={userEmail} />
       {locked ? (
         <section style={{ background: '#450a0a', padding: 16, borderRadius: 12, marginTop: 16 }}>
           <h2>Your office is locked</h2>
@@ -88,44 +100,78 @@ export default function Home() {
               : 'Your free trial or subscription is not active, so your office is locked. Subscribe above to reopen it — your leads, deals, and records are saved.'}
           </p>
         </section>
-      ) : (
-      <>
-      <div id="dashboard"><PortalHome userId={userId} /></div>
-      {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
-
-      <PublicDealsSection />
-      <h2 style={{ marginTop: 24 }}>Pipeline</h2>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {STAGES.map((s) => (
-          <span key={s} style={{ background: '#1e293b', padding: '8px 12px', borderRadius: 999 }}>{s}</span>
-        ))}
-      </div>
-
-      <div id="today"><TodayCenter leads={leads} /></div>
-      <div id="money"><MoneyScoreboard userId={userId} /></div>
-      <div id="leads"><Leads userId={userId} onLeads={setLeads} /></div>
-
-      <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
-        No fake leads, buyers, or deals are seeded here. Empty states are
-        honest empty states until you enter your own data. Your buyer list
-        and leads are yours only — Row Level Security in schema.sql blocks
-        other users from reading them.
-      </p>
-
-      <div id="contracts"><Contracts userId={userId} /></div>
-      <Viewings userId={userId} />
-      <div id="escrow"><Escrow userId={userId} /></div>
-      <div id="buyers"><Buyers userId={userId} /></div>
-      <Titles userId={userId} />
-      <Counties userId={userId} />
-      <div id="outreach"><Outreach userId={userId} /></div>
-      <div id="comms"><CommsCenter userId={userId} /></div>
-      <StaleDollars userId={userId} />
-      <WatchlistProbate />
-      <BusinessPL />
-
-      <DealAnalyzer />
-      </>
+      ) : userId ? (
+        <div className="ws-shell">
+          <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} />
+          <div className="ws-view">
+            {view === 'dashboard' && (
+              <>
+                <div id="dashboard"><PortalHome userId={userId} /></div>
+                {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                <PublicDealsSection />
+                <h2 style={{ marginTop: 24 }}>Pipeline</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {STAGES.map((s) => (
+                    <span key={s} style={{ background: '#1e293b', padding: '8px 12px', borderRadius: 999 }}>{s}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {view === 'today' && (
+              <div id="today"><TodayCenter leads={leads} /></div>
+            )}
+            {view === 'leads' && (
+              <>
+                <div id="leads"><Leads userId={userId} onLeads={setLeads} /></div>
+                <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
+                  No fake leads, buyers, or deals are seeded here. Empty states are
+                  honest empty states until you enter your own data. Your buyer list
+                  and leads are yours only — Row Level Security in schema.sql blocks
+                  other users from reading them.
+                </p>
+                <StaleDollars userId={userId} />
+                <WatchlistProbate />
+                <DealAnalyzer />
+              </>
+            )}
+            {view === 'comms' && (
+              <>
+                <div id="comms"><CommsCenter userId={userId} /></div>
+                <div id="outreach"><Outreach userId={userId} /></div>
+              </>
+            )}
+            {view === 'contracts' && (
+              <>
+                <div id="contracts"><Contracts userId={userId} /></div>
+                <Viewings userId={userId} />
+                <div id="escrow"><Escrow userId={userId} /></div>
+              </>
+            )}
+            {view === 'buyers' && (
+              <div id="buyers"><Buyers userId={userId} /></div>
+            )}
+            {view === 'money' && (
+              <>
+                <div id="money"><MoneyScoreboard userId={userId} /></div>
+                <BusinessPL />
+              </>
+            )}
+            {view === 'records' && (
+              <>
+                <Titles userId={userId} />
+                <Counties userId={userId} />
+              </>
+            )}
+            {view === 'admin' && (
+              <AdminConsole userId={userId} userEmail={userEmail} />
+            )}
+          </div>
+        </div>
+      ) : null}
+      {!userId && (
+        <div style={{ marginTop: 16 }}>
+          <PublicDealsSection />
+        </div>
       )}
     </div>
   );

@@ -12,14 +12,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="ws-topbar">
           <a className="ws-brand" href="#">Wholesaling<span>OS</span></a>
-          <nav className="ws-nav">
-            <a href="#dashboard">Dashboard</a>
-            <a href="#today">Today</a>
-            <a href="#leads">Leads</a>
-            <a href="#contracts">Contracts</a>
-            <a href="#buyers">Buyers</a>
-            <a href="#money">Money</a>
-          </nav>
           <span className="ws-topbar-price">90 days free, then $150/mo — no other platform fee</span>
         </header>
         <main className="ws-main">{children}</main>
