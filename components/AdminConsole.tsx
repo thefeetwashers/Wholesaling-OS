@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadAdminAggregates, loadAdminRoster, setAdminSuspended, type AdminAggregates, type RosterRow } from '../lib/money';
+import { loadCountyDemand, type CountyDemandRow } from '../lib/directories';
 import { getProfileAccess, type ProfileAccess } from '../lib/access';
 
 // Owner admin console — visible ONLY to the owner account. Privacy rule
@@ -20,6 +21,8 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
   const [rErr, setRErr] = useState('');
   const [rMsg, setRMsg] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [demand, setDemand] = useState<CountyDemandRow[] | null>(null);
+  const [dErr, setDErr] = useState('');
 
   const refreshRoster = () => {
     loadAdminRoster().then(setRoster).catch(() => setRErr('The account roster is not available yet — schema v3.6 must be run in Supabase first.'));
@@ -30,6 +33,7 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
     loadAdminAggregates().then(setAgg).catch(() => setErr('Admin aggregates are not available yet — schema v3.4 must be run in Supabase first.'));
     getProfileAccess(userId).then(setAccess).catch(() => {});
     refreshRoster();
+    loadCountyDemand().then(setDemand).catch(() => setDErr('The county Verify Queue is not available yet — schema v4.0 must be run in Supabase first.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, userEmail]);
 
@@ -107,6 +111,29 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
         The roster shows account and billing information only. Individual users' buyer lists, leads, and deal details are never shown here —
         a buyer list is a wholesaler's moat.
       </p>
+      <h3 style={{ marginTop: 16 }}>County Verify Queue — where wholesalers are asking for coverage</h3>
+      <p style={{ fontSize: 13 }}>
+        Counties wholesalers have saved their own links for, ranked by how many distinct wholesalers saved them.
+        County names and counts only — never who saved them or what links they entered. A county with a platform
+        row is already verified; the rest are candidates for the next verification batch.
+      </p>
+      {dErr && <p style={{ fontSize: 13, color: '#fbbf24' }}>{dErr}</p>}
+      {demand === null && !dErr ? (
+        <p style={{ fontSize: 13 }}>Loading the Verify Queue…</p>
+      ) : demand && demand.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No wholesaler-saved counties yet.</p>
+      ) : demand ? (
+        <ul style={{ fontSize: 13, paddingLeft: 18 }}>
+          {demand.map((d) => (
+            <li key={`${d.state_code}-${d.county_name}`} style={{ marginBottom: 6 }}>
+              <strong>{d.county_name} County, {d.state_code}</strong> — {d.wholesalers} wholesaler{d.wholesalers === 1 ? '' : 's'} · {d.saved_rows} saved row{d.saved_rows === 1 ? '' : 's'} ·{' '}
+              {d.has_platform
+                ? <span style={{ color: '#4ade80' }}>Platform verified already</span>
+                : <span style={{ color: '#fbbf24' }}>Not platform-verified yet</span>}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

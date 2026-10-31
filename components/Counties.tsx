@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadCountyLinks, loadStateDirectories, type CountyLinkRow, type StateDirectoryRow } from '../lib/directories';
+import { loadCountyLinks, loadStateDirectories, loadUserCounties, saveUserCounty, deleteUserCounty, US_STATES, type CountyLinkRow, type StateDirectoryRow } from '../lib/directories';
 
 // County records (Slice 22). Two platform-verified layers, both read
 // from Supabase — nothing here is guessed:
@@ -16,9 +16,11 @@ import { loadCountyLinks, loadStateDirectories, type CountyLinkRow, type StateDi
 //     utility are usually city-level) are shown as not covered — never
 //     filled with a plausible guess.
 // St. Lucie keeps its original five-link seed (verified Oct 24, 2026).
-// Counties a wholesaler adds below are their own working notes for this
-// session, labeled unverified; saving your own links permanently is
-// Slice 23.
+// Slice 23: wholesalers save their OWN links for counties the platform
+// set doesn't cover (schema v4.0 — one private row per user per
+// county). Their rows are labeled "your links — unverified" and are
+// visible only to them. Counties many wholesalers save surface in the
+// owner's Verify Queue for a future platform verification batch.
 
 interface LinkLine { label: string; url?: string | null; note: string }
 
@@ -37,17 +39,82 @@ export default function Counties({ userId }: { userId: string | null }) {
   const [counties, setCounties] = useState<CountyLinkRow[]>([]);
   const [stateCode, setStateCode] = useState('FL');
   const [countyName, setCountyName] = useState('St. Lucie');
-  const [added, setAdded] = useState<string[]>([]);
-  const [county, setCounty] = useState('');
   const [loadErr, setLoadErr] = useState('');
+  const [mine, setMine] = useState<CountyLinkRow[]>([]);
+  const [fState, setFState] = useState('FL');
+  const [fCounty, setFCounty] = useState('');
+  const [fClerk, setFClerk] = useState('');
+  const [fAppraiser, setFAppraiser] = useState('');
+  const [fSheriff, setFSheriff] = useState('');
+  const [fCode, setFCode] = useState('');
+  const [fUtility, setFUtility] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formMsg, setFormMsg] = useState('');
+  const [formBusy, setFormBusy] = useState(false);
+
+  const refreshMine = () => {
+    if (userId) loadUserCounties(userId).then(setMine).catch(() => {});
+  };
 
   useEffect(() => {
     if (userId && supabaseConfigured) {
       loadStateDirectories().then((rows) => { if (rows) setStates(rows); }).catch(() => setLoadErr('State directories could not be loaded — check the connection.'));
       loadCountyLinks().then((rows) => { if (rows) setCounties(rows.filter((r) => !r.added_by)); }).catch(() => {});
+      refreshMine();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  const resetForm = () => {
+    setFCounty(''); setFClerk(''); setFAppraiser(''); setFSheriff(''); setFCode(''); setFUtility('');
+    setEditingId(null);
+  };
+
+  const startEdit = (r: CountyLinkRow) => {
+    setFState(r.state_code);
+    setFCounty(r.county_name);
+    setFClerk(r.clerk_court_deeds_url || '');
+    setFAppraiser(r.tax_assessor_gis_url || '');
+    setFSheriff(r.arrest_logs_url || '');
+    setFCode(r.code_enforcement_url || '');
+    setFUtility(r.utility_records_url || '');
+    setEditingId(r.id || null);
+    setFormMsg(`Editing your saved links for ${r.county_name} County, ${r.state_code}.`);
+  };
+
+  const saveMine = async () => {
+    if (!userId) return;
+    setFormBusy(true);
+    setFormMsg('');
+    try {
+      await saveUserCounty(userId, {
+        state_code: fState,
+        county_name: fCounty,
+        clerk_court_deeds_url: fClerk,
+        tax_assessor_gis_url: fAppraiser,
+        arrest_logs_url: fSheriff,
+        code_enforcement_url: fCode,
+        utility_records_url: fUtility,
+      });
+      setFormMsg(`Saved. ${fCounty.trim()} County, ${fState} is now in your list below — your links, unverified.`);
+      resetForm();
+      refreshMine();
+    } catch {
+      setFormMsg('That save failed — check the connection and that the county name is filled in, then try again.');
+    }
+    setFormBusy(false);
+  };
+
+  const removeMine = async (r: CountyLinkRow) => {
+    if (!r.id) return;
+    try {
+      await deleteUserCounty(r.id);
+      if (editingId === r.id) resetForm();
+      refreshMine();
+    } catch {
+      setFormMsg('Delete failed — check the connection and try again.');
+    }
+  };
 
   const selState = states.find((s) => s.state_code === stateCode);
   const flCounties = counties.filter((c) => c.state_code === 'FL');
@@ -97,10 +164,63 @@ export default function Counties({ userId }: { userId: string | null }) {
       )}
       <p style={{ fontSize: 13 }}>Extraction guide: use the county links above, then import the list yourself. Import gives owner name + mailing address only — never phones or emails.</p>
 
-      <h3 style={{ marginBottom: 6 }}>3 · Counties you work that aren’t covered yet</h3>
-      <input placeholder="Add a county you work" value={county} onChange={(e) => setCounty(e.target.value)} style={{ marginRight: 8 }} />
-      <button onClick={() => { if (county.trim()) { setAdded([county, ...added]); setCounty(''); } }}>Add county (unverified)</button>
-      <ul>{added.map((c) => <li key={c} style={{ fontSize: 13 }}>{c} — unverified, no links guessed. Use your state directory above to find its offices.</li>)}</ul>
+      <h3 style={{ marginBottom: 6 }}>3 · Your own county links — saved to your office</h3>
+      <p style={{ fontSize: 13, color: '#94a3b8' }}>
+        Work a county the platform set doesn’t cover yet? Find its offices through your state directory above,
+        paste the links here, and they’re saved to YOUR office only — labeled unverified, never shown to anyone else.
+        When many wholesalers save the same county, it moves up the platform’s verification list.
+      </p>
+      {!userId ? (
+        <p style={{ fontSize: 13 }}>Sign in to save your own county links.</p>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gap: 6, maxWidth: 560 }}>
+            <label style={{ fontSize: 13 }}>
+              State{' '}
+              <select value={fState} onChange={(e) => setFState(e.target.value)}>
+                {US_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
+              </select>
+            </label>
+            <input placeholder="County name (e.g. Cook)" value={fCounty} onChange={(e) => setFCounty(e.target.value)} />
+            <input placeholder="Clerk of Court URL" value={fClerk} onChange={(e) => setFClerk(e.target.value)} />
+            <input placeholder="Property Appraiser URL" value={fAppraiser} onChange={(e) => setFAppraiser(e.target.value)} />
+            <input placeholder="Sheriff's Office URL" value={fSheriff} onChange={(e) => setFSheriff(e.target.value)} />
+            <input placeholder="Code enforcement URL" value={fCode} onChange={(e) => setFCode(e.target.value)} />
+            <input placeholder="Utility records URL" value={fUtility} onChange={(e) => setFUtility(e.target.value)} />
+          </div>
+          <p style={{ marginTop: 8 }}>
+            <button onClick={saveMine} disabled={formBusy || !fCounty.trim()}>
+              {formBusy ? 'Saving…' : editingId ? 'Update my links' : 'Save my links'}
+            </button>
+            {editingId && <button onClick={resetForm} style={{ marginLeft: 8 }}>Cancel edit</button>}
+          </p>
+          {formMsg && <p style={{ fontSize: 13 }}>{formMsg}</p>}
+          {mine.length > 0 && (
+            <>
+              <h4 style={{ marginBottom: 6 }}>Your saved counties</h4>
+              {mine.map((r) => (
+                <div key={r.id} style={{ borderTop: '1px solid #334155', paddingTop: 8, marginTop: 8 }}>
+                  <p style={{ fontSize: 13.5, margin: 0 }}>
+                    <strong>{r.county_name} County, {r.state_code}</strong>{' '}
+                    <span style={{ color: '#fbbf24' }}>Your links — unverified</span>{' '}
+                    <button onClick={() => startEdit(r)}>Edit</button>{' '}
+                    <button onClick={() => removeMine(r)}>Delete</button>
+                  </p>
+                  <ul style={{ marginTop: 4 }}>
+                    {countyLines(r).map((l) => (
+                      <li key={l.label} style={{ fontSize: 13.5 }}>
+                        {l.url
+                          ? <a href={l.url} target="_blank" rel="noreferrer">{l.label}</a>
+                          : <span style={{ color: '#94a3b8' }}>{l.label} — not saved yet.</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
     </section>
   );
 }
