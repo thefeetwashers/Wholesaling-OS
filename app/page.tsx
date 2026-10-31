@@ -18,6 +18,7 @@ import type { Lead } from '../lib/leads';
 import SubscribeButton from '../components/SubscribeButton';
 import PortalHome, { PublicDealsSection } from '../components/PortalHome';
 import Outreach from '../components/Outreach';
+import CommsCenter from '../components/CommsCenter';
 import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
@@ -36,11 +37,6 @@ export default function Home() {
   const [role, setRole] = useState<string | null>(null);
   useEffect(() => { if (userId) { loadMyProfile(userId).then((p) => setRole(p?.role ?? null)).catch(() => {}); } }, [userId]);
 
-  // Slice 18 access lock. Suspension locks every role; a lapsed trial or
-  // subscription locks wholesalers only (buyers, sellers, and title
-  // companies never pay, so their portals never lock for billing). The
-  // owner account is exempt, and nothing locks while the profile is
-  // still loading. A locked user's data stays saved and RLS-protected.
   const OWNER_EMAIL = 'thefeetwashers@gmail.com';
   const suspended = !!access?.admin_suspended;
   const locked = !!userId && userEmail !== OWNER_EMAIL && access !== null &&
@@ -48,7 +44,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 23</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 24</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -123,6 +119,7 @@ export default function Home() {
       <Titles userId={userId} />
       <Counties userId={userId} />
       <div id="outreach"><Outreach userId={userId} /></div>
+      <div id="comms"><CommsCenter userId={userId} /></div>
       <StaleDollars userId={userId} />
       <WatchlistProbate />
       <BusinessPL />

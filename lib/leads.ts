@@ -23,7 +23,17 @@ export interface Lead {
   status: LeadStatus;
   notes?: string;
   follow_up_date?: string;
+  // Slice 24 (schema v4.1): consent + do-not-contact state.
+  do_not_contact?: boolean;
+  consent_status?: ConsentStatus;
+  consent_at?: string | null;
+  consent_source?: string | null;
 }
+
+// What contact permission is on file for a lead. 'unknown' is the
+// default and means human one-to-one outreach only — the platform
+// offers no automated sending or dialing at any consent level.
+export type ConsentStatus = 'unknown' | 'requested_contact' | 'express_consent' | 'opted_out';
 
 export const LEAD_STATUSES: LeadStatus[] = [
   'new', 'contacted', 'qualified', 'under_contract', 'assigned', 'closed', 'dead',
@@ -51,6 +61,22 @@ export async function saveLead(userId: string, lead: Lead): Promise<Lead | null>
     .single();
   if (error) throw error;
   return data as Lead;
+}
+
+// Partial update of the caller's own lead (RLS enforces ownership).
+// Used by the comms center for consent / do-not-contact changes.
+export async function updateLeadFields(
+  userId: string,
+  leadId: string,
+  patch: Partial<Lead>
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('leads')
+    .update(patch)
+    .eq('id', leadId)
+    .eq('owner_id', userId);
+  if (error) throw error;
 }
 
 export function leadsToCsv(leads: Lead[]): string {
