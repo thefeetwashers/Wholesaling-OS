@@ -24,6 +24,7 @@ import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
 import AssistantPanel from '../components/AssistantPanel';
+import AddFromLink from '../components/AddFromLink';
 import Sidebar from '../components/Sidebar';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
@@ -35,6 +36,7 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [view, setView] = useState('dashboard');
+  const [leadsNonce, setLeadsNonce] = useState(0);
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
   const [role, setRole] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 28</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 29</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -126,7 +128,8 @@ export default function Home() {
             )}
             {view === 'leads' && (
               <>
-                <div id="leads"><Leads userId={userId} onLeads={setLeads} /></div>
+                <AddFromLink userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
+                <div id="leads"><Leads key={leadsNonce} userId={userId} onLeads={setLeads} /></div>
                 <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
                   No fake leads, buyers, or deals are seeded here. Empty states are
                   honest empty states until you enter your own data. Your buyer list

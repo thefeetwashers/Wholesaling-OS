@@ -280,3 +280,8 @@ can be built in slices without starting from a blank folder.
 - Abuse guard: every POST verifies the caller's Supabase session against the project's Auth API, so only signed-in users can spend the owner's key, and only on their own data summary (client-built, capped, no raw exports).
 - Honest off state: until the owner sets the env vars, GET /api/assistant reports configured:false and the panel shows "Not connected yet" with the exact owner step, ask box disabled. No simulated answers anywhere.
 - New sidebar door: AI Assistant (between Today and Leads).
+
+## Slice 29 — Add a lead from a link (Oct 31, 2026)
+- Owner request: "allow us to be able to search link with url for property online with the link and add them to his pipeline" — built without scraping. New card at the top of the Leads view: the wholesaler pastes any property listing URL, types/confirms the address (plus optional city/state/owner name), and the lead is created with list_source 'Listing link' and the URL stored in the lead's notes as its source, so it can be reopened from the pipeline anytime.
+- The app does not fetch, scrape, or parse the linked page — no property data is pulled in or invented, and the card says so. Consent starts 'unknown' (a public listing is not marketing consent). No schema change: existing leads columns carry it.
+- After a successful add, the Leads list below remounts (key nonce) so the new lead is visible immediately.
