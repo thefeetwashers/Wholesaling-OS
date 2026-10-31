@@ -47,25 +47,37 @@ export default function Home() {
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 18</h1>
-      <p>
-        One pipeline, one deal record: Find → Qualify → Contract → Market
-        → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
-        title directory, county records, watchlist, probate guardrail, and
-        business P&L into the new full-stack app.
-      </p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 19</p>
+      {!userId && (
+        <div className="ws-hero">
+          <h1>Your whole wholesaling business. One office.</h1>
+          <p>
+            WholesalingOS runs your pipeline from the first lead to the funded closing —
+            leads, deal analysis, contracts, signing, escrow, and payouts — with private
+            portals for your cash buyers, your sellers, and your title company.
+          </p>
+          <div className="ws-chips">
+            <span className="ws-chip">90 days free</span>
+            <span className="ws-chip">Then $150/mo</span>
+            <span className="ws-chip">No other platform fee</span>
+          </div>
+          <ul>
+            <li>Your company office is sealed: your leads and buyer list are yours alone — not even the platform owner can see them.</li>
+            <li>Sellers see their price only. Your assignment fee stays yours.</li>
+            <li>One pipeline, one deal record: Find → Qualify → Contract → Market → Show → Close → Track.</li>
+          </ul>
+        </div>
+      )}
 
-      <section style={{ background: supabaseConfigured ? '#052e16' : '#422006', padding: 16, borderRadius: 12 }}>
-        <strong>Sync status: {supabaseConfigured ? 'Supabase configured — sign-in and lead sync can be tested.' : 'Supabase NOT configured yet — sign-in and lead sync are local-only until then.'}</strong>
-        <p style={{ fontSize: 13 }}>
-          To turn on sync: create a fresh Supabase project (rotate the compromised Oct 19 key first),
-          run production/schema.sql then schema-v2-additions.sql in its SQL editor, and set
-          NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY. Google sign-in also needs the
-          Google provider enabled in Supabase Auth. Until then, no data is claimed to sync.
-        </p>
+      <section style={{ background: supabaseConfigured ? '#052e16' : '#422006', padding: '10px 16px', borderRadius: 12 }}>
+        <strong style={{ fontSize: 13.5 }}>
+          {supabaseConfigured
+            ? '● Your office is connected — everything syncs securely to your account.'
+            : '● Local-only mode — sign-in and sync are not configured on this deployment yet.'}
+        </strong>
       </section>
 
-      <div style={{ marginTop: 16 }}>
+      <div id="signin" style={{ marginTop: 16 }}>
         <AuthPanel onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
@@ -81,7 +93,7 @@ export default function Home() {
         </section>
       ) : (
       <>
-      <PortalHome userId={userId} />
+      <div id="dashboard"><PortalHome userId={userId} /></div>
 
       <PublicDealsSection />
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>
@@ -91,8 +103,9 @@ export default function Home() {
         ))}
       </div>
 
-      <TodayCenter leads={leads} />
-      <Leads userId={userId} onLeads={setLeads} />
+      <div id="today"><TodayCenter leads={leads} /></div>
+      <div id="money"><MoneyScoreboard userId={userId} /></div>
+      <div id="leads"><Leads userId={userId} onLeads={setLeads} /></div>
 
       <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
         No fake leads, buyers, or deals are seeded here. Empty states are
@@ -101,15 +114,14 @@ export default function Home() {
         other users from reading them.
       </p>
 
-      <Contracts userId={userId} />
+      <div id="contracts"><Contracts userId={userId} /></div>
       <Viewings userId={userId} />
-      <Escrow userId={userId} />
-      <Buyers userId={userId} />
+      <div id="escrow"><Escrow userId={userId} /></div>
+      <div id="buyers"><Buyers userId={userId} /></div>
       <Titles userId={userId} />
       <Counties userId={userId} />
-      <Outreach userId={userId} />
+      <div id="outreach"><Outreach userId={userId} /></div>
       <StaleDollars userId={userId} />
-      <MoneyScoreboard userId={userId} />
       <WatchlistProbate />
       <BusinessPL />
 

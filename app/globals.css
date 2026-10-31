@@ -1,0 +1,144 @@
+/* WholesalingOS design system (Slice 19 — frontend overhaul).
+   One professional theme applied across every component: base element
+   styling lifts the whole app at once, and the ws-* classes style the
+   shell (top bar, hero, navigation) added in layout.tsx and page.tsx.
+   No framework, no webfonts — fast and dependency-free. */
+
+:root {
+  --ws-bg: #0f172a;
+  --ws-bg-grad: linear-gradient(180deg, #0b1220 0%, #0f172a 320px);
+  --ws-panel: #16213a;
+  --ws-border: rgba(148, 163, 184, 0.22);
+  --ws-text: #e2e8f0;
+  --ws-muted: #94a3b8;
+  --ws-accent: #10b981;
+  --ws-accent-dark: #065f46;
+  --ws-field: #0b1220;
+  --ws-radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--ws-bg-grad);
+  background-color: var(--ws-bg);
+  color: var(--ws-text);
+  line-height: 1.5;
+}
+
+/* ---------- shell ---------- */
+.ws-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  background: rgba(11, 18, 32, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--ws-border);
+}
+.ws-brand { font-size: 19px; font-weight: 800; letter-spacing: 0.2px; color: #fff; text-decoration: none; }
+.ws-brand span { color: var(--ws-accent); }
+.ws-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.ws-nav a {
+  color: var(--ws-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.ws-nav a:hover { color: #fff; background: rgba(148, 163, 184, 0.14); }
+.ws-topbar-price { margin-left: auto; font-size: 12.5px; color: var(--ws-muted); }
+.ws-main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 40px; }
+.ws-footer {
+  border-top: 1px solid var(--ws-border);
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ws-muted);
+}
+
+/* ---------- hero / front door ---------- */
+.ws-buildtag { font-size: 12px; color: var(--ws-muted); letter-spacing: 0.4px; margin: 0 0 8px; }
+.ws-hero {
+  background: linear-gradient(135deg, #064e3b 0%, #0b2e26 55%, #0b1220 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 16px;
+  padding: 32px 28px;
+  margin-bottom: 20px;
+}
+.ws-hero h1 { font-size: 32px; line-height: 1.15; margin: 0 0 10px; color: #fff; }
+.ws-hero p { font-size: 15.5px; color: #cbd5e1; max-width: 720px; margin: 0 0 14px; }
+.ws-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.ws-chip {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #a7f3d0;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+.ws-hero ul { margin: 10px 0 0; padding-left: 20px; color: #cbd5e1; font-size: 14px; }
+.ws-hero li { margin-bottom: 6px; }
+
+/* ---------- base elements (the lift for every component) ---------- */
+h1 { font-size: 26px; margin: 0 0 12px; }
+h2 { font-size: 20px; margin: 0 0 10px; color: #f1f5f9; }
+h3 { font-size: 16px; margin: 0 0 8px; color: #f1f5f9; }
+
+section {
+  border: 1px solid var(--ws-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+button {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  background: #1e293b;
+  color: var(--ws-text);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--ws-accent); color: #fff; }
+button:disabled { opacity: 0.55; cursor: default; }
+
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  font: inherit;
+  font-size: 14px;
+  background: var(--ws-field);
+  color: var(--ws-text);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 2px 4px 2px 0;
+  max-width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid rgba(16, 185, 129, 0.55);
+  outline-offset: 0;
+  border-color: var(--ws-accent);
+}
+
+a { color: #34d399; }
+ul { line-height: 1.55; }
+
+@media (max-width: 720px) {
+  .ws-hero { padding: 24px 18px; }
+  .ws-hero h1 { font-size: 25px; }
+  .ws-topbar-price { display: none; }
+  .ws-main { padding: 16px 12px 32px; }
+}
