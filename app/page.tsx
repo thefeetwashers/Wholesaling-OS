@@ -23,6 +23,7 @@ import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
+import AssistantPanel from '../components/AssistantPanel';
 import Sidebar from '../components/Sidebar';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
@@ -57,7 +58,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 27</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 28</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -119,6 +120,9 @@ export default function Home() {
             )}
             {view === 'today' && (
               <div id="today"><TodayCenter leads={leads} /></div>
+            )}
+            {view === 'assistant' && (
+              <AssistantPanel userId={userId} />
             )}
             {view === 'leads' && (
               <>

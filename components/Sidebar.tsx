@@ -14,6 +14,7 @@ export interface ShellView {
 export const SHELL_VIEWS: ShellView[] = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
   { key: 'today', label: 'Today', icon: '📅' },
+  { key: 'assistant', label: 'AI Assistant', icon: '🤖' },
   { key: 'leads', label: 'Leads', icon: '🏘️' },
   { key: 'comms', label: 'Comms Center', icon: '💬' },
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝' },
