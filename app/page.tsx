@@ -22,6 +22,7 @@ import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
+import { loadMyProfile } from '../lib/portals';
 
 const STAGES = ['Find', 'Qualify', 'Contract', 'Market', 'Show', 'Close', 'Track'];
 
@@ -31,10 +32,22 @@ export default function Home() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => { if (userId) { loadMyProfile(userId).then((p) => setRole(p?.role ?? null)).catch(() => {}); } }, [userId]);
+
+  // Slice 18 access lock. Suspension locks every role; a lapsed trial or
+  // subscription locks wholesalers only (buyers, sellers, and title
+  // companies never pay, so their portals never lock for billing). The
+  // owner account is exempt, and nothing locks while the profile is
+  // still loading. A locked user's data stays saved and RLS-protected.
+  const OWNER_EMAIL = 'thefeetwashers@gmail.com';
+  const suspended = !!access?.admin_suspended;
+  const locked = !!userId && userEmail !== OWNER_EMAIL && access !== null &&
+    (suspended || (role === 'wholesaler' && !hasAccess(access)));
 
   return (
     <div>
-      <h1>WholesalingOS — Production Build, Slice 17</h1>
+      <h1>WholesalingOS — Production Build, Slice 18</h1>
       <p>
         One pipeline, one deal record: Find → Qualify → Contract → Market
         → Show → Close → Track. Slice 7 adds the corrected SubscribeButton, trial access reading, Stripe webhook route, and blocklist check route. Slice 6 linked viewings and escrow to a selected saved deal. Slice 5 synced buyers, deals, and directories. Slice 4 ported the old prototype's buyer CRM,
@@ -56,8 +69,19 @@ export default function Home() {
         <AuthPanel onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
-      <PortalHome userId={userId} />
       <AdminConsole userId={userId} userEmail={userEmail} />
+      {locked ? (
+        <section style={{ background: '#450a0a', padding: 16, borderRadius: 12, marginTop: 16 }}>
+          <h2>Your office is locked</h2>
+          <p style={{ fontSize: 14 }}>
+            {suspended
+              ? 'Your account has been suspended by the platform owner. Your leads, deals, and records are saved — contact thefeetwashers@gmail.com if you believe this is a mistake.'
+              : 'Your free trial or subscription is not active, so your office is locked. Subscribe above to reopen it — your leads, deals, and records are saved.'}
+          </p>
+        </section>
+      ) : (
+      <>
+      <PortalHome userId={userId} />
 
       <PublicDealsSection />
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>
@@ -90,6 +114,8 @@ export default function Home() {
       <BusinessPL />
 
       <DealAnalyzer />
+      </>
+      )}
     </div>
   );
 }

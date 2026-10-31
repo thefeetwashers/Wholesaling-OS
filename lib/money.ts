@@ -181,3 +181,38 @@ export async function loadAdminAggregates(): Promise<AdminAggregates | null> {
   if (error) throw error;
   return (data || {}) as AdminAggregates;
 }
+
+
+// ---------- Owner roster (schema v3.6, Slice 18) ----------
+// Account + billing fields only, served by the owner-only admin_roster()
+// function. setAdminSuspended flips profiles.admin_suspended through the
+// owner-only admin_set_suspended() function; the database refuses to
+// suspend the owner's own account.
+export interface RosterRow {
+  user_id: string;
+  email: string;
+  company?: string | null;
+  role: string;
+  subscription_status: string;
+  trial_ends_at?: string | null;
+  admin_suspended: boolean;
+  has_stripe_customer: boolean;
+  created_at: string;
+}
+
+export async function loadAdminRoster(): Promise<RosterRow[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.rpc('admin_roster');
+  if (error) throw error;
+  return (data || []) as RosterRow[];
+}
+
+export async function setAdminSuspended(userId: string, suspended: boolean): Promise<boolean> {
+  if (!supabaseConfigured || !supabase) return false;
+  const { data, error } = await supabase.rpc('admin_set_suspended', {
+    p_user_id: userId,
+    p_suspended: suspended,
+  });
+  if (error) throw error;
+  return !!data;
+}
