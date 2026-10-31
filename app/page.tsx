@@ -21,6 +21,7 @@ import Outreach from '../components/Outreach';
 import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
+import SellerPageSettingsCard from '../components/SellerPageSettings';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
 
@@ -47,7 +48,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 19</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 20</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -94,6 +95,7 @@ export default function Home() {
       ) : (
       <>
       <div id="dashboard"><PortalHome userId={userId} /></div>
+      {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
 
       <PublicDealsSection />
       <h2 style={{ marginTop: 24 }}>Pipeline</h2>

@@ -222,3 +222,9 @@ can be built in slices without starting from a blank folder.
 - Public front door: signed-out visitors get a hero — what the platform is, who it serves, the honest pricing chips (90 days free / $150/mo / no other platform fee), and the three structural promises (sealed company offices, seller sees price only, one pipeline). Signed-in users go straight to their office.
 - Dashboard-first layout: role portal, then Today Center, then the Money scoreboard, then the pipeline tools; top-bar navigation anchors to Dashboard / Today / Leads / Contracts / Buyers / Money. The developer-facing sync instructions were replaced with a one-line connection status.
 - No functional changes: every component, the Slice 18 lock, and all data flows are untouched — this slice is presentation only, so the Oct 29 E2E results stand.
+
+
+## Slice 20 — Public seller page per wholesaler + company branding (Oct 31, 2026)
+- Schema v3.7: profiles gain public_slug (unique where set), seller_page_enabled, seller_page_headline, seller_page_about. Public access is ONLY through two security-definer functions — get_seller_page (branding fields only, enabled + non-suspended pages) and submit_seller_lead (honeypot bot trap, length caps, lands as a 'new' lead with list_source 'Seller landing page' in that wholesaler's CRM). No anon SELECT or INSERT policy was added anywhere; profiles stay private.
+- Wholesalers control it from a settings card in their office: company name (also their profiles.company), page slug, headline, about text, publish toggle, and their live link with copy button. A suspended wholesaler's page goes dark automatically.
+- Public route /sell/<slug> renders the wholesaler's own brand (hero with company name, headline, about), an intake form (name + address required; phone/email/city/state/ZIP/notes optional), an honest assignment disclosure, and a thank-you state. Unknown or unpublished slugs show an honest unavailable page.

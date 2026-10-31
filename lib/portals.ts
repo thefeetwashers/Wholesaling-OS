@@ -526,3 +526,95 @@ export async function setListingStatus(listingId: string, status: 'active' | 'dr
     .eq('id', listingId);
   if (error) throw error;
 }
+
+
+// ---------- Public seller pages (schema v3.7, Slice 20) ----------
+// Each wholesaler can publish a "sell your house" page at /sell/<slug>
+// under their own company name. Settings live on their own profiles row
+// (updated through the existing own-profile policy). The public side
+// reads and submits ONLY through security-definer functions — profiles
+// are never exposed to anonymous visitors.
+export interface SellerPageSettings {
+  company: string;
+  public_slug: string;
+  seller_page_enabled: boolean;
+  seller_page_headline: string;
+  seller_page_about: string;
+}
+
+export async function loadSellerPageSettings(userId: string): Promise<SellerPageSettings | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('company, public_slug, seller_page_enabled, seller_page_headline, seller_page_about')
+    .eq('id', userId)
+    .single();
+  if (error || !data) return null;
+  const d = data as Record<string, unknown>;
+  return {
+    company: (d.company as string) || '',
+    public_slug: (d.public_slug as string) || '',
+    seller_page_enabled: !!d.seller_page_enabled,
+    seller_page_headline: (d.seller_page_headline as string) || '',
+    seller_page_about: (d.seller_page_about as string) || '',
+  };
+}
+
+export async function saveSellerPageSettings(userId: string, s: SellerPageSettings): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const slug = s.public_slug.trim().toLowerCase();
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      company: s.company.trim() || null,
+      public_slug: slug || null,
+      seller_page_enabled: s.seller_page_enabled && !!slug,
+      seller_page_headline: s.seller_page_headline.trim() || null,
+      seller_page_about: s.seller_page_about.trim() || null,
+    })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+export interface PublicSellerPage {
+  company: string;
+  headline?: string | null;
+  about?: string | null;
+}
+
+export async function loadPublicSellerPage(slug: string): Promise<PublicSellerPage | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.rpc('get_seller_page', { p_slug: slug });
+  if (error || !data || (data as unknown[]).length === 0) return null;
+  return (data as PublicSellerPage[])[0];
+}
+
+export interface SellerLeadForm {
+  owner_name: string;
+  property_address: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone: string;
+  email: string;
+  notes: string;
+  website: string; // honeypot — real sellers leave this empty
+}
+
+export async function submitSellerLead(slug: string, f: SellerLeadForm): Promise<boolean> {
+  if (!supabaseConfigured || !supabase) return false;
+  const { data, error } = await supabase.rpc('submit_seller_lead', {
+    p_slug: slug,
+    p_owner_name: f.owner_name,
+    p_property_address: f.property_address,
+    p_city: f.city,
+    p_state: f.state,
+    p_zip: f.zip,
+    p_phone: f.phone,
+    p_email: f.email,
+    p_notes: f.notes,
+    p_website: f.website,
+  });
+  if (error) return false;
+  return !!data;
+}
