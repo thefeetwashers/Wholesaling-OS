@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadDeals, type DealRow } from '../lib/deals';
-import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, addEscrowMilestone, type EscrowFileRow } from '../lib/escrow';
+import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
 import { emdCountdownText } from '../lib/contracts';
 
 // Title escrow tracker, ported from the old prototype.
@@ -70,7 +70,25 @@ export default function Escrow({ userId }: { userId: string | null }) {
         ))}
       </ol>
       <button onClick={saveEscrow}>Save escrow file to Supabase</button>
-      {files.length > 0 && <ul>{files.map((f) => <li key={f.id}>Escrow file — EMD required ${f.emd_amount_required ?? 0}, status {f.file_status}, deadline {f.emd_deadline || 'none'}</li>)}</ul>}
+      {files.length > 0 && (
+        <ul>
+          {files.map((f) => (
+            <li key={f.id} style={{ marginBottom: 8 }}>
+              Escrow file — EMD required ${f.emd_amount_required ?? 0}, deadline {f.emd_deadline || 'none'} ·{' '}
+              <strong>Outcome: {f.outcome === 'closed' ? 'Closed' : f.outcome === 'fell_through' ? 'Fell through' : 'Open'}</strong>
+              {f.id && (
+                <>
+                  {' '}
+                  {f.outcome !== 'closed' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'closed'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'closed' } : x))); setSavedMsg('Escrow marked closed — this counts on the buyer’s record.'); }}>Mark closed</button>}{' '}
+                  {f.outcome !== 'fell_through' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'fell_through'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'fell_through' } : x))); setSavedMsg('Escrow marked fell through — this counts on the buyer’s record.'); }}>Mark fell through</button>}{' '}
+                  {f.outcome && f.outcome !== 'open' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'open'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'open' } : x))); setSavedMsg('Escrow outcome reopened.'); }}>Reopen</button>}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>Mark the outcome honestly when a file ends — it becomes part of the buyer’s earned record that other wholesalers see at offer time.</p>
     </section>
   );
 }

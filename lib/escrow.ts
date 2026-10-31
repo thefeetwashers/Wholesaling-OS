@@ -13,6 +13,21 @@ export interface EscrowFileRow {
   emd_deadline?: string | null;
   file_status?: string;
   target_closing_date?: string | null;
+  outcome?: string;
+  outcome_at?: string | null;
+}
+
+export type EscrowOutcome = 'open' | 'closed' | 'fell_through';
+
+// The wholesaler who owns the escrow file records how it ended. This
+// outcome feeds the buyer's earned record (buyer_record, schema v3.8).
+export async function setEscrowOutcome(fileId: string, outcome: EscrowOutcome): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('escrow_files')
+    .update({ outcome, outcome_at: outcome === 'open' ? null : new Date().toISOString() })
+    .eq('id', fileId);
+  if (error) throw error;
 }
 
 export async function createListingForDeal(

@@ -618,3 +618,46 @@ export async function submitSellerLead(slug: string, f: SellerLeadForm): Promise
   if (error) return false;
   return !!data;
 }
+
+
+// ---------- Verified-buyer trust layer (schema v3.8, Slice 21) ----------
+// The record is counted by the database from real events only:
+// accepted offers (documents.buyer_user), B-C signings (bc_status), and
+// escrow outcomes the wholesaler marked. Proof of funds is the buyer's
+// own attestation and is labeled self-reported wherever it is shown.
+export interface BuyerRecord {
+  accepted_deals: number;
+  bc_signed: number;
+  closed_deals: number;
+  fell_through: number;
+  pof_status: string;
+  pof_note?: string | null;
+}
+
+export async function loadBuyerRecord(buyerUser: string): Promise<BuyerRecord | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.rpc('buyer_record', { p_buyer: buyerUser });
+  if (error || !data || (data as unknown[]).length === 0) return null;
+  return (data as BuyerRecord[])[0];
+}
+
+export async function loadMyProofOfFunds(userId: string): Promise<{ status: string; note: string }> {
+  if (!supabaseConfigured || !supabase) return { status: 'none', note: '' };
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('pof_status, pof_note')
+    .eq('id', userId)
+    .single();
+  if (error || !data) return { status: 'none', note: '' };
+  const d = data as Record<string, unknown>;
+  return { status: (d.pof_status as string) || 'none', note: (d.pof_note as string) || '' };
+}
+
+export async function setMyProofOfFunds(userId: string, status: string, note: string): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('profiles')
+    .update({ pof_status: status, pof_note: note.trim() || null })
+    .eq('id', userId);
+  if (error) throw error;
+}

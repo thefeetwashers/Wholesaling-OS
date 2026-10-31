@@ -228,3 +228,10 @@ can be built in slices without starting from a blank folder.
 - Schema v3.7: profiles gain public_slug (unique where set), seller_page_enabled, seller_page_headline, seller_page_about. Public access is ONLY through two security-definer functions — get_seller_page (branding fields only, enabled + non-suspended pages) and submit_seller_lead (honeypot bot trap, length caps, lands as a 'new' lead with list_source 'Seller landing page' in that wholesaler's CRM). No anon SELECT or INSERT policy was added anywhere; profiles stay private.
 - Wholesalers control it from a settings card in their office: company name (also their profiles.company), page slug, headline, about text, publish toggle, and their live link with copy button. A suspended wholesaler's page goes dark automatically.
 - Public route /sell/<slug> renders the wholesaler's own brand (hero with company name, headline, about), an intake form (name + address required; phone/email/city/state/ZIP/notes optional), an honest assignment disclosure, and a thank-you state. Unknown or unpublished slugs show an honest unavailable page.
+
+
+## Slice 21 — Verified-buyer trust layer (Oct 31, 2026)
+- Schema v3.8: escrow_files gain outcome (open/closed/fell_through) + outcome_at; profiles gain pof_status (none/self_reported) + pof_note. New buyer_record(uuid) function (authenticated only) counts a buyer's earned record from real events: accepted offers via deals.documents.buyer_user, B-C signings via documents.bc_status, and escrow outcomes joined through listings. Counts and the POF attestation only — no deal details or contact data.
+- Escrow tracker: the wholesaler marks each file Closed / Fell through / Reopen; the outcome feeds the buyer's record.
+- Offers inbox: every offer now shows the buyer's record line (signed / closed / fell-through counts) and their proof-of-funds state at decision time.
+- Buyer portal: a "Your buyer record" card shows the buyer's own counts and the proof-of-funds editor. POF is labeled self-reported everywhere — the platform does not verify bank documents; the closing record is platform-counted and cannot be self-entered.

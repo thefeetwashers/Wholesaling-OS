@@ -28,6 +28,10 @@ import {
   signDealDocument,
   loadBuyerDeals,
   loadFileMilestones,
+  loadBuyerRecord,
+  loadMyProofOfFunds,
+  setMyProofOfFunds,
+  type BuyerRecord,
   type PortalRole,
   type BuyBox,
   type FeedListing,
@@ -162,6 +166,7 @@ function OffersInbox({ userId }: { userId: string }) {
               {o.counter_amount != null ? ` · your counter: ${money(Number(o.counter_amount))}` : ''}
               {' '}· status: {o.status}
               {o.message ? <><br />Buyer note: {o.message}</> : null}
+              <BuyerRecordLine buyerUser={o.buyer_user} />
               {o.status === 'sent' && (
                 <>
                   <br />
@@ -307,6 +312,7 @@ function BuyerPortal({ userId }: { userId: string }) {
       <h3>Cash Buyer Portal</h3>
       {err && <p style={{ fontSize: 13, color: '#f87171' }}>{err}</p>}
       <p style={{ fontSize: 13 }}>Publish a buy box so wholesalers' deals can be matched to you. Comma-separated lists.</p>
+      <BuyerRecordCard userId={userId} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <input placeholder="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
         <input placeholder="States (FL, GA)" value={form.states} onChange={(e) => setForm({ ...form, states: e.target.value })} />
@@ -389,6 +395,63 @@ function BuyerPortal({ userId }: { userId: string }) {
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Match = your price range plus a plain text match of your cities/states against the property address.
       </p>
+    </div>
+  );
+}
+
+function BuyerRecordLine({ buyerUser }: { buyerUser: string }) {
+  const [rec, setRec] = useState<BuyerRecord | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let on = true;
+    loadBuyerRecord(buyerUser).then((r) => { if (on) { setRec(r); setLoaded(true); } }).catch(() => { if (on) setLoaded(true); });
+    return () => { on = false; };
+  }, [buyerUser]);
+  if (!loaded) return <><br /><span style={{ color: '#94a3b8' }}>Buyer record: loading…</span></>;
+  if (!rec) return <><br /><span style={{ color: '#94a3b8' }}>Buyer record: not available.</span></>;
+  return (
+    <>
+      <br />
+      <span style={{ color: '#a5b4fc' }}>
+        Buyer record: {rec.accepted_deals === 0
+          ? 'no platform deals yet — no closing history'
+          : `${rec.bc_signed} B–C signed · ${rec.closed_deals} closed · ${rec.fell_through} fell through (of ${rec.accepted_deals} accepted)`}
+        {' · '}Proof of funds: {rec.pof_status === 'self_reported'
+          ? `self-reported${rec.pof_note ? ` — ${rec.pof_note}` : ''} (ask for the letter before you rely on it)`
+          : 'not provided'}
+      </span>
+    </>
+  );
+}
+
+function BuyerRecordCard({ userId }: { userId: string }) {
+  const [rec, setRec] = useState<BuyerRecord | null>(null);
+  const [has, setHas] = useState(false);
+  const [note, setNote] = useState('');
+  const [msg, setMsg] = useState('');
+  const refresh = () => {
+    loadBuyerRecord(userId).then(setRec).catch(() => {});
+    loadMyProofOfFunds(userId).then((p) => { setHas(p.status === 'self_reported'); setNote(p.note); }).catch(() => {});
+  };
+  useEffect(refresh, [userId]);
+  return (
+    <div style={{ background: '#0f172a', padding: 12, borderRadius: 10, marginBottom: 12 }}>
+      <h4 style={{ marginTop: 0 }}>Your buyer record — earned here, shown to wholesalers at offer time</h4>
+      <p style={{ fontSize: 13 }}>
+        {rec == null
+          ? 'Your record is not available yet.'
+          : rec.accepted_deals === 0
+            ? 'No platform deals yet. When a wholesaler accepts your offer, you sign the B–C, and the escrow closes, it counts here — automatically. Nothing is self-entered.'
+            : `${rec.bc_signed} B–C signed · ${rec.closed_deals} closed · ${rec.fell_through} fell through, out of ${rec.accepted_deals} accepted offers.`}
+      </p>
+      <label style={{ fontSize: 13 }}>
+        <input type="checkbox" checked={has} onChange={(e) => setHas(e.target.checked)} />{' '}
+        I have proof of funds available
+      </label>{' '}
+      <input placeholder="Where — e.g. Chase letter dated Oct 2026" value={note} onChange={(e) => setNote(e.target.value)} style={{ minWidth: 260 }} />{' '}
+      <button onClick={async () => { try { await setMyProofOfFunds(userId, has ? 'self_reported' : 'none', note); setMsg('Saved. Wholesalers see this as self-reported — expect them to ask for the letter.'); refresh(); } catch { setMsg('Save failed — try again.'); } }}>Save</button>
+      {msg && <p style={{ fontSize: 12 }}>{msg}</p>}
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>Proof of funds is your own attestation — the platform does not verify bank documents. Your closing record, by contrast, is counted from signed deals and escrow outcomes.</p>
     </div>
   );
 }
