@@ -235,3 +235,10 @@ can be built in slices without starting from a blank folder.
 - Escrow tracker: the wholesaler marks each file Closed / Fell through / Reopen; the outcome feeds the buyer's record.
 - Offers inbox: every offer now shows the buyer's record line (signed / closed / fell-through counts) and their proof-of-funds state at decision time.
 - Buyer portal: a "Your buyer record" card shows the buyer's own counts and the proof-of-funds editor. POF is labeled self-reported everywhere — the platform does not verify bank documents; the closing record is platform-counted and cannot be self-entered.
+
+
+## Slice 22 — County coverage: 50-state directories + Florida's 67 counties (Oct 31, 2026)
+- Schema v3.9: new state_directory_links table (one verified official state-level county directory per state; readable by signed-in users) + 67 Florida platform rows in county_portal_links. Every URL was verified by opening the page on 2026-10-31; the research log lives in production/county-coverage/.
+- Coverage, honestly: state directories 48 of 50 (Michigan and Washington have no verifiable public state-level directory — no rows loaded); Florida clerks 67 of 67; Florida property appraisers 66 of 67 (Highlands' DOR-listed site could not be opened); Florida sheriffs 64 of 67 (Baker and Jackson have no verifiable official site; Highlands' domain is offline). Uncovered slots are NULL and render as "not in the platform set" — never guessed.
+- Counties UI rebuilt: (1) state directory picker showing who runs the directory, (2) Florida county picker rendering clerk / appraiser / sheriff / code enforcement / utility with honest gaps, (3) the wholesaler's own unverified county notes, pointing at the state directory.
+- Correction banked during research: Florida's county-clerk association directory is flclerks.com (Florida Court Clerks & Comptrollers) — floridaclerks.org is the CITY clerks association and was not loaded.

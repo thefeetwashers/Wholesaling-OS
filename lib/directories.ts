@@ -45,3 +45,25 @@ export async function loadCountyLinks(): Promise<CountyLinkRow[] | null> {
   if (error) throw error;
   return (data || []) as CountyLinkRow[];
 }
+
+
+export interface StateDirectoryRow {
+  state_code: string;
+  state_name: string;
+  directory_url: string;
+  run_by?: string | null;
+  verified: boolean;
+}
+
+// Official state-level directories (schema v3.9, Slice 22): one
+// verified directory per state that lists or links the state's county
+// clerks / recorders / county offices. Platform rows only.
+export async function loadStateDirectories(): Promise<StateDirectoryRow[] | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase
+    .from('state_directory_links')
+    .select('*')
+    .order('state_name');
+  if (error) throw error;
+  return (data || []) as StateDirectoryRow[];
+}
