@@ -63,6 +63,21 @@ export async function saveLead(userId: string, lead: Lead): Promise<Lead | null>
   return data as Lead;
 }
 
+// Slice 30 — batch import for the import inbox. Inserts in chunks of
+// 100 and returns how many rows actually landed; throws on the first
+// failed chunk so the caller can report honestly instead of guessing.
+export async function importLeads(userId: string, rows: Lead[]): Promise<number> {
+  if (!supabaseConfigured || !supabase) return 0;
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100).map((r) => ({ ...r, owner_id: userId }));
+    const { error } = await supabase.from('leads').insert(chunk);
+    if (error) throw error;
+    inserted += chunk.length;
+  }
+  return inserted;
+}
+
 // Partial update of the caller's own lead (RLS enforces ownership).
 // Used by the comms center for consent / do-not-contact changes.
 export async function updateLeadFields(
