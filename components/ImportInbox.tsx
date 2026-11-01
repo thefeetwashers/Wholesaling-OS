@@ -137,29 +137,35 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
         const auction = cell(r, 'auction_date'); if (auction) extra.push(`Auction: ${auction}`);
         const phone = cell(r, 'phones');
         const email = cell(r, 'emails');
+        // Uniform key set with explicit nulls on EVERY row: PostgREST
+        // bulk inserts reject payloads whose objects carry different
+        // keys (an absent optional field on one row sinks the batch).
         toInsert.push({
           property_address: address,
-          city: cell(r, 'city') || undefined,
-          state: cell(r, 'state') || undefined,
-          zip: cell(r, 'zip') || undefined,
-          county: cell(r, 'county') || undefined,
-          owner_name: cell(r, 'owner_name') || undefined,
-          mailing_address: cell(r, 'mailing_address') || undefined,
-          phones: phone ? [phone] : undefined,
-          emails: email ? [email] : undefined,
+          city: cell(r, 'city') || null,
+          state: cell(r, 'state') || null,
+          zip: cell(r, 'zip') || null,
+          county: cell(r, 'county') || null,
+          owner_name: cell(r, 'owner_name') || null,
+          mailing_address: cell(r, 'mailing_address') || null,
+          phones: phone ? [phone] : null,
+          emails: email ? [email] : null,
           status: 'new',
           list_source: `Import: ${sourceLabel.trim()}`.slice(0, 120),
           notes: extra.length ? `${stamp} · ${extra.join(' · ')}` : stamp,
           consent_status: 'unknown',
-        });
+        } as unknown as Lead);
       }
-      const inserted = await importLeads(userId as string, toInsert);
+      const outcome = await importLeads(userId as string, toInsert);
+      const inserted = outcome.inserted;
       setResult(`Import complete: ${inserted} lead${inserted === 1 ? '' : 's'} added` +
         `${dupes ? `, ${dupes} duplicate${dupes === 1 ? '' : 's'} skipped (already in your pipeline or repeated in the file)` : ''}` +
-        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address)` : ''}. Every added lead is stamped with this file and source.`);
+        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address)` : ''}. Every added lead is stamped with this file and source.` +
+        `${outcome.error ? ` Some rows were rejected by the database: ${outcome.error}` : ''}`);
       if (inserted > 0 && onAdded) onAdded();
     } catch (e) {
-      setResult(e instanceof Error ? `Import stopped: ${e.message}` : 'Import stopped unexpectedly — check the file and try again.');
+      const m = e instanceof Error ? e.message : (e as { message?: string } | null)?.message;
+      setResult(`Import stopped: ${m || 'unknown error — check the file and try again.'}`);
     } finally {
       setBusy(false);
     }

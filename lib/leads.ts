@@ -64,18 +64,29 @@ export async function saveLead(userId: string, lead: Lead): Promise<Lead | null>
 }
 
 // Slice 30 — batch import for the import inbox. Inserts in chunks of
-// 100 and returns how many rows actually landed; throws on the first
-// failed chunk so the caller can report honestly instead of guessing.
-export async function importLeads(userId: string, rows: Lead[]): Promise<number> {
-  if (!supabaseConfigured || !supabase) return 0;
+// 100. If a chunk fails, it falls back to one-by-one inserts so a single
+// bad row cannot sink the batch, and it reports the database's real
+// error message (PostgREST errors are plain objects, not Errors — the
+// first live test's failure was invisible until this surfaced them).
+export async function importLeads(
+  userId: string,
+  rows: Lead[],
+): Promise<{ inserted: number; error?: string }> {
+  if (!supabaseConfigured || !supabase) return { inserted: 0, error: 'not configured' };
   let inserted = 0;
+  let firstError: string | undefined;
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100).map((r) => ({ ...r, owner_id: userId }));
     const { error } = await supabase.from('leads').insert(chunk);
-    if (error) throw error;
-    inserted += chunk.length;
+    if (!error) { inserted += chunk.length; continue; }
+    if (!firstError) firstError = error.message || 'database insert failed';
+    for (const row of chunk) {
+      const single = await supabase.from('leads').insert(row);
+      if (single.error) { if (!firstError) firstError = single.error.message || firstError; }
+      else inserted += 1;
+    }
   }
-  return inserted;
+  return firstError && inserted < rows.length ? { inserted, error: firstError } : { inserted };
 }
 
 // Partial update of the caller's own lead (RLS enforces ownership).
