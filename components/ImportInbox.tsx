@@ -137,9 +137,12 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
         const auction = cell(r, 'auction_date'); if (auction) extra.push(`Auction: ${auction}`);
         const phone = cell(r, 'phones');
         const email = cell(r, 'emails');
-        // Uniform key set with explicit nulls on EVERY row: PostgREST
-        // bulk inserts reject payloads whose objects carry different
-        // keys (an absent optional field on one row sinks the batch).
+        // Uniform key set on EVERY row: PostgREST bulk inserts reject
+        // payloads whose objects carry different keys (first failure).
+        // But explicit null is wrong for the array columns: leads.phones
+        // and leads.emails are NOT NULL with a '[]' default, so an
+        // explicit null violates the constraint (second failure, caught
+        // once the real error message was surfaced). Empty array it is.
         toInsert.push({
           property_address: address,
           city: cell(r, 'city') || null,
@@ -148,8 +151,8 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
           county: cell(r, 'county') || null,
           owner_name: cell(r, 'owner_name') || null,
           mailing_address: cell(r, 'mailing_address') || null,
-          phones: phone ? [phone] : null,
-          emails: email ? [email] : null,
+          phones: phone ? [phone] : [],
+          emails: email ? [email] : [],
           status: 'new',
           list_source: `Import: ${sourceLabel.trim()}`.slice(0, 120),
           notes: extra.length ? `${stamp} · ${extra.join(' · ')}` : stamp,
