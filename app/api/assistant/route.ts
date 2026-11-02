@@ -19,7 +19,12 @@ import { NextResponse } from 'next/server';
 // account, same bill, no duplicate secret to keep in sync.
 const EXPLICIT_PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
 const EXPLICIT_KEY = process.env.AI_API_KEY || '';
-const FALLBACK_OPENAI_KEY = !EXPLICIT_KEY && !EXPLICIT_PROVIDER ? process.env.OPENAI_API_KEY || '' : '';
+// The owner's own AI variables in the hosting environment are named
+// Chatgpt_key and Claude_Key (added Nov 2, 2026). The owner chose
+// ChatGPT, so Chatgpt_key is the second fallback after OPENAI_API_KEY.
+const FALLBACK_OPENAI_KEY = !EXPLICIT_KEY && !EXPLICIT_PROVIDER
+  ? process.env.OPENAI_API_KEY || process.env.Chatgpt_key || ''
+  : '';
 const PROVIDER = EXPLICIT_PROVIDER || (FALLBACK_OPENAI_KEY ? 'openai' : '');
 const KEY = EXPLICIT_KEY || FALLBACK_OPENAI_KEY;
 const MODEL = process.env.AI_MODEL || '';
