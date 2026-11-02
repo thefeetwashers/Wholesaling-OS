@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadLeads, saveLead, leadsToCsv, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { loadLeads, saveLead, deleteLead, leadsToCsv, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -11,6 +11,8 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
   const [form, setForm] = useState<Lead>(EMPTY);
   const [filter, setFilter] = useState<string>('all');
   const [mode, setMode] = useState<'local' | 'synced'>('local');
+  const [confirmId, setConfirmId] = useState<string>('');
+  const [delMsg, setDelMsg] = useState<string>('');
 
   useEffect(() => {
     if (userId && supabaseConfigured) {
@@ -30,6 +32,24 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
     }
     const next = [saved, ...leads];
     setLeads(next); onLeads(next); setForm(EMPTY);
+  };
+
+  // Slice 33 — two-step delete: the button arms a confirm on that row
+  // only; confirming removes the row from Supabase (synced mode) and
+  // from the list either way. No silent one-click destruction.
+  const removeLead = async (lead: Lead) => {
+    setDelMsg('');
+    try {
+      if (userId && supabaseConfigured && lead.id && !lead.id.startsWith('local-')) {
+        await deleteLead(userId, lead.id);
+      }
+      const next = leads.filter((x) => x !== lead);
+      setLeads(next); onLeads(next);
+      setConfirmId('');
+      setDelMsg(`Deleted: ${lead.property_address}`);
+    } catch (e) {
+      setDelMsg(`Could not delete ${lead.property_address}: ${(e as { message?: string })?.message || 'unknown error'}`);
+    }
   };
 
   const shown = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
@@ -72,6 +92,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
         <button onClick={downloadCsv} disabled={leads.length === 0}>Export CSV ({leads.length})</button>
       </div>
 
+      {delMsg && <p style={{ fontSize: 13 }}>{delMsg}</p>}
       {shown.length === 0 && <p>No leads yet. Add your first lead above.</p>}
       <ul>
         {shown.map((l) => (
@@ -80,6 +101,15 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {' '}· {l.status}
             {l.follow_up_date ? ` · follow-up ${l.follow_up_date}` : ''}
             {l.owner_name ? ` · owner: ${l.owner_name}` : ''}
+            {' '}
+            {confirmId === (l.id || l.property_address) ? (
+              <>
+                <button onClick={() => removeLead(l)}>Confirm delete</button>{' '}
+                <button onClick={() => setConfirmId('')}>Cancel</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmId(l.id || l.property_address)}>Delete</button>
+            )}
           </li>
         ))}
       </ul>

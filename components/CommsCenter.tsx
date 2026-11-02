@@ -11,6 +11,7 @@ import {
   type CallOutcome,
 } from '../lib/outreach';
 import { updateLeadFields, type Lead } from '../lib/leads';
+import { checkPhone } from '../lib/phone';
 import {
   firstPhone,
   firstEmail,
@@ -170,6 +171,13 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
             {firstPhone(lead) ? ` · ${firstPhone(lead)}` : ' · no phone on file'}
             {firstEmail(lead) ? ` · ${firstEmail(lead)}` : ' · no email on file'}
           </p>
+          {firstPhone(lead) && !checkPhone(firstPhone(lead) as string).valid && (
+            <p style={{ fontSize: 13, color: '#fbbf24', marginTop: 0 }}>
+              ⚠ This phone number fails the format check ({checkPhone(firstPhone(lead) as string).reason}) —
+              double-check it on the lead before you rely on it. A format check cannot confirm the line is
+              active or who owns it.
+            </p>
+          )}
           <p style={{ fontSize: 13, color: consentColor, marginTop: 0 }}>
             Consent: {consentLabel(lead)}
             {lead.consent_at ? ` · recorded ${new Date(lead.consent_at).toLocaleDateString()}` : ''}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { importLeads, loadLeads, type Lead } from '../lib/leads';
+import { checkPhone } from '../lib/phone';
 
 // Slice 30 — import inbox, built to the feed-schema contract
 // (production/feed-schema.md). The wholesaler uploads a CSV they
@@ -124,6 +125,7 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
       const toInsert: Lead[] = [];
       let dupes = 0;
       let noAddress = 0;
+      let badPhones = 0;
       for (const r of rows) {
         const address = cell(r, 'property_address');
         if (!address) { noAddress++; continue; }
@@ -137,6 +139,17 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
         const auction = cell(r, 'auction_date'); if (auction) extra.push(`Auction: ${auction}`);
         const phone = cell(r, 'phones');
         const email = cell(r, 'emails');
+        // Slice 32 — format-check a phone the file itself contains:
+        // valid numbers are stored in standard +1 (E.164) form;
+        // numbers that fail are kept exactly as entered and counted.
+        // A format check cannot say whether a line is active or whose
+        // it is — and the result message below says so.
+        let phoneOut: string[] = [];
+        if (phone) {
+          const c = checkPhone(phone);
+          if (c.valid && c.e164) phoneOut = [c.e164];
+          else { phoneOut = [phone]; badPhones++; }
+        }
         // Uniform key set on EVERY row: PostgREST bulk inserts reject
         // payloads whose objects carry different keys (first failure).
         // But explicit null is wrong for the array columns: leads.phones
@@ -151,7 +164,7 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
           county: cell(r, 'county') || null,
           owner_name: cell(r, 'owner_name') || null,
           mailing_address: cell(r, 'mailing_address') || null,
-          phones: phone ? [phone] : [],
+          phones: phoneOut,
           emails: email ? [email] : [],
           status: 'new',
           list_source: `Import: ${sourceLabel.trim()}`.slice(0, 120),
@@ -163,7 +176,8 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
       const inserted = outcome.inserted;
       setResult(`Import complete: ${inserted} lead${inserted === 1 ? '' : 's'} added` +
         `${dupes ? `, ${dupes} duplicate${dupes === 1 ? '' : 's'} skipped (already in your pipeline or repeated in the file)` : ''}` +
-        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address)` : ''}. Every added lead is stamped with this file and source.` +
+        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address)` : ''}` +
+        `${badPhones ? `. ${badPhones} phone number${badPhones === 1 ? '' : 's'} failed the format check and ${badPhones === 1 ? 'was' : 'were'} kept exactly as entered — a format check only; it cannot confirm a line is active or who owns it` : ''}. Every added lead is stamped with this file and source.` +
         `${outcome.error ? ` Some rows were rejected by the database: ${outcome.error}` : ''}`);
       if (inserted > 0 && onAdded) onAdded();
     } catch (e) {
@@ -182,7 +196,9 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
       <p style={{ fontSize: 13.5, marginTop: 0 }}>
         Upload a CSV you lawfully obtained (a county list, your own spreadsheet). Map its columns, preview,
         and import — duplicates are skipped, the list source is stamped on every lead, and nothing is
-        invented: phones and emails import only when the file itself contains them.
+        invented: phones and emails import only when the file itself contains them. Phone numbers are
+        format-checked on the way in: valid US numbers are stored in standard +1 form, and numbers that
+        fail the format check are kept as entered and counted in the result.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files)} />

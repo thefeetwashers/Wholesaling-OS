@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createHash } from 'crypto';
+import { createHash } from 'crypto';import { normalizePhones } from '../../../../lib/phone';
 
 // Lead-ingestion webhook — SERVER ONLY, service-role key required.
 // Slice 31. A wholesaler's OWN sources (their form backend, a
@@ -136,10 +136,10 @@ export async function POST(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
   const rows: Record<string, unknown>[] = [];
   let duplicates = 0;
-  let noAddress = 0;
+  let noAddress = 0; let invalidPhones = 0;
   for (const rec of records) {
     const n = normalize(rec && typeof rec === 'object' ? rec : {});
-    if (!n.property_address) { noAddress++; continue; }
+    if (!n.property_address) { noAddress++; continue; } const checked = normalizePhones(n.phones); n.phones = checked.phones; invalidPhones += checked.invalid;
     const dedupeKey = `${normAddr(n.property_address)}|${normAddr(n.zip || n.city)}`;
     if (seen.has(dedupeKey)) { duplicates++; continue; }
     seen.add(dedupeKey);
@@ -190,7 +190,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     added,
     duplicates_skipped: duplicates,
-    skipped_no_address: noAddress,
+    skipped_no_address: noAddress, ...(invalidPhones ? { invalid_phones: invalidPhones } : {}),
     ...(insertError && added < rows.length ? { error: insertError } : {}),
   });
 }

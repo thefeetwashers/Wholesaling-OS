@@ -89,6 +89,19 @@ export async function importLeads(
   return firstError && inserted < rows.length ? { inserted, error: firstError } : { inserted };
 }
 
+// Slice 33 — delete one of the caller's own leads (RLS enforces
+// ownership). Exposed after the Slice 31 verification found the app
+// had no lead-delete control anywhere and cleanup needed raw SQL.
+export async function deleteLead(userId: string, leadId: string): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('leads')
+    .delete()
+    .eq('id', leadId)
+    .eq('owner_id', userId);
+  if (error) throw error;
+}
+
 // Partial update of the caller's own lead (RLS enforces ownership).
 // Used by the comms center for consent / do-not-contact changes.
 export async function updateLeadFields(
