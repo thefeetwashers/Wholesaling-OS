@@ -100,7 +100,15 @@ export async function checkBlocklist(address?: string, phone?: string): Promise<
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (res.status === 500) return 'unconfigured';
+    if (res.status === 500) {
+      // Two different 500s live behind this route: env vars missing
+      // ("not configured") vs the database query failing ("check
+      // failed"). Until Nov 2, 2026 the client mapped BOTH to
+      // 'unconfigured', which sent everyone hunting for a missing key
+      // when the real fault was a missing table grant. Read the body.
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+      return errBody.error && errBody.error.includes('not configured') ? 'unconfigured' : 'error';
+    }
     if (!res.ok) return 'error';
     const data = (await res.json()) as { blocked?: boolean };
     return data.blocked ? 'blocked' : 'clear';
