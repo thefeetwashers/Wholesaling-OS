@@ -12,8 +12,16 @@ import { NextResponse } from 'next/server';
 // by signed-in users, on summaries of their OWN office data, which the
 // client builds from rows RLS already restricts to them.
 
-const PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
-const KEY = process.env.AI_API_KEY || '';
+// Explicit AI_* settings win. Fallback (added Nov 2, 2026, after the
+// owner had already placed an OPENAI_API_KEY in the hosting
+// environment): when no explicit AI_* settings exist but OPENAI_API_KEY
+// does, the assistant runs on OpenAI with that key — same owner
+// account, same bill, no duplicate secret to keep in sync.
+const EXPLICIT_PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
+const EXPLICIT_KEY = process.env.AI_API_KEY || '';
+const FALLBACK_OPENAI_KEY = !EXPLICIT_KEY && !EXPLICIT_PROVIDER ? process.env.OPENAI_API_KEY || '' : '';
+const PROVIDER = EXPLICIT_PROVIDER || (FALLBACK_OPENAI_KEY ? 'openai' : '');
+const KEY = EXPLICIT_KEY || FALLBACK_OPENAI_KEY;
 const MODEL = process.env.AI_MODEL || '';
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPA_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
