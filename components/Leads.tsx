@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadLeads, saveLead, deleteLead, leadsToCsv, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
+import LeadTags from './LeadTags';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -14,15 +16,31 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
   const [mode, setMode] = useState<'local' | 'synced'>('local');
   const [confirmId, setConfirmId] = useState<string>('');
   const [delMsg, setDelMsg] = useState<string>('');
+  // Slice 42 — distress tags + the human call queue.
+  const [tagsByLead, setTagsByLead] = useState<Record<string, DistressTagRow[]>>({});
+  const [queueMode, setQueueMode] = useState(false);
+  const [queueTag, setQueueTag] = useState<string>('any');
+
+  const refreshTags = () => {
+    if (userId && supabaseConfigured) {
+      loadAllTags(userId).then(setTagsByLead).catch(() => {});
+    }
+  };
 
   useEffect(() => {
     if (userId && supabaseConfigured) {
       loadLeads(userId).then((rows) => {
         if (rows) { setLeads(rows); setMode('synced'); onLeads(rows); }
       }).catch(() => {});
+      refreshTags();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  const onContactsChanged = (lead: Lead, phones: string[], emails: string[]) => {
+    const next = leads.map((x) => (x === lead ? { ...x, phones, emails } : x));
+    setLeads(next); onLeads(next);
+  };
 
   const addLead = async () => {
     if (!form.property_address.trim()) return;
@@ -53,7 +71,15 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
     }
   };
 
-  const shown = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+  let shown = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+  if (queueMode) {
+    const todayISO = new Date().toISOString().slice(0, 10);
+    shown = shown.filter((l) => {
+      const ts = tagsByLead[l.id || ''] || [];
+      return ts.length > 0 && (queueTag === 'any' || ts.some((t) => t.tag === queueTag));
+    });
+    shown = sortCallQueue(shown, tagsByLead, todayISO);
+  }
 
   const downloadCsv = () => {
     const blob = new Blob([leadsToCsv(leads)], { type: 'text/csv' });
@@ -93,6 +119,22 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
         <button onClick={downloadCsv} disabled={leads.length === 0}>Export CSV ({leads.length})</button>
       </div>
 
+      <div style={{ marginTop: 8 }}>
+        <label>
+          <input type="checkbox" checked={queueMode} onChange={(e) => setQueueMode(e.target.checked)} />{' '}
+          Call queue — tagged leads only, in follow-up order
+        </label>
+        {queueMode && (
+          <>{' '}
+            <select value={queueTag} onChange={(e) => setQueueTag(e.target.value)}>
+              <option value="any">Any tag</option>
+              {DISTRESS_TAGS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+            <span style={{ fontSize: 12.5, color: '#94a3b8' }}> Overdue follow-ups first. You make the calls — the Comms Center checks consent and the blocklist before any channel opens.</span>
+          </>
+        )}
+      </div>
+
       {delMsg && <p style={{ fontSize: 13 }}>{delMsg}</p>}
       {shown.length === 0 && <p>No leads yet. Add your first lead above.</p>}
       <ul>
@@ -104,6 +146,10 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {l.owner_name ? ` · owner: ${l.owner_name}` : ''}
             {l.list_source ? ` · source: ${l.list_source}` : ''}
             <ResearchLinks lead={l} />
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}
+                onTagsChanged={refreshTags} onContactsChanged={onContactsChanged} />
+            )}
             {' '}
             {confirmId === (l.id || l.property_address) ? (
               <>
