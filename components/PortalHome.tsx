@@ -40,6 +40,7 @@ import {
   type TitleLink,
   type OfferRow,
 } from '../lib/portals';
+import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTierSummary } from '../lib/buyer-tiers';
 
 // Full Portals home (Slices 9-10). One signed-in home, routed by
 // profiles.role: wholesaler command dashboard + offers inbox + buyer
@@ -136,6 +137,7 @@ function WholesalerDashboard({ userId }: { userId: string }) {
         {dash.leadsByStatus.dead ? ` · dead: ${dash.leadsByStatus.dead}` : ''}
       </p>
       <OffersInbox userId={userId} />
+      <EarnedBuyerTiers userId={userId} />
       <MyListings userId={userId} />
       <BuyerDemand />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
@@ -176,6 +178,76 @@ function OffersInbox({ userId }: { userId: string }) {
                   <button onClick={async () => { await setOfferStatus(o.id, 'declined'); setMsg('Offer declined.'); refresh(); }}>Decline</button>
                 </>
               )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function EarnedBuyerTiers({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<BuyerTierSummary[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    void (async () => {
+      try {
+        const offers = await loadIncomingOffers(userId);
+        const grouped = new Map<string, OfferRow[]>();
+        for (const offer of offers) {
+          const existing = grouped.get(offer.buyer_user) || [];
+          existing.push(offer);
+          grouped.set(offer.buyer_user, existing);
+        }
+        const entries = Array.from(grouped.entries());
+        const summaries = await Promise.all(entries.map(async ([buyerUser, buyerOffers]) => {
+          const record = await loadBuyerRecord(buyerUser);
+          if (!record) return null;
+          return {
+            buyerUser,
+            record,
+            tier: buyerTier(record),
+            offersCount: buyerOffers.length,
+            latestAddress: offerAddress(buyerOffers[0]),
+            completionRatePct: completionRatePct(record),
+          } as BuyerTierSummary;
+        }));
+        if (on) setRows(summaries.filter((x): x is BuyerTierSummary => x !== null).sort(compareBuyerTierSummaries));
+      } catch {
+        if (on) { setRows([]); setFailed(true); }
+      }
+    })();
+    return () => { on = false; };
+  }, [userId]);
+
+  return (
+    <div>
+      <h4>Earned buyer tiers — counted from platform closing records</h4>
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>
+        Only buyers who have offered on your listings appear here. The counts are the buyer&apos;s database-counted
+        platform record from Slice 21 — accepted offers, B–C signings, and escrow outcomes — not a manual CRM
+        label, a buyer&apos;s self-rating, or an outside list. Rules: Tier 1 = 3+ closed; Tier 2 = 1–2 closed;
+        Tier 3 = no closings yet; Caution overrides when more escrows fell through than closed.
+      </p>
+      {rows === null ? (
+        <p style={{ fontSize: 13 }}>Loading earned buyer tiers…</p>
+      ) : failed ? (
+        <p style={{ fontSize: 13 }}>Earned buyer tiers could not be loaded. No tier is shown rather than guessed.</p>
+      ) : rows.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No buyer offers yet, so no earned tiers to rank. Tiers appear as buyers offer on your listings and their platform records develop.</p>
+      ) : (
+        <ul style={{ fontSize: 13 }}>
+          {rows.map((row) => (
+            <li key={row.buyerUser} style={{ marginBottom: 8 }}>
+              <strong>{row.tier.label}</strong> · Buyer ref {row.buyerUser.slice(0, 8)} · {row.offersCount} offer{row.offersCount === 1 ? '' : 's'} to you · latest: {row.latestAddress}
+              <br />
+              Platform record: {row.record.accepted_deals} accepted · {row.record.bc_signed} B–C signed · {row.record.closed_deals} closed · {row.record.fell_through} fell through
+              {row.completionRatePct !== null ? ` · ${row.completionRatePct.toFixed(0)}% of resolved escrows closed` : ' · no resolved escrows yet'}
+              {' · '}Proof of funds: {row.record.pof_status === 'self_reported'
+                ? `self-reported${row.record.pof_note ? ` — ${row.record.pof_note}` : ''} (ask for the letter before you rely on it)`
+                : 'not provided'}
             </li>
           ))}
         </ul>
@@ -413,7 +485,7 @@ function BuyerRecordLine({ buyerUser }: { buyerUser: string }) {
     <>
       <br />
       <span style={{ color: '#a5b4fc' }}>
-        Buyer record: {rec.accepted_deals === 0
+        Earned tier: {buyerTier(rec).label} · Buyer record: {rec.accepted_deals === 0
           ? 'no platform deals yet — no closing history'
           : `${rec.bc_signed} B–C signed · ${rec.closed_deals} closed · ${rec.fell_through} fell through (of ${rec.accepted_deals} accepted)`}
         {' · '}Proof of funds: {rec.pof_status === 'self_reported'

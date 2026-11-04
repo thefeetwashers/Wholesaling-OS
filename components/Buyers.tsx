@@ -37,7 +37,8 @@ export default function Buyers({ userId }: { userId: string | null }) {
       <h2>Buyers — Your Buyer List + Demand Map</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         Your private buyer list only. It is never shared with other users and never shown to the owner as raw rows.
-        The demand count below is buyers YOU entered, by state — not live corporate orders.
+        The demand count below is buyers YOU entered, by state — not live corporate orders. The tier saved here is
+        your private working label; earned tiers in Your Portal come only from platform closing records.
       </p>
       <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
         <input placeholder="Buyer name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -47,13 +48,13 @@ export default function Buyers({ userId }: { userId: string | null }) {
         </select>
         <input placeholder="States, e.g. FL" value={form.states} onChange={(e) => setForm({ ...form, states: e.target.value })} />
         <input placeholder="Buy box, e.g. single-family under 70% ARV in 34982" value={form.buy_box} onChange={(e) => setForm({ ...form, buy_box: e.target.value })} />
-        <label>Tier <input type="number" min={1} max={3} value={form.tier} onChange={(e) => setForm({ ...form, tier: Number(e.target.value) })} /></label>
+        <label>Your working tier (manual, 1–3) <input type="number" min={1} max={3} value={form.tier} onChange={(e) => setForm({ ...form, tier: Number(e.target.value) })} /></label>
         <label><input type="checkbox" checked={form.verified_pof} onChange={(e) => setForm({ ...form, verified_pof: e.target.checked })} /> Proof of funds verified</label>
         <button onClick={addBuyer}>Add buyer</button>
       </div>
       {buyers.length === 0 && <p>No buyers yet. Add your first buyer above. Empty areas mean: no buyer data yet.</p>}
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to sync.'}</p>
-      <ul>{buyers.map((b) => <li key={b.id || b.name}><strong>{b.name}</strong> — {b.buyer_type}, {(b.states || []).join(', ')}, Tier {b.tier}, POF: {b.verified_pof ? 'Yes' : 'No'} — {b.buy_box}</li>)}</ul>
+      <ul>{buyers.map((b) => <li key={b.id || b.name}><strong>{b.name}</strong> — {b.buyer_type}, {(b.states || []).join(', ')}, Your working tier {b.tier}, POF: {b.verified_pof ? 'Yes' : 'No'} — {b.buy_box}</li>)}</ul>
     </section>
   );
 }
