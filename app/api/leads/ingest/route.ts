@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createHash } from 'crypto';import { normalizePhones } from '../../../../lib/phone';
+import { createHash } from 'crypto';
+import { normalizePhones } from '../../../../lib/phone';
+import { alertLeadOwner } from '../../../../lib/lead-alert';
 
 // Lead-ingestion webhook — SERVER ONLY, service-role key required.
 // Slice 31. A wholesaler's OWN sources (their form backend, a
@@ -136,10 +138,17 @@ export async function POST(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
   const rows: Record<string, unknown>[] = [];
   let duplicates = 0;
-  let noAddress = 0; let invalidPhones = 0;
+  let noAddress = 0;
+  let invalidPhones = 0;
   for (const rec of records) {
     const n = normalize(rec && typeof rec === 'object' ? rec : {});
-    if (!n.property_address) { noAddress++; continue; } const checked = normalizePhones(n.phones); n.phones = checked.phones; invalidPhones += checked.invalid;
+    if (!n.property_address) { noAddress++; continue; }
+    // Slice 32 — format-check any phones the payload itself carries:
+    // valid numbers are stored in standard +1 (E.164) form; invalid
+    // ones are kept as sent and counted in the response summary.
+    const checked = normalizePhones(n.phones);
+    n.phones = checked.phones;
+    invalidPhones += checked.invalid;
     const dedupeKey = `${normAddr(n.property_address)}|${normAddr(n.zip || n.city)}`;
     if (seen.has(dedupeKey)) { duplicates++; continue; }
     seen.add(dedupeKey);
@@ -187,10 +196,21 @@ export async function POST(req: Request) {
 
   await supabase.from('ingest_keys').update({ last_used_at: new Date().toISOString() }).eq('id', key.id);
 
+  // Slice 45 — one digest alert per batch (never one per row),
+  // best-effort and dark until the owner's Resend key is connected.
+  if (added > 0 && rows.length > 0) {
+    await alertLeadOwner(supabase, userId, {
+      address: added === 1 ? String(rows[0].property_address || 'New lead') : `${added} new leads`,
+      source: `Webhook: ${key.label}`,
+      detail: added === 1 ? undefined : `First: ${String(rows[0].property_address || '')}`,
+    });
+  }
+
   return NextResponse.json({
     added,
     duplicates_skipped: duplicates,
-    skipped_no_address: noAddress, ...(invalidPhones ? { invalid_phones: invalidPhones } : {}),
+    skipped_no_address: noAddress,
+    ...(invalidPhones ? { invalid_phones: invalidPhones } : {}),
     ...(insertError && added < rows.length ? { error: insertError } : {}),
   });
 }

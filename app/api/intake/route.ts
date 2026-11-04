@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { checkPhone } from '../../../lib/phone';
+import { alertLeadOwner } from '../../../lib/lead-alert';
 
 // Slice 41 — seller-page voice intake completion route.
 // PUBLIC and unauthenticated by design (it serves the public seller
@@ -118,5 +119,12 @@ export async function POST(req: Request) {
     notes: bits.join(' '),
   });
   if (error) return Response.json({ error: error.message }, { status: 500 });
+  // Slice 45 — tell the wholesaler a lead just landed (best-effort,
+  // dark until their Resend key is connected; never blocks intake).
+  await alertLeadOwner(sb, profile.id as string, {
+    address,
+    source: 'Seller page voice intake',
+    detail: bits.join(' '),
+  });
   return Response.json({ ok: true });
 }

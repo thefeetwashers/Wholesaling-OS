@@ -28,6 +28,11 @@ export interface Lead {
   consent_status?: ConsentStatus;
   consent_at?: string | null;
   consent_source?: string | null;
+  // Dead-lead watchlist (schema v2 columns; UI wired in Slice 47):
+  // watched leads carry a manual re-check date; a logged public-record
+  // event (public.lead_events) resurrects them.
+  watched?: boolean;
+  recheck_date?: string | null;
 }
 
 // What contact permission is on file for a lead. 'unknown' is the

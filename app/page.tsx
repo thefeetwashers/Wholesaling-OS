@@ -15,6 +15,10 @@ import Titles from '../components/Titles';
 import Counties from '../components/Counties';
 import AuctionDirectory from '../components/AuctionDirectory';
 import DashboardBand from '../components/DashboardBand';
+import DeadlineRadar from '../components/DeadlineRadar';
+import GlobalSearch from '../components/GlobalSearch';
+import DeadLeadWatch from '../components/DeadLeadWatch';
+import TitlePacket from '../components/TitlePacket';
 import ListingsManager from '../components/ListingsManager';
 import WatchlistProbate from '../components/WatchlistProbate';
 import BusinessPL from '../components/BusinessPL';
@@ -68,7 +72,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 44</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 47</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -115,9 +119,11 @@ export default function Home() {
         <div className="ws-shell">
           <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} />
           <div className="ws-view">
+            <GlobalSearch userId={userId} onNavigate={setView} />
             {view === 'dashboard' && (
               <>
                 {role === 'wholesaler' && userId && <DashboardBand userId={userId} />}
+                {role === 'wholesaler' && userId && <DeadlineRadar userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
                 <PublicDealsSection />
@@ -162,6 +168,7 @@ export default function Home() {
                 </p>
                 <StaleDollars userId={userId} />
                 <WatchlistProbate />
+                <DeadLeadWatch userId={userId} />
                 <DealAnalyzer />
                 <RentalAnalyzer />
               </>
@@ -177,6 +184,7 @@ export default function Home() {
                 <div id="contracts"><Contracts userId={userId} /></div>
                 <Viewings userId={userId} />
                 <div id="escrow"><Escrow userId={userId} /></div>
+                <TitlePacket userId={userId} />
               </>
             )}
             {view === 'buyers' && (
