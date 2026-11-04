@@ -322,3 +322,9 @@ can be built in slices without starting from a blank folder.
 - Honesty rules: listing type is 'For Sale By Owner' only when the text says so (or FSBO), 'Agent listed' only with an explicit Listed by/Courtesy of/Brokered by line; owner_name is taken ONLY from an explicit "Seller:"/"Owner:" label — never inferred from clues; anything not found stays blank.
 - components/ListingParser.tsx in the Leads view (under Add-from-link): paste box + optional source link, Extract → fully editable preview (address/city/state/ZIP/owner) with phones/emails/type/notes shown → Create this lead. Saved with list_source 'Pasted listing', consent 'unknown', and a notes stamp recording the paste date, the source link when given, the notes bits, and any rejected phone candidates.
 - No schema change.
+
+
+## Slice 35 — Investor video walkthrough template (Nov 3, 2026)
+- Owner-approved Nov 3, 2026: the corrected video-script deliverable (rewritten from a pasted AI draft that invented its property facts and promised a nonexistent "Muse.ai video player" CTA) saved as the tenth script template, key 'videowalk', in lib/scripts-data.ts — so it appears in BOTH the Comms Center and Scripts & Outreach template pickers, same as the Slice 27 deal-blast.
+- Content: filming checklist (street, roofline, panel/water heater/HVAC plates, under-sink plumbing, room passes, damage filmed not hidden), the ~60-second spoken script, the overlay list, and the CTA pattern (public deal page link; EMD to the title company, never through a form). Every figure is an honest [bracketed] slot to fill from the deal record (the Deal Analyzer computes MAO); {city}/{address} merge automatically. The equitable-interest disclosure line is built in.
+- The label states plainly that it is a script to RECORD, not a message to send. No schema change.
