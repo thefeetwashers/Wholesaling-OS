@@ -8,6 +8,7 @@ import {
   type PublicSellerPage,
   type SellerLeadForm,
 } from '../../../lib/portals';
+import VoiceIntake from '../../../components/VoiceIntake';
 
 // Public seller landing page (Slice 20): /sell/<slug> under the
 // wholesaler's own company name. No account needed. The submission
@@ -84,6 +85,8 @@ export default function SellerPage() {
         <p>{page.headline || 'Thinking of selling your house? Tell us about it — no obligation.'}</p>
         {page.about && <p style={{ fontSize: 14 }}>{page.about}</p>}
       </div>
+
+      <VoiceIntake slug={slug} company={page.company} />
 
       <section style={{ background: '#16213a', padding: 20, borderRadius: 12 }}>
         <h2>Tell us about your property</h2>
