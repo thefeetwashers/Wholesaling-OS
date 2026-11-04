@@ -12,6 +12,7 @@ import {
 } from '../lib/outreach';
 import { updateLeadFields, type Lead } from '../lib/leads';
 import { checkPhone } from '../lib/phone';
+import InAppSend from './InAppSend';
 import {
   firstPhone,
   firstEmail,
@@ -145,8 +146,10 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
       <h2>Comms Center — you tap, your phone sends</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         Pick a lead, pick a script, pass the blocklist check, then tap the channel — the message opens in your own
-        phone or mail app, from your own number and accounts. Nothing here auto-sends or auto-dials, and there is
-        no AI caller: AI voices are “artificial” under the TCPA without prior express consent (FCC, Feb 2024).
+        phone or mail app, from your own number and accounts; or, once you've connected your own Twilio/Resend
+        accounts, send it from right here — still one tap per message, consent on file required. Nothing here
+        auto-sends or auto-dials, and there is no AI caller: AI voices are “artificial” under the TCPA without
+        prior express consent (FCC, Feb 2024).
       </p>
       {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
 
@@ -231,6 +234,7 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
                   </div>
                   {!firstPhone(lead) && <p style={{ fontSize: 13 }}>No phone on file for this lead — call, text, and WhatsApp unlock once a phone is added to the lead.</p>}
                   {!firstEmail(lead) && <p style={{ fontSize: 13 }}>No email on file for this lead.</p>}
+                  <InAppSend userId={userId} lead={lead} merged={merged} tplKey={tpl.key} />
                 </div>
               )}
             </>

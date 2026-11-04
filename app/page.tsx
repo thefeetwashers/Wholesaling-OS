@@ -14,6 +14,8 @@ import VendorDirectory from '../components/VendorDirectory';
 import Titles from '../components/Titles';
 import Counties from '../components/Counties';
 import AuctionDirectory from '../components/AuctionDirectory';
+import DashboardBand from '../components/DashboardBand';
+import ListingsManager from '../components/ListingsManager';
 import WatchlistProbate from '../components/WatchlistProbate';
 import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
@@ -66,7 +68,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 42</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 44</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -115,6 +117,7 @@ export default function Home() {
           <div className="ws-view">
             {view === 'dashboard' && (
               <>
+                {role === 'wholesaler' && userId && <DashboardBand userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
                 <PublicDealsSection />
@@ -125,6 +128,18 @@ export default function Home() {
                   ))}
                 </div>
               </>
+            )}
+            {view === 'listings' && (
+              <div id="listings"><ListingsManager userId={userId} /></div>
+            )}
+            {view === 'sellerpage' && (
+              <>
+                {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                {role !== 'wholesaler' && <p style={{ fontSize: 14 }}>The seller page belongs to wholesaler accounts.</p>}
+              </>
+            )}
+            {view === 'titles' && (
+              <Titles userId={userId} />
             )}
             {view === 'today' && (
               <div id="today"><TodayCenter leads={leads} /></div>

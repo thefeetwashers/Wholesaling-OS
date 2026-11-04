@@ -74,6 +74,26 @@ export async function logOutreach(
   if (error) throw error;
 }
 
+// Slice 44 — a message actually sent from inside the app (via the
+// wholesaler's own provider account) is logged as 'sent', distinct
+// from the 'prepared' rows the click-out channels create.
+export async function logSentOutreach(
+  userId: string,
+  leadId: string | null,
+  channel: OutreachChannel,
+  templateKey: string
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase.from('outreach').insert({
+    owner_id: userId,
+    lead_id: leadId,
+    channel,
+    template: templateKey,
+    status: 'sent',
+  });
+  if (error) throw error;
+}
+
 export async function sha256Hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
