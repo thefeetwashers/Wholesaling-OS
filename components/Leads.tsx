@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadLeads, saveLead, deleteLead, leadsToCsv, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import ResearchLinks from './ResearchLinks';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -101,6 +102,8 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {' '}· {l.status}
             {l.follow_up_date ? ` · follow-up ${l.follow_up_date}` : ''}
             {l.owner_name ? ` · owner: ${l.owner_name}` : ''}
+            {l.list_source ? ` · source: ${l.list_source}` : ''}
+            <ResearchLinks lead={l} />
             {' '}
             {confirmId === (l.id || l.property_address) ? (
               <>
