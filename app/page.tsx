@@ -27,6 +27,7 @@ import AssistantPanel from '../components/AssistantPanel';
 import AddFromLink from '../components/AddFromLink';
 import ImportInbox from '../components/ImportInbox';
 import WebhookPanel from '../components/WebhookPanel';
+import ListingParser from '../components/ListingParser';
 import Sidebar from '../components/Sidebar';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
@@ -62,7 +63,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 33</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 34</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -131,6 +132,7 @@ export default function Home() {
             {view === 'leads' && (
               <>
                 <AddFromLink userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
+                <ListingParser userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <ImportInbox userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <WebhookPanel userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <div id="leads"><Leads key={leadsNonce} userId={userId} onLeads={setLeads} /></div>
