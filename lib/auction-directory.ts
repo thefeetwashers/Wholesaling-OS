@@ -10,13 +10,14 @@
 //   (vehicles, equipment) — not real estate. GSA Real Estate Sales is
 //   the real-property channel and IS listed.
 // - TreasuryDirect: sells Treasury securities, not seized property.
-// - The Realauction county subdomains that sit behind bot protection
-//   (palmbeach.realforeclose.com, stlucie.realforeclose.com,
-//   charlotte.realforeclose.com, broward.realtaxdeed.com,
-//   stlucie.realtaxdeed.com): each is corroborated by its clerk's own
-//   pages, but none could be fetched directly, so the directory links
-//   the CLERK's official page instead — which itself links the sale
-//   site. They join this list only after a live-browser confirmation.
+// - Realauction county subdomains: three were confirmed in a LIVE
+//   browser on Nov 3, 2026 and are listed below (stlucie and
+//   charlotte .realforeclose.com, broward.realtaxdeed.com). Two are
+//   still excluded: palmbeach.realforeclose.com and
+//   stlucie.realtaxdeed.com both redirect to the Realauction homepage
+//   instead of a county sale page (live check, Nov 3, 2026) — for
+//   those, the directory links the CLERK's official page, which links
+//   the working sale route.
 // - broward.deedauction.net: Broward's former tax deed portal,
 //   superseded July 2026 by the move to RealAuction. Stale — excluded.
 
@@ -67,6 +68,9 @@ export const AUCTION_GROUPS: AuctionGroup[] = [
     sources: [
       { name: 'Realauction — client directory', url: 'https://www.realauction.com/clients/index', operator: 'Commercial platform used by Florida clerks', covers: 'The directory of clerk sale sites on the RealForeclose / RealTaxDeed platform — find any participating county here.' },
       { name: 'Broward County — foreclosure sales', url: 'https://broward.realforeclose.com/', operator: 'Broward Clerk of Courts (RealForeclose)', covers: 'Broward judicial foreclosure auctions, online.' },
+      { name: 'Broward County — tax deed sales', url: 'https://broward.realtaxdeed.com/', operator: 'Broward County Records, Taxes & Treasury (RealTaxDeed)', covers: 'Broward tax deed auctions, online since the July 2026 move to RealAuction. Live-browser confirmed Nov 3, 2026.' },
+      { name: 'St. Lucie County — foreclosure sales', url: 'https://stlucie.realforeclose.com/', operator: 'St. Lucie Clerk of Court (RealForeclose)', covers: 'St. Lucie judicial foreclosure auctions, online. Live-browser confirmed Nov 3, 2026.' },
+      { name: 'Charlotte County — foreclosure & tax deed sales', url: 'https://www.charlotte.realforeclose.com/', operator: 'Charlotte Clerk of Courts (RealForeclose)', covers: 'Charlotte runs BOTH foreclosure and tax deed sales on this one site. Live-browser confirmed Nov 3, 2026.' },
       { name: 'Palm Beach County — tax deed sales', url: 'https://palmbeach.realtaxdeed.com/', operator: 'Palm Beach Clerk & Comptroller (RealTaxDeed)', covers: 'Palm Beach tax deed auctions, online.' },
       { name: 'Palm Beach Clerk — foreclosure information', url: 'https://www.mypalmbeachclerk.com/departments/courts/foreclosures/general-information', operator: 'Palm Beach Clerk & Comptroller (official)', covers: "The Clerk's official explainer for its online foreclosure and tax deed sales, with registration links. Separate accounts for foreclosure vs. tax deed sales." },
       { name: 'St. Lucie Clerk — foreclosures', url: 'https://stlucieclerk.gov/services/auctions/foreclosure', operator: 'St. Lucie Clerk of Court (official)', covers: "The Clerk's foreclosure page; sales are held online at RealAuction and administered by Real Foreclose." },

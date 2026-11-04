@@ -36,9 +36,9 @@ export default function AuctionDirectory() {
         </div>
       ))}
       <p style={{ fontSize: 12.5, color: '#94a3b8' }}>
-        County sale sites that sit behind bot protection aren't linked directly yet — the Clerk pages
-        above link them officially, and a county joins this list directly only after a live confirmation,
-        never by guessing a URL pattern.
+        County sale sites join this list directly only after a live confirmation, never by guessing a
+        URL pattern — where a direct link doesn't resolve to a real sale page, the Clerk's official
+        page above is the route in.
       </p>
     </section>
   );
