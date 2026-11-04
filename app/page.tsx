@@ -13,6 +13,7 @@ import Buyers from '../components/Buyers';
 import VendorDirectory from '../components/VendorDirectory';
 import Titles from '../components/Titles';
 import Counties from '../components/Counties';
+import AuctionDirectory from '../components/AuctionDirectory';
 import WatchlistProbate from '../components/WatchlistProbate';
 import BusinessPL from '../components/BusinessPL';
 import { supabaseConfigured } from '../lib/supabase';
@@ -65,7 +66,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 39</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 40</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -179,6 +180,7 @@ export default function Home() {
               <>
                 <Titles userId={userId} />
                 <Counties userId={userId} />
+                <AuctionDirectory />
               </>
             )}
             {view === 'admin' && (
