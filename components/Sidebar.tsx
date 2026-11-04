@@ -19,6 +19,7 @@ export const SHELL_VIEWS: ShellView[] = [
   { key: 'comms', label: 'Comms Center', icon: '💬' },
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝' },
   { key: 'buyers', label: 'Buyers', icon: '💵' },
+  { key: 'directory', label: 'Lenders & Vendors', icon: '🧰' },
   { key: 'money', label: 'Money', icon: '📊' },
   { key: 'records', label: 'Counties & Title', icon: '🗂️' },
 ];

@@ -11,6 +11,7 @@ export interface EscrowFileRow {
   emd_amount_required?: number;
   emd_status?: string;
   emd_deadline?: string | null;
+  title_search_status?: string;
   file_status?: string;
   target_closing_date?: string | null;
   outcome?: string;
@@ -82,6 +83,42 @@ export async function loadEscrowFilesForDeal(
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []) as EscrowFileRow[];
+}
+
+// Slice 39: milestones for a set of files, grouped by file id, so the
+// closing checklist can be derived on load (before Slice 39 the
+// milestones were only visible in the session that created them).
+export async function loadMilestonesForFiles(
+  userId: string,
+  fileIds: string[],
+): Promise<Record<string, string[]> | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  if (fileIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('escrow_milestones')
+    .select('file_id, milestone_name')
+    .eq('owner_id', userId)
+    .in('file_id', fileIds)
+    .order('logged_at', { ascending: true });
+  if (error) throw error;
+  const out: Record<string, string[]> = {};
+  for (const r of (data || []) as { file_id: string; milestone_name: string }[]) {
+    if (!out[r.file_id]) out[r.file_id] = [];
+    out[r.file_id].push(r.milestone_name);
+  }
+  return out;
+}
+
+// Slice 39: the wholesaler updates the file's own status fields as
+// reality changes (EMD lands, title search moves). Check constraints
+// in schema v2 own the allowed values.
+export async function updateEscrowFileStatus(
+  fileId: string,
+  patch: { emd_status?: string; title_search_status?: string },
+): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase.from('escrow_files').update(patch).eq('id', fileId);
+  if (error) throw error;
 }
 
 export async function addEscrowMilestone(

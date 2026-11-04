@@ -10,6 +10,7 @@ import Contracts from '../components/Contracts';
 import Viewings from '../components/Viewings';
 import Escrow from '../components/Escrow';
 import Buyers from '../components/Buyers';
+import VendorDirectory from '../components/VendorDirectory';
 import Titles from '../components/Titles';
 import Counties from '../components/Counties';
 import WatchlistProbate from '../components/WatchlistProbate';
@@ -64,7 +65,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 38</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 39</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -164,6 +165,9 @@ export default function Home() {
             )}
             {view === 'buyers' && (
               <div id="buyers"><Buyers userId={userId} /></div>
+            )}
+            {view === 'directory' && (
+              <div id="directory"><VendorDirectory userId={userId} /></div>
             )}
             {view === 'money' && (
               <>

@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadDeals, type DealRow } from '../lib/deals';
-import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
+import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, loadMilestonesForFiles, updateEscrowFileStatus, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
+import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
 
 // Title escrow tracker, ported from the old prototype.
@@ -19,6 +20,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [dealId, setDealId] = useState('');
   const [files, setFiles] = useState<EscrowFileRow[]>([]);
+  const [milestones, setMilestones] = useState<Record<string, string[]>>({});
   const [savedMsg, setSavedMsg] = useState('');
   useEffect(() => {
     if (userId && supabaseConfigured) {
@@ -28,7 +30,12 @@ export default function Escrow({ userId }: { userId: string | null }) {
   }, [userId]);
   useEffect(() => {
     if (userId && supabaseConfigured && dealId) {
-      loadEscrowFilesForDeal(userId, dealId).then((rows) => { if (rows) setFiles(rows); }).catch(() => {});
+      loadEscrowFilesForDeal(userId, dealId).then((rows) => {
+        if (!rows) return;
+        setFiles(rows);
+        const ids = rows.map((r) => r.id).filter(Boolean) as string[];
+        loadMilestonesForFiles(userId, ids).then((m) => { if (m) setMilestones(m); }).catch(() => {});
+      }).catch(() => {});
     }
   }, [userId, dealId]);
   const saveEscrow = async () => {
@@ -38,9 +45,12 @@ export default function Escrow({ userId }: { userId: string | null }) {
     const selectedDeal = deals.find((d) => d.id === dealId);
     const file = await createEscrowFile(userId, listing.id, selectedDeal?.emd_amount ?? 0, deadline || null).catch(() => null);
     if (!file || !file.id) { setSavedMsg('Listing created but escrow file failed — check the listings table.'); return; }
+    const recorded: string[] = [];
     for (let i = 0; i <= step && i < MILESTONES.length; i++) {
       await addEscrowMilestone(userId, file.id, MILESTONES[i]).catch(() => {});
+      recorded.push(MILESTONES[i]);
     }
+    setMilestones({ ...milestones, [file.id]: recorded });
     setFiles([file, ...files]); setSavedMsg('Escrow file saved to Supabase (listing + file + milestones).');
   };
   const [fee, setFee] = useState(10000);
@@ -52,7 +62,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Title Escrow Tracker</h2>
-      <label>Deal (saved in Supabase): <select value={dealId} onChange={(e) => setDealId(e.target.value)}><option value="">— pick a deal —</option>{deals.map((d) => <option key={d.id} value={d.id}>{(d.documents as { property_address?: string } | undefined)?.property_address || d.id} — {d.contract_type}</option>)}</select></label>
+      <label>Deal (saved in Supabase): <select value={dealId} onChange={(e) => { const id = e.target.value; setDealId(id); const d = deals.find((x) => x.id === id); if (d?.contract_price != null) setPrice(Number(d.contract_price)); if (d?.assignment_fee != null) setFee(Number(d.assignment_fee)); }}><option value="">— pick a deal —</option>{deals.map((d) => <option key={d.id} value={d.id}>{(d.documents as { property_address?: string } | undefined)?.property_address || d.id} — {d.contract_type}</option>)}</select></label>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>{savedMsg || 'Save creates a marketplace listing, then an escrow file, then append-only milestone rows.'}</p>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Milestones are advanced by you, by hand. Nothing here talks to a title company system. Milestones saved to Supabase are append-only — they are inserted, never edited or deleted.</p>
       <label>Contract price $ <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} /></label>{' '}
@@ -84,6 +94,34 @@ export default function Escrow({ userId }: { userId: string | null }) {
                   {f.outcome && f.outcome !== 'open' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'open'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'open' } : x))); setSavedMsg('Escrow outcome reopened.'); }}>Reopen</button>}
                 </>
               )}
+              {f.id && (() => {
+                const names = milestones[f.id] || [];
+                const cl = closingChecklist(f, names);
+                const next = nextMilestone(names);
+                const icon = (s: string) => (s === 'done' ? '✅' : s === 'attention' ? '🔴' : s === 'pending' ? '🟡' : '⚪');
+                return (
+                  <span style={{ display: 'block', marginTop: 6, fontSize: 12.5 }}>
+                    <strong>{cl.badgeLabel}</strong>
+                    <span style={{ display: 'block', marginTop: 2 }}>
+                      {cl.items.map((it) => (
+                        <span key={it.key} style={{ marginRight: 10 }} title={it.detail}>{icon(it.state)} {it.label}{it.state === 'attention' ? ` — ${it.detail}` : ''}</span>
+                      ))}
+                    </span>
+                    {next && <button onClick={async () => { await addEscrowMilestone(userId!, f.id!, next); setMilestones({ ...milestones, [f.id!]: [...names, next] }); setSavedMsg(`Milestone recorded: ${next}`); }}>Record next step: {next}</button>}{' '}
+                    <label>EMD: <select value={f.emd_status || 'awaiting_wire'} onChange={async (e) => { const v = e.target.value; await updateEscrowFileStatus(f.id!, { emd_status: v }); setFiles(files.map((x) => (x.id === f.id ? { ...x, emd_status: v } : x))); }}>
+                      <option value="awaiting_wire">Awaiting</option>
+                      <option value="received_verified">Received</option>
+                      <option value="deficient_cancelled">Deficient / cancelled</option>
+                    </select></label>{' '}
+                    <label>Title search: <select value={f.title_search_status || 'not_started'} onChange={async (e) => { const v = e.target.value; await updateEscrowFileStatus(f.id!, { title_search_status: v }); setFiles(files.map((x) => (x.id === f.id ? { ...x, title_search_status: v } : x))); }}>
+                      <option value="not_started">Not started</option>
+                      <option value="in_progress">In progress</option>
+                      <option value="issues_found">Issues found</option>
+                      <option value="clear_title">Clear title</option>
+                    </select></label>
+                  </span>
+                );
+              })()}
             </li>
           ))}
         </ul>
