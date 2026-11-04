@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DealAnalyzer from '../components/DealAnalyzer';
+import RentalAnalyzer from '../components/RentalAnalyzer';
 import AuthPanel from '../components/AuthPanel';
 import Leads from '../components/Leads';
 import TodayCenter from '../components/TodayCenter';
@@ -63,7 +64,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 36</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 37</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -145,6 +146,7 @@ export default function Home() {
                 <StaleDollars userId={userId} />
                 <WatchlistProbate />
                 <DealAnalyzer />
+                <RentalAnalyzer />
               </>
             )}
             {view === 'comms' && (

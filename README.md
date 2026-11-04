@@ -335,3 +335,9 @@ can be built in slices without starting from a blank folder.
 - The platform fetches nothing and looks nobody up: the wholesaler opens the record, reads it, and types findings into the lead themselves. Panel copy says exactly that, including that no phone numbers are pulled or promised. Automated skip tracing remains rejected (standing TCPA/ToS grounds); this is the human-research accelerator instead.
 - Rider (long-standing polish gap): lead rows now print list_source ("source: …") — Slices 20/29/30/31/34 have stamped it in the data since October; the row finally shows it.
 - No schema change. Sidebar unchanged (the toggle lives on the lead row, where the research starts).
+
+
+## Slice 37 — Rental & DSCR analyzer (Nov 3, 2026)
+- Gap-audit build #2 under the owner's Nov 3 delegation. The Deal Analyzer answers a flip buyer's question (MAO); landlord and fund buyers ask a different one — does it cash-flow, and will a DSCR lender fund it. lib/rental.ts + components/RentalAnalyzer.tsx (Leads view, under the Deal Analyzer) answer it from numbers the wholesaler types in ONLY: price, rent, taxes, insurance, HOA, vacancy/maintenance/management percentages, down payment, rate, term.
+- Outputs: loan/down, monthly P&I (standard amortization), effective rent after vacancy, operating expenses, NOI, cap rate, gross rent multiplier, 1%-rule ratio, monthly/yearly cash flow, cash-on-cash, and DSCR (NOI ÷ yearly debt service) with the common 1.20 lender threshold labeled as the lenders' rule, not the platform's. Missing inputs produce honest blanks/nulls — a cash purchase correctly shows DSCR as not applicable.
+- Math verified by unit checks before push (textbook case: $150k price, $1,500 rent, 20% down at 7%/30yr → P&I $798.36, NOI $12,000, cap 8.00%, DSCR 1.25, cash flow $201.64/mo, CoC 8.07%). No schema change, no data source — the platform supplies no rents or rates.
