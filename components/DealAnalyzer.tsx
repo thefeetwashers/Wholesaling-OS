@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { calculateMAO, totalMarketplaceCost, isOverMAO } from '../lib/mao';
+import { suggestAssignmentFee, type PropertyKind } from '../lib/fee-guide';
 
 export default function DealAnalyzer() {
   const [arv, setArv] = useState(300000);
@@ -9,6 +10,8 @@ export default function DealAnalyzer() {
   const [repairs, setRepairs] = useState(50000);
   const [fee, setFee] = useState(10000);
   const [customFee, setCustomFee] = useState('');
+  const [kind, setKind] = useState<PropertyKind>('house');
+  const guide = suggestAssignmentFee(kind, arv, repairs, contractPrice);
 
   const mao = calculateMAO(arv, repairs, fee);
   const total = totalMarketplaceCost(contractPrice, fee);
@@ -35,6 +38,19 @@ export default function DealAnalyzer() {
             onChange={(e) => { setCustomFee(e.target.value); if (e.target.value) setFee(Number(e.target.value)); }}
             style={{ width: 120 }}
           />
+        </div>
+        <div style={{ background: '#0f172a', border: '1px solid rgba(16,185,129,0.35)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ fontSize: 12, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 700 }}>Assignment fee guide</div>
+          <div style={{ margin: '8px 0' }}>
+            <button onClick={() => setKind('house')}>🏠 House</button>{' '}
+            <button onClick={() => setKind('land')}>🌳 Land</button>
+          </div>
+          <p style={{ margin: '4px 0', fontSize: 13.5 }}>Room in this deal: <strong>${guide.room.toLocaleString()}</strong> <span style={{ color: '#94a3b8' }}>(buyer budget at the 70% rule, minus your contract price)</span></p>
+          <p style={{ margin: '4px 0', fontSize: 13.5 }}>Suggested fee: <strong>${guide.suggested.toLocaleString()}</strong></p>
+          <p style={{ margin: '4px 0', fontSize: 12.5, color: '#94a3b8' }}>{guide.note}</p>
+          {guide.suggested > 0 && (
+            <button onClick={() => { setFee(guide.suggested); setCustomFee(String(guide.suggested)); }}>Use suggested fee</button>
+          )}
         </div>
       </div>
       <div style={{ marginTop: 16 }}>

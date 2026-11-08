@@ -54,6 +54,9 @@ export const AUCTION_GROUPS: AuctionGroup[] = [
     sources: [
       { name: 'GSA Real Estate Sales', url: 'https://realestatesales.gov', operator: 'General Services Administration', covers: 'Surplus federal land and buildings sold to the public by competitive sale.' },
       { name: 'Treasury Auctions', url: 'https://home.treasury.gov/services/treasury-auctions/', operator: 'U.S. Dept. of the Treasury', covers: 'Seized/forfeited property auctions — IRS (real estate, vehicles, merchandise) and TEOAF (real estate and general property).' },
+      { name: 'CWS Marketing Group', url: 'https://cwsmarketing.com/', operator: 'Treasury contractor (CWS Asset Management & Sales) — commercial site running the official auctions', covers: 'Runs the U.S. Treasury seized real estate auctions (IRS-CI seizures) — homes, land, commercial. Live auctions verified Nov 8, 2026, including Florida properties.' },
+      { name: 'U.S. Marshals Service — Asset Forfeiture', url: 'https://www.usmarshals.gov/what-we-do/asset-forfeiture', operator: 'U.S. Marshals Service (Dept. of Justice)', covers: 'Seized/forfeited DOJ assets, including real estate. Honest note: most forfeited homes are listed with licensed brokers at fair market value (via the RealLook contractor site) — a real channel, not a below-market bargain board. Page confirmed via usmarshals.gov, Nov 8, 2026.' },
+      { name: 'Forfeiture.gov — forfeiture notices', url: 'https://www.forfeiture.gov/', operator: 'U.S. Dept. of Justice', covers: 'Official federal forfeiture NOTICES and claim/petition filing. Property is NOT sold here — sales happen through the Treasury and Marshals channels above. Verified Nov 8, 2026.' },
     ],
   },
   {
