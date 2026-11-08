@@ -222,6 +222,7 @@ export function LandingFooter() {
           <strong style={{ color: '#fff' }}>Legal</strong>
           <a href="/privacy" style={link}>Privacy Policy</a>
           <a href="/terms" style={link}>Terms of Service</a>
+          <a href="/verify" style={link}>How We Verify</a>
           <span style={{ color: '#94a3b8' }}>WholesalingOS is software, not legal, tax, or investment advice. Contract templates carry an attorney-review flag — use your own attorney for your state.</span>
         </div>
       </div>
