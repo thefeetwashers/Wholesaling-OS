@@ -39,6 +39,7 @@ import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
+import SignKit from '../components/SignKit';
 import AssistantPanel from '../components/AssistantPanel';
 import AddFromLink from '../components/AddFromLink';
 import ImportInbox from '../components/ImportInbox';
@@ -88,7 +89,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 61</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 62</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -148,6 +149,7 @@ export default function Home() {
                 {role === 'wholesaler' && userId && <DeadlineRadar userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                {role === 'wholesaler' && userId && <SignKit userId={userId} />}
                 <PublicDealsSection />
                 <h2 style={{ marginTop: 24 }}>Pipeline</h2>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -163,6 +165,7 @@ export default function Home() {
             {view === 'sellerpage' && (
               <>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                {role === 'wholesaler' && userId && <SignKit userId={userId} />}
                 {role !== 'wholesaler' && <p style={{ fontSize: 14 }}>The seller page belongs to wholesaler accounts.</p>}
               </>
             )}

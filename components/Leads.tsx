@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import LeadLetter from './LeadLetter';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
@@ -48,7 +49,17 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
     // Slice 61 — the same form now edits: with an editing target it
     // updates that row instead of inserting a duplicate.
     if (editingId && userId && supabaseConfigured) {
-      const row = await updateLead(userId, { ...form, id: editingId }).catch(() => null);
+      // Slice 62 fix (found by the Slice 61 live verification): cleared
+      // numeric inputs become undefined, which the update serializer drops —
+      // so the stored values survived "clearing". On edit, an emptied
+      // numeric field must be sent as null so the database actually clears.
+      const editForm: Lead = {
+        ...form,
+        year_built: form.year_built ?? null,
+        assessed_value: form.assessed_value ?? null,
+        liens_amount: form.liens_amount ?? null,
+      } as Lead;
+      const row = await updateLead(userId, { ...editForm, id: editingId }).catch(() => null);
       if (row) {
         const next = leads.map((x) => (x.id === editingId ? row : x));
         setLeads(next); onLeads(next);
@@ -187,6 +198,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <button onClick={() => startEdit(l)}>Edit</button>
             )}{' '}
+            <LeadLetter lead={l} />{' '}
             {confirmId === (l.id || l.property_address) ? (
               <>
                 <button onClick={() => removeLead(l)}>Confirm delete</button>{' '}
