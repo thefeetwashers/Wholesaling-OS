@@ -198,6 +198,9 @@ export interface RosterRow {
   admin_suspended: boolean;
   has_stripe_customer: boolean;
   created_at: string;
+  // Slice 71 (schema v5.0): subscriber-referral attribution on the roster.
+  referrer_email?: string | null;
+  referral_credit_due?: boolean;
 }
 
 export async function loadAdminRoster(): Promise<RosterRow[]> {

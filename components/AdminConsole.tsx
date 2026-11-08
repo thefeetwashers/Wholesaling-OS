@@ -99,6 +99,8 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
                 ? ` · trial ends ${new Date(r.trial_ends_at).toLocaleDateString()}`
                 : ''}
               {r.admin_suspended ? ' · SUSPENDED' : ''}
+              {r.referrer_email ? ` · referred by ${r.referrer_email}` : ''}
+              {r.referral_credit_due ? ' · 💳 REFERRAL CREDIT DUE — $150 to the referrer (settle by hand; it is never billed or paid automatically)' : ''}
               <br />
               {r.email === OWNER_EMAIL ? (
                 <span style={{ fontSize: 12, color: '#d8b4fe' }}>Owner account — cannot be suspended.</span>

@@ -43,6 +43,21 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
         localStorage.removeItem('ws_pending_role');
       }
     } catch { /* role stays at the default; switchable in Your Portal */ }
+    // Slice 71: subscriber-referral attribution. A ?ref=<slug> seen on
+    // any page is stashed as ws_ref; here it is resolved once and
+    // written to this profile's referred_by — only while still empty,
+    // and never to yourself. Best-effort: signup never fails over it.
+    try {
+      const ref = localStorage.getItem('ws_ref');
+      if (ref) {
+        const { data } = await supabase.rpc('public_referrer_id', { p_slug: ref });
+        const rid = (Array.isArray(data) ? data[0] : data) as string | null;
+        if (rid && rid !== id) {
+          await supabase.from('profiles').update({ referred_by: rid }).eq('id', id).is('referred_by', null);
+        }
+        localStorage.removeItem('ws_ref');
+      }
+    } catch { /* attribution skipped; nothing else depends on it */ }
   };
 
   useEffect(() => {
