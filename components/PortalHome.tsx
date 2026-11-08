@@ -40,6 +40,7 @@ import {
   type TitleLink,
   type OfferRow,
 } from '../lib/portals';
+import { supabase } from '../lib/supabase';
 import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTierSummary } from '../lib/buyer-tiers';
 import ReferrerPortal from './ReferrerPortal';
 
@@ -652,13 +653,24 @@ export function PublicDealsSection() {
   const [feed, setFeed] = useState<FeedListing[] | null>(null);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [copied, setCopied] = useState('');
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setSharedId(new URLSearchParams(window.location.search).get('deal'));
     }
     loadFeed().then(setFeed).catch(() => setFeed([]));
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session)).catch(() => setSignedIn(false));
+    } else {
+      setSignedIn(false);
+    }
   }, []);
   const ordered = feed ? [...feed].sort((a, b) => (a.id === sharedId ? -1 : b.id === sharedId ? 1 : 0)) : null;
+  const shared = ordered && sharedId ? ordered.find((l) => l.id === sharedId) || null : null;
+  const joinAsBuyer = () => {
+    try { localStorage.setItem('ws_pending_role', 'buyer'); } catch { /* ignore */ }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   return (
     <section style={{ background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 }}>
       <h2>Public Deals</h2>
@@ -667,6 +679,34 @@ export function PublicDealsSection() {
         purchasing the wholesaler's contract rights, not the property itself. Verify all figures
         with the wholesaler and the title company before sending any funds.
       </p>
+      {shared && (
+        <div style={{ background: '#0f172a', border: '1px solid #34d399', padding: 14, borderRadius: 10, marginBottom: 12 }}>
+          <strong style={{ fontSize: 15 }}>👀 You&rsquo;re looking at a shared deal</strong>
+          <p style={{ fontSize: 14, margin: '6px 0' }}>
+            <strong>{shared.deals?.documents?.property_address || 'Address in deal file'}</strong>
+            {shared.deals?.documents?.city ? ` — ${shared.deals.documents.city}, ${shared.deals.documents.state || ''}` : ''}
+            {' · '}total cost to the buyer {money(Number(shared.total_marketplace_cost))}
+            {shared.deals?.status ? ` · status: ${shared.deals.status}` : ''}
+          </p>
+          <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '4px 0' }}>
+            Total cost is the buyer&rsquo;s all-in figure for the contract rights. The disclosure above applies:
+            verify every figure with the wholesaler and the title company before sending any funds.
+          </p>
+          {signedIn === false && (
+            <>
+              <p style={{ fontSize: 13.5, margin: '8px 0 4px' }}>
+                <strong>Buying?</strong> A free buyer account lets you make offers, save your buy boxes, and get
+                matched to deals like this one.{' '}
+                <button onClick={joinAsBuyer}>I&rsquo;m a buyer — create my free account</button>
+              </p>
+              <p style={{ fontSize: 13.5, margin: '4px 0 0' }}>
+                <strong>Selling a house of your own?</strong> Use your wholesaler&rsquo;s seller link — or talk to
+                the platform&rsquo;s operator, The Feet Washers, Inc., at 772-971-6129. No fee to talk.
+              </p>
+            </>
+          )}
+        </div>
+      )}
       {ordered === null ? (
         <p style={{ fontSize: 13 }}>Loading public deals…</p>
       ) : ordered.length === 0 ? (
@@ -682,7 +722,12 @@ export function PublicDealsSection() {
                 const url = `${window.location.origin}/?deal=${l.id}`;
                 try { await navigator.clipboard.writeText(url); setCopied(l.id); } catch { setCopied(''); }
               }}>Copy share link</button>
-              {copied === l.id ? ' Link copied.' : ''}
+              {' '}<button onClick={async () => {
+                const url = `${window.location.origin}/?deal=${l.id}`;
+                const text = `🏠 ${l.deals?.documents?.property_address || 'Property'}${l.deals?.documents?.city ? `, ${l.deals.documents.city}, ${l.deals.documents.state || ''}` : ''} — total cost ${money(Number(l.total_marketplace_cost))}. Assignment of equitable interest (contract rights, not the property itself) via WholesalingOS: ${url}`;
+                try { await navigator.clipboard.writeText(text); setCopied(l.id + '-text'); } catch { setCopied(''); }
+              }}>Copy share text</button>
+              {copied === l.id ? ' Link copied.' : copied === l.id + '-text' ? ' Share text copied.' : ''}
             </li>
           ))}
         </ul>
