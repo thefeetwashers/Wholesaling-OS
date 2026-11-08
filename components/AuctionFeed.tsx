@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadMyStates } from '../lib/my-states';
 
 // Slice 53 — the live auction feed panel (BidProwl). Real, live
 // government auction lots in the real-estate category, fetched
@@ -31,6 +32,25 @@ export default function AuctionFeed({ onNavigate }: { onNavigate: (view: string)
   const [lots, setLots] = useState<Lot[] | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState('');
+  // Slice 96 — My States: the feed opens on the wholesaler's
+  // first saved state (schema v5.5). A chip click is the user's
+  // own choice and always wins over the saved default.
+  const touched = useRef(false);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        if (!supabase) return;
+        const { data } = await supabase.auth.getSession();
+        const uid = data.session?.user?.id;
+        if (!uid) return;
+        const mine = await loadMyStates(uid);
+        if (live && !touched.current && mine.length > 0) setState(mine[0]);
+      } catch { /* the FL default stands */ }
+    })();
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -65,7 +85,7 @@ export default function AuctionFeed({ onNavigate }: { onNavigate: (view: string)
             <button
               key={s}
               type="button"
-              onClick={() => setState(s)}
+              onClick={() => { touched.current = true; setState(s); }}
               style={{ fontSize: 12.5, padding: '4px 10px', borderRadius: 999, background: state === s ? '#065f46' : '#0f172a', color: '#e2e8f0', border: '1px solid rgba(148,163,184,0.3)', cursor: 'pointer' }}
             >
               {s === 'ALL' ? 'All states' : s}
