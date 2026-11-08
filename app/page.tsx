@@ -27,6 +27,7 @@ import SpeedToLead from '../components/SpeedToLead';
 import ReferralEngine from '../components/ReferralEngine';
 import OwnerDealDesk from '../components/OwnerDealDesk';
 import ValueReceipt from '../components/ValueReceipt';
+import SealedOffice from '../components/SealedOffice';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
 import TitlePacket from '../components/TitlePacket';
@@ -82,7 +83,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 74: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 75: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -103,7 +104,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 74</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 75</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -139,6 +140,7 @@ export default function Home() {
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
       {locked ? (
+        <>
         <section style={{ background: '#450a0a', padding: 16, borderRadius: 12, marginTop: 16 }}>
           <h2>Your office is locked</h2>
           <p style={{ fontSize: 14 }}>
@@ -147,6 +149,8 @@ export default function Home() {
               : 'Your free trial or subscription is not active, so your office is locked. Subscribe above to reopen it — your leads, deals, and records are saved.'}
           </p>
         </section>
+        {!suspended && userId && <SealedOffice userId={userId} access={access} />}
+        </>
       ) : userId ? (
         <div className="ws-shell">
           <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} />
