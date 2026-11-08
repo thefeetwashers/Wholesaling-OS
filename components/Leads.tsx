@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadLeads, saveLead, deleteLead, leadsToCsv, isOutOfStateOwner, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
@@ -15,6 +15,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
   const [filter, setFilter] = useState<string>('all');
   const [mode, setMode] = useState<'local' | 'synced'>('local');
   const [confirmId, setConfirmId] = useState<string>('');
+  const [editingId, setEditingId] = useState<string>('');
   const [delMsg, setDelMsg] = useState<string>('');
   // Slice 42 — distress tags + the human call queue.
   const [tagsByLead, setTagsByLead] = useState<Record<string, DistressTagRow[]>>({});
@@ -44,6 +45,17 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
 
   const addLead = async () => {
     if (!form.property_address.trim()) return;
+    // Slice 61 — the same form now edits: with an editing target it
+    // updates that row instead of inserting a duplicate.
+    if (editingId && userId && supabaseConfigured) {
+      const row = await updateLead(userId, { ...form, id: editingId }).catch(() => null);
+      if (row) {
+        const next = leads.map((x) => (x.id === editingId ? row : x));
+        setLeads(next); onLeads(next);
+      }
+      setForm(EMPTY); setEditingId('');
+      return;
+    }
     let saved: Lead = { ...form, id: `local-${Date.now()}` };
     if (userId && supabaseConfigured) {
       const row = await saveLead(userId, form).catch(() => null);
@@ -51,6 +63,12 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
     }
     const next = [saved, ...leads];
     setLeads(next); onLeads(next); setForm(EMPTY);
+  };
+
+  const startEdit = (lead: Lead) => {
+    setForm({ ...lead });
+    setEditingId(lead.id || '');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Slice 33 — two-step delete: the button arms a confirm on that row
@@ -101,6 +119,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
         <input placeholder="City" value={form.city || ''} onChange={(e) => setForm({ ...form, city: e.target.value })} />
         <input placeholder="State" value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })} />
         <input placeholder="ZIP" value={form.zip || ''} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
+        <input placeholder="County" value={form.county || ''} onChange={(e) => setForm({ ...form, county: e.target.value })} />
         <input placeholder="Owner name" value={form.owner_name || ''} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} />
         <input placeholder="Parcel / APN (from the county appraiser)" value={form.parcel_id || ''} onChange={(e) => setForm({ ...form, parcel_id: e.target.value })} />
         <input placeholder="Year built" type="number" value={form.year_built ?? ''} onChange={(e) => setForm({ ...form, year_built: e.target.value === '' ? undefined : Number(e.target.value) })} />
@@ -108,13 +127,17 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
         <input placeholder="Mailing city" value={form.mailing_city || ''} onChange={(e) => setForm({ ...form, mailing_city: e.target.value })} />
         <input placeholder="Mailing state (e.g. NY)" value={form.mailing_state || ''} onChange={(e) => setForm({ ...form, mailing_state: e.target.value })} />
         <input placeholder="Mailing ZIP" value={form.mailing_zip || ''} onChange={(e) => setForm({ ...form, mailing_zip: e.target.value })} />
+        <input placeholder="Assessed value (county figure)" type="number" value={form.assessed_value ?? ''} onChange={(e) => setForm({ ...form, assessed_value: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <input placeholder="Total liens / mortgage balance" type="number" value={form.liens_amount ?? ''} onChange={(e) => setForm({ ...form, liens_amount: e.target.value === '' ? undefined : Number(e.target.value) })} />
         <input placeholder="List source (e.g. driving for dollars)" value={form.list_source || ''} onChange={(e) => setForm({ ...form, list_source: e.target.value })} />
         <input type="date" value={form.follow_up_date || ''} onChange={(e) => setForm({ ...form, follow_up_date: e.target.value })} />
         <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as LeadStatus })}>
           {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <textarea placeholder="Notes" value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        <button onClick={addLead}>Add lead</button>
+        <button onClick={addLead}>{editingId ? 'Save changes' : 'Add lead'}</button>
+        {editingId && <button onClick={() => { setForm(EMPTY); setEditingId(''); }}>Cancel edit</button>}
+        {editingId && <span style={{ fontSize: 13, color: '#fbbf24' }}>Editing: {form.property_address}</span>}
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -154,12 +177,16 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {l.parcel_id ? ` · parcel: ${l.parcel_id}` : ''}
             {l.year_built ? ` · built ${l.year_built}` : ''}
             {isOutOfStateOwner(l) ? ' · 📬 out-of-state owner' : ''}
+            {(() => { const eq = estimatedEquity(l); return eq ? ` · equity ≈ $${eq.equity.toLocaleString()} (${eq.pct}% of assessed)${eq.pct < 30 ? ' · ⚠️ thin equity — verify before spending' : ''}` : ''; })()}
             <ResearchLinks lead={l} />
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}
                 onTagsChanged={refreshTags} onContactsChanged={onContactsChanged} />
             )}
             {' '}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <button onClick={() => startEdit(l)}>Edit</button>
+            )}{' '}
             {confirmId === (l.id || l.property_address) ? (
               <>
                 <button onClick={() => removeLead(l)}>Confirm delete</button>{' '}

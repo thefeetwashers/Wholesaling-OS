@@ -19,6 +19,8 @@ export interface Lead {
   // the county record and enters — parcel/APN, year built, and the
   // mailing city/state/ZIP that powers the out-of-state owner flag.
   parcel_id?: string;
+  assessed_value?: number | null;
+  liens_amount?: number | null;
   year_built?: number;
   mailing_city?: string;
   mailing_state?: string;
@@ -70,6 +72,28 @@ export async function saveLead(userId: string, lead: Lead): Promise<Lead | null>
   const { data, error } = await supabase
     .from('leads')
     .insert({ ...lead, owner_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Lead;
+}
+
+// Slice 61 — edit an existing lead. The Leads form was add-only
+// through Slice 60, which meant a lead's facts (county above all —
+// Your Markets reads it) could never be corrected in the app.
+// Updates are fenced to the owner's own row twice: by id AND by
+// owner_id, on top of the table's RLS.
+export async function updateLead(userId: string, lead: Lead): Promise<Lead | null> {
+  if (!supabaseConfigured || !supabase || !lead.id) return null;
+  const fields: Record<string, unknown> = { ...(lead as unknown as Record<string, unknown>) };
+  delete fields.id;
+  delete fields.created_at;
+  delete fields.owner_id;
+  const { data, error } = await supabase
+    .from('leads')
+    .update(fields)
+    .eq('id', lead.id)
+    .eq('owner_id', userId)
     .select()
     .single();
   if (error) throw error;
@@ -137,14 +161,27 @@ export function leadsToCsv(leads: Lead[]): string {
     esc(l.property_address), esc(l.city), esc(l.state), esc(l.zip),
     esc(l.owner_name), esc(l.status), esc(l.follow_up_date), esc(l.list_source),
     esc(l.parcel_id), esc(l.year_built), esc(l.mailing_address), esc(l.mailing_city), esc(l.mailing_state), esc(l.mailing_zip),
+    esc(l.assessed_value), esc(l.liens_amount),
   ].join(','));
-  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source,parcel_id,year_built,mailing_address,mailing_city,mailing_state,mailing_zip', ...rows].join('\n');
+  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source,parcel_id,year_built,mailing_address,mailing_city,mailing_state,mailing_zip,assessed_value,liens_amount', ...rows].join('\n');
 }
 
 // Slice 56 — the out-of-state owner flag: the property sits in one
 // state and the owner's tax bills go to another, computed only from
 // the two state fields the wholesaler entered. Both must be present
 // and different; anything less is not a flag.
+// Slice 59 — estimated equity, a SCREENING FLAG on the wholesaler's
+// own numbers: assessed value (the county's figure) minus the liens
+// they recorded. It is never used to hide or drop a lead — the
+// wholesaler sees the flag and decides. Assessed value is not
+// market value; the analyzer is where real numbers get run.
+export function estimatedEquity(lead: Lead): { equity: number; pct: number } | null {
+  const a = lead.assessed_value; const l = lead.liens_amount;
+  if (a == null || l == null || !isFinite(a) || !isFinite(l) || a <= 0) return null;
+  const equity = a - l;
+  return { equity, pct: Math.round((equity / a) * 100) };
+}
+
 export function isOutOfStateOwner(lead: Lead): boolean {
   const ps = (lead.state || '').trim().toUpperCase();
   const ms = (lead.mailing_state || '').trim().toUpperCase();

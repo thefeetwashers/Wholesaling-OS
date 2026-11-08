@@ -12,7 +12,11 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [role, setRole] = useState('wholesaler');
+  // Slice 60: a role door on the homepage stashes the picked role;
+  // when this panel (re)mounts it opens with that role preselected.
+  const [role, setRole] = useState(() => {
+    try { return localStorage.getItem('ws_pending_role') || 'wholesaler'; } catch { return 'wholesaler'; }
+  });
   const [message, setMessage] = useState('');
   // OAuth errors come back in the URL, not through supabase.auth — surface them.
   useEffect(() => {

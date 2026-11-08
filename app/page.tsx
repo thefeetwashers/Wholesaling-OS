@@ -18,6 +18,7 @@ import DashboardBand from '../components/DashboardBand';
 import CommandCenter from '../components/CommandCenter';
 import DealRadar from '../components/DealRadar';
 import AuctionFeed from '../components/AuctionFeed';
+import Landing, { LandingFooter } from '../components/Landing';
 import DistressRadar from '../components/DistressRadar';
 import MarketBoard from '../components/MarketBoard';
 import ListPlaybooks from '../components/ListPlaybooks';
@@ -58,6 +59,15 @@ export default function Home() {
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
   const [role, setRole] = useState<string | null>(null);
+  const [authKey, setAuthKey] = useState(0);
+  const pickRole = (r: string) => {
+    try { localStorage.setItem('ws_pending_role', r); } catch { /* ignore */ }
+    setAuthKey((k) => k + 1);
+    if (typeof document !== 'undefined') {
+      const el = document.getElementById('signin');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
   useEffect(() => { if (userId) { loadMyProfile(userId).then((p) => setRole(p?.role ?? null)).catch(() => {}); } }, [userId]);
   // Slice 25: the Today view reads the page-level lead list. The Leads
   // component also reports its list up (onLeads) when it mounts; this
@@ -78,7 +88,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 58</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 61</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -108,8 +118,9 @@ export default function Home() {
         </strong>
       </section>
 
+      {!userId && <Landing onPickRole={pickRole} />}
       <div id="signin" style={{ marginTop: 16 }}>
-        <AuthPanel onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
+        <AuthPanel key={authKey} onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
       {userId && <div style={{ marginTop: 16, maxWidth: 520 }}><SubscribeButton userId={userId} hasAccess={hasAccess(access)} /></div>}
       {locked ? (
@@ -227,6 +238,7 @@ export default function Home() {
       {!userId && (
         <div style={{ marginTop: 16 }}>
           <PublicDealsSection />
+          <LandingFooter />
         </div>
       )}
     </div>

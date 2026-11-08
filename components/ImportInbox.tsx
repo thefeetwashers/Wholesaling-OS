@@ -22,7 +22,7 @@ import { checkPhone } from '../lib/phone';
 
 type FieldKey = 'property_address' | 'city' | 'state' | 'zip' | 'county' | 'owner_name'
   | 'mailing_address' | 'mailing_city' | 'mailing_state' | 'mailing_zip' | 'year_built'
-  | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date';
+  | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date' | 'liens_amount';
 
 const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'property_address', label: 'Property address *', aliases: ['property_address', 'property address', 'address', 'street address', 'street', 'situs address', 'property'] },
@@ -39,7 +39,8 @@ const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'mailing_zip', label: 'Mailing ZIP', aliases: ['mailing zip', 'mailing_zip', 'mailing zipcode', 'mail zip'] },
   { key: 'year_built', label: 'Year built', aliases: ['year built', 'year_built', 'yr built', 'built'] },
   { key: 'parcel_id', label: 'Parcel / APN', aliases: ['parcel', 'parcel_id', 'parcel id', 'apn', 'folio', 'account'] },
-  { key: 'assessed_value', label: 'Assessed value (saved to notes)', aliases: ['assessed', 'assessed value', 'assessed_value', 'market value', 'just value'] },
+  { key: 'assessed_value', label: 'Assessed value (county)', aliases: ['assessed', 'assessed value', 'assessed_value', 'market value', 'just value'] },
+  { key: 'liens_amount', label: 'Total liens / mortgage balance', aliases: ['liens', 'total liens', 'liens_amount', 'mortgage balance', 'loan balance', 'total owed', 'amount owed'] },
   { key: 'opening_bid', label: 'Opening bid / amount owed (saved to notes)', aliases: ['opening bid', 'opening_bid', 'bid', 'amount owed', 'total owed', 'liability', 'judgment'] },
   { key: 'auction_date', label: 'Auction / sale date (saved to notes)', aliases: ['auction', 'auction date', 'sale date', 'auction_date', 'sale_date'] },
 ];
@@ -141,7 +142,7 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
         if (seen.has(key)) { dupes++; continue; }
         seen.add(key);
         const extra: string[] = [];
-        const assessed = cell(r, 'assessed_value'); if (assessed) extra.push(`Assessed: ${assessed}`);
+        const money = (v: string): number | null => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return Number.isFinite(n) && n >= 0 ? n : null; };
         const bid = cell(r, 'opening_bid'); if (bid) extra.push(`Opening bid / owed: ${bid}`);
         const auction = cell(r, 'auction_date'); if (auction) extra.push(`Auction: ${auction}`);
         const phone = cell(r, 'phones');
@@ -175,6 +176,8 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
           mailing_state: cell(r, 'mailing_state') || null,
           mailing_zip: cell(r, 'mailing_zip') || null,
           parcel_id: cell(r, 'parcel_id') || null,
+          assessed_value: money(cell(r, 'assessed_value')),
+          liens_amount: money(cell(r, 'liens_amount')),
           year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
           phones: phoneOut,
           emails: email ? [email] : [],
@@ -264,7 +267,7 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
                   ))}
                 </tbody>
               </table>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>Preview of the first {preview.length} rows with the mapping above. Columns that map to no lead field are not stored, except assessed / bid / auction, which are saved into the lead's notes.</p>
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>Preview of the first {preview.length} rows with the mapping above. Columns that map to no lead field are not stored, except opening bid / auction date, which are saved into the lead's notes. Assessed value and liens land as real fields and power the equity flag on each lead row.</p>
             </div>
           )}
           <button style={{ marginTop: 10 }} disabled={busy} onClick={runImport}>
