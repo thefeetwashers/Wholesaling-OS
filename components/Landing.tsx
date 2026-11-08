@@ -35,7 +35,7 @@ const FORGOTTEN: { title: string; body: string }[] = [
   { title: 'Set the tax money aside the day you are paid', body: 'Assignment income is ordinary income. The deal net sheet shows what you kept; moving the tax share out of your spending account the same week is the habit that separates businesses from hobbies.' },
 ];
 
-const FAQS: { q: string; a: string }[] = [
+export const FAQS: { q: string; a: string }[] = [
   { q: 'What does it cost?', a: 'One subscription: 90 days free, then $150/month per wholesaler. There is no per-deal cut, no percentage of your assignment fees, and no second platform fee hiding anywhere. Your assignment fees are your money.' },
   { q: 'Who can see my leads and my buyer list?', a: 'Only you. Your workspace is sealed — the platform owner cannot open your leads, your buyers, or your deals. Ownership sees billing status and anonymous counts, never your business.' },
   { q: 'Does the platform find leads for me automatically?', a: 'It hands you the doors and the routines, not a scraped database: official county playbooks, a government-auction radar and live feed, and a seller page that brings motivated sellers to you. Lists you build or lawfully buy import in one drop. Anyone promising you free nationwide probate lists "while you sleep" is selling you a terms-of-service violation with your name on the account.' },
@@ -68,6 +68,20 @@ const ONLY_HERE: { tag: string; proof: string }[] = [
 export default function Landing({ onPickRole }: { onPickRole: (role: string) => void }) {
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: FAQS.map((f) => ({
+              '@type': 'Question',
+              name: f.q,
+              acceptedAnswer: { '@type': 'Answer', text: f.a },
+            })),
+          }),
+        }}
+      />
       <h2 style={h2}>What no other wholesaling platform gives you</h2>
       <p style={sub}>Read the fine print anywhere else, then read ours. These eight are true of this office today — each one is how the system actually behaves, not a slogan:</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
