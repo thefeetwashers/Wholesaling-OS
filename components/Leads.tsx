@@ -8,6 +8,7 @@ import ScreenGuard from './ScreenGuard';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
+import LeadPhotos from './LeadPhotos';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -200,6 +201,9 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}
                 onTagsChanged={refreshTags} onContactsChanged={onContactsChanged} />
+            )}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <LeadPhotos userId={userId} lead={l} />
             )}
             {' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (

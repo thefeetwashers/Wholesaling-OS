@@ -620,6 +620,29 @@ export async function submitSellerLead(slug: string, f: SellerLeadForm): Promise
   return !!data;
 }
 
+// Slice 84 — same submission, but returns the created lead's id
+// (schema v5.2 made submit_seller_lead return the id) so the
+// seller page can offer the optional photo step for that exact
+// lead. Returns null on any failure, exactly like the boolean
+// version's false.
+export async function submitSellerLeadWithId(slug: string, f: SellerLeadForm): Promise<string | null> {
+  if (!supabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.rpc('submit_seller_lead', {
+    p_slug: slug,
+    p_owner_name: f.owner_name,
+    p_property_address: f.property_address,
+    p_city: f.city,
+    p_state: f.state,
+    p_zip: f.zip,
+    p_phone: f.phone,
+    p_email: f.email,
+    p_notes: f.notes,
+    p_website: f.website,
+  });
+  if (error || !data) return null;
+  return String(data);
+}
+
 
 // ---------- Verified-buyer trust layer (schema v3.8, Slice 21) ----------
 // The record is counted by the database from real events only:

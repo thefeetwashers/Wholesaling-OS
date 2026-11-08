@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   loadPublicSellerPage,
-  submitSellerLead,
+  submitSellerLeadWithId,
   type PublicSellerPage,
   type SellerLeadForm,
 } from '../../../lib/portals';
@@ -32,6 +32,12 @@ export default function SellerPage() {
   // underwrites, the form only asks.
   const [q, setQ] = useState({ roof: '', hvac: '', repairs: '', timeline: '', reason: '' });
   const [sent, setSent] = useState(false);
+  // Slice 84 — after a successful submission the seller may attach
+  // photos of the property; they post to /api/seller-photo, which
+  // re-verifies this page + the fresh lead server-side.
+  const [leadId, setLeadId] = useState('');
+  const [photoNote, setPhotoNote] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [closedCount, setClosedCount] = useState<number | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,10 +67,34 @@ export default function SellerPage() {
     const notes = qLines.length
       ? [`Seller questionnaire — ${qLines.join(' · ')}`, f.notes].filter(Boolean).join('\n')
       : f.notes;
-    const ok = await submitSellerLead(slug, { ...f, notes });
+    const newLeadId = await submitSellerLeadWithId(slug, { ...f, notes });
     setBusy(false);
-    if (ok) setSent(true);
+    if (newLeadId) { setLeadId(newLeadId); setSent(true); }
     else setErr('Your details could not be sent. Check the address and name, then try again.');
+  };
+
+  const sendPhotos = async (files: FileList | null) => {
+    if (!files || !leadId) return;
+    setPhotoBusy(true);
+    setPhotoNote('');
+    let sentCount = 0;
+    for (const file of Array.from(files)) {
+      const body = new FormData();
+      body.append('slug', slug);
+      body.append('lead_id', leadId);
+      body.append('file', file);
+      try {
+        const res = await fetch('/api/seller-photo', { method: 'POST', body });
+        const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+        if (res.ok && json?.ok) sentCount += 1;
+        else { setPhotoNote(json?.error || 'One photo could not be sent.'); break; }
+      } catch {
+        setPhotoNote('One photo could not be sent — check your connection and try again.');
+        break;
+      }
+    }
+    if (sentCount > 0) setPhotoNote(`${sentCount} photo${sentCount === 1 ? '' : 's'} sent to ${page?.company || 'the company'}.`);
+    setPhotoBusy(false);
   };
 
   if (state === 'loading') {
@@ -91,6 +121,19 @@ export default function SellerPage() {
           {page.company} received your property details and will reach out shortly.
           There’s nothing else you need to do.
         </p>
+        {leadId && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ fontSize: 14 }}>
+              <strong>Optional:</strong> photos help {page.company} understand the property — the outside,
+              any rooms or repairs you want them to see. Images only, up to 6, and they go only to
+              {' '}{page.company}'s private file for this property.
+            </p>
+            <input type="file" accept="image/*" multiple disabled={photoBusy}
+              onChange={(e) => { void sendPhotos(e.target.files); e.target.value = ''; }} />
+            {photoBusy && <p style={{ fontSize: 13.5 }}>Sending…</p>}
+            {photoNote && <p style={{ fontSize: 13.5 }}>{photoNote}</p>}
+          </div>
+        )}
       </section>
     );
   }
