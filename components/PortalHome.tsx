@@ -43,6 +43,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTierSummary } from '../lib/buyer-tiers';
 import ReferrerPortal from './ReferrerPortal';
+import BuyerProofCard from './BuyerProofCard';
 
 // Full Portals home (Slices 9-10). One signed-in home, routed by
 // profiles.role: wholesaler command dashboard + offers inbox + buyer
@@ -104,7 +105,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
           </p>
           {note && <p style={{ fontSize: 13 }}>{note}</p>}
           {role === 'wholesaler' && <WholesalerDashboard userId={userId} />}
-          {role === 'buyer' && <BuyerPortal userId={userId} />}
+          {role === 'buyer' && <><BuyerProofCard userId={userId} /><BuyerPortal userId={userId} /></>}
           {role === 'seller' && <SellerPortal userId={userId} />}
           {role === 'title' && <TitlePortal userId={userId} />}
           {role === 'referrer' && <ReferrerPortal userId={userId} />}

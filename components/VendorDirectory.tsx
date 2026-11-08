@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadVendors, saveVendor, deleteVendor, categoryLabel, VENDOR_CATEGORIES, type VendorRow } from '../lib/vendors';
+import { loadVendors, saveVendor, deleteVendor, setVendorPinned, categoryLabel, VENDOR_CATEGORIES, type VendorRow } from '../lib/vendors';
 
 // Slice 39 — My Lenders & Vendors. The wholesaler's own address book
 // of funding contacts and trades, stored privately under RLS
@@ -38,6 +38,21 @@ export default function VendorDirectory({ userId }: { userId: string | null }) {
     setVendors([...vendors, saved].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
     setForm(EMPTY);
     setMsg(`Added: ${saved.name}`);
+  };
+
+  // Slice 87 — the Fast Lane pin: the wholesaler's own "I actually
+  // use this person" flag. Optimistic in the UI, persisted to the
+  // row; a failed save restores the true state with a message.
+  const togglePin = async (v: VendorRow) => {
+    const next = !v.pinned;
+    setVendors((prev) => prev.map((x) => (x === v ? { ...x, pinned: next } : x)));
+    if (v.id && userId && supabaseConfigured && !v.id.startsWith('local-')) {
+      try { await setVendorPinned(userId, v.id, next); }
+      catch {
+        setVendors((prev) => prev.map((x) => (x.id === v.id ? { ...x, pinned: v.pinned } : x)));
+        setMsg('That pin did not save — try again.');
+      }
+    }
   };
 
   const remove = async (v: VendorRow) => {
@@ -76,6 +91,21 @@ export default function VendorDirectory({ userId }: { userId: string | null }) {
       </div>
       {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
       <p style={{ fontSize: 12.5, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to sync.'}</p>
+      {vendors.some((v) => v.pinned) && (
+        <div style={{ background: '#0f172a', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+          <strong style={{ fontSize: 14 }}>⚡ Your fast lane — the people you actually use</strong>
+          <ul style={{ fontSize: 13.5, marginTop: 8 }}>
+            {vendors.filter((v) => v.pinned).map((v) => (
+              <li key={`lane-${v.id || v.name}`}>
+                <strong>{v.name}</strong> — {categoryLabel(v.category)}
+                {v.phone ? <> · <a href={`tel:${v.phone}`}>{v.phone}</a></> : ''}
+                {v.email ? <> · <a href={`mailto:${v.email}`}>{v.email}</a></> : ''}
+              </li>
+            ))}
+          </ul>
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>Your own pins, in your own directory — nobody pays to be here and the platform endorses no one.</p>
+        </div>
+      )}
       {vendors.length === 0 ? (
         <p style={{ fontSize: 13.5 }}>No lenders or vendors yet. Add the hard-money lender, contractor, or inspector you already work with — your first closing team starts here.</p>
       ) : (
@@ -88,6 +118,8 @@ export default function VendorDirectory({ userId }: { userId: string | null }) {
               {v.email ? <> · <a href={`mailto:${v.email}`}>{v.email}</a></> : ''}
               {v.website ? <> · <a href={v.website} target="_blank" rel="noreferrer">{v.website}</a></> : ''}
               {v.notes ? <><br /><span style={{ color: '#94a3b8' }}>{v.notes}</span></> : ''}
+              {' '}
+              <button onClick={() => void togglePin(v)}>{v.pinned ? '📌 In your fast lane — Unpin' : '📌 Pin to fast lane'}</button>
               {' '}
               {confirming === v.id ? (
                 <>Delete this contact? <button onClick={() => void remove(v)}>Confirm delete</button> <button onClick={() => setConfirming(null)}>Cancel</button></>

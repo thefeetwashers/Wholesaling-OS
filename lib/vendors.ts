@@ -34,6 +34,9 @@ export interface VendorRow {
   website?: string | null;
   service_area?: string | null;
   notes?: string | null;
+  // Slice 87 (schema v5.3): the wholesaler's own "I actually use
+  // this person" pin — the Fast Lane. Their pick, not a rating.
+  pinned?: boolean;
   created_at?: string;
 }
 
@@ -72,6 +75,17 @@ export async function saveVendor(userId: string, v: VendorRow): Promise<VendorRo
     .single();
   if (error) throw error;
   return data as VendorRow;
+}
+
+// Slice 87 — pin/unpin a directory contact in the Fast Lane.
+export async function setVendorPinned(userId: string, id: string, pinned: boolean): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('directory_contacts')
+    .update({ pinned })
+    .eq('id', id)
+    .eq('owner_id', userId);
+  if (error) throw error;
 }
 
 export async function deleteVendor(userId: string, id: string): Promise<void> {
