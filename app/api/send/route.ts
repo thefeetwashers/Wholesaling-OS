@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { mailProvider, sendMail } from '../../../lib/server-mail';
 import { checkPhone } from '../../../lib/phone';
 import { sha256Hex } from '../../../lib/outreach';
 
@@ -8,7 +9,9 @@ import { sha256Hex } from '../../../lib/outreach';
 //   Texts:  TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
 //           (the wholesaler's Twilio account + their registered
 //           A2P 10DLC number — business texting in the US requires it)
-//   Email:  RESEND_API_KEY, optional SEND_FROM_EMAIL
+//   Email:  Amazon SES (AWS_SES_ACCESS_KEY_ID / AWS_SES_SECRET_ACCESS_KEY,
+//   owner decision Nov 8, 2026) via lib/server-mail; RESEND_API_KEY remains
+//   a fallback only. Optional SEND_FROM_EMAIL / AWS_SES_FROM.
 //           (the wholesaler's Resend account; default From is the
 //           verified wholesalingos.thefeetwashers.com domain)
 // Until those are set, GET reports the channels as not connected and
@@ -33,14 +36,12 @@ export const dynamic = 'force-dynamic';
 const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID || '';
 const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
 const TWILIO_FROM = process.env.TWILIO_FROM_NUMBER || '';
-const RESEND_KEY = process.env.RESEND_API_KEY || '';
-const SEND_FROM = process.env.SEND_FROM_EMAIL || 'WholesalingOS <noreply@wholesalingos.thefeetwashers.com>';
 
 function smsConfigured() { return !!(TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM); }
-function emailConfigured() { return !!RESEND_KEY; }
+function emailConfigured() { return mailProvider() !== null; }
 
 export async function GET() {
-  return Response.json({ sms: smsConfigured(), email: emailConfigured() });
+  return Response.json({ sms: smsConfigured(), email: emailConfigured(), emailProvider: mailProvider() });
 }
 
 function serviceClient() {
@@ -152,17 +153,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, provider_id: j.sid || null });
   }
 
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      from: SEND_FROM,
-      to: [target],
-      subject: subject || `About ${lead.property_address}`,
-      text,
-    }),
-  });
-  const j = (await r.json().catch(() => ({}))) as { id?: string; message?: string };
-  if (!r.ok) return Response.json({ error: `Resend refused the send: ${j.message || `HTTP ${r.status}`}` }, { status: 502 });
-  return Response.json({ ok: true, provider_id: j.id || null });
+  const sent = await sendMail(target, subject || `About ${lead.property_address}`, text);
+  if (!sent.ok) return Response.json({ error: sent.error || 'The email could not be sent.' }, { status: 502 });
+  return Response.json({ ok: true, provider_id: sent.id || null, provider: sent.provider });
 }
