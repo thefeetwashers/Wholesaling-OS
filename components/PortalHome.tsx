@@ -57,6 +57,19 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 const offerAddress = (o: OfferRow) => o.listing?.deals?.documents?.property_address || 'Property';
 
+// Slice 97 — portal frame parity. Every role's desk opens with
+// the same framed header band the wholesaler surfaces use: an
+// icon, the desk's name, and one line stating what the desk
+// actually does — each line checked against the portal below it.
+// Same shell, same frame, each role's own tools inside.
+const ROLE_BAND: Record<string, { icon: string; line: string }> = {
+  wholesaler: { icon: '🏢', line: 'Your portal summary — pipeline, fees in play, offers received. The full office is in the sidebar; everything here is counted from your own records.' },
+  buyer: { icon: '💵', line: 'Publish your buy box so deals can be matched to you, work the offers you make and receive — and your proof card above counts your real record from platform events, never from claims.' },
+  seller: { icon: '🏠', line: 'Link a deal your wholesaler sent you, review what is yours, and sign when you are ready. You see your price — never the wholesaler’s fee.' },
+  title: { icon: '🏛️', line: 'Link your company listing, see the escrow files assigned to you, and keep their milestones and dates in front of everyone who depends on them.' },
+  referrer: { icon: '📨', line: 'Send a seller to the company desk, track the referral’s status, and earn $1,000 when the deal closes and funds — recorded on the deal itself.' },
+};
+
 export default function PortalHome({ userId }: { userId: string | null }) {
   const [role, setRole] = useState<PortalRole | null>(null);
   const [note, setNote] = useState('');
@@ -104,6 +117,12 @@ export default function PortalHome({ userId }: { userId: string | null }) {
             Roles are self-selected at launch — pick the one that matches how you use WholesalingOS.
           </p>
           {note && <p style={{ fontSize: 13 }}>{note}</p>}
+          {ROLE_BAND[role] && (
+            <div style={{ background: '#0f172a', border: '1px solid rgba(110,231,183,0.35)', borderRadius: 10, padding: '12px 14px', margin: '10px 0' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{ROLE_BAND[role].icon} Your {ROLE_LABELS[role]} desk</div>
+              <p style={{ fontSize: 13, color: '#cbd5e1', margin: '4px 0 0' }}>{ROLE_BAND[role].line}</p>
+            </div>
+          )}
           {role === 'wholesaler' && <WholesalerDashboard userId={userId} />}
           {role === 'buyer' && <><BuyerProofCard userId={userId} /><BuyerPortal userId={userId} /></>}
           {role === 'seller' && <SellerPortal userId={userId} />}
