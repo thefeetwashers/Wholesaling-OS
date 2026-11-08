@@ -23,6 +23,7 @@ import DistressRadar from '../components/DistressRadar';
 import MarketBoard from '../components/MarketBoard';
 import ListPlaybooks from '../components/ListPlaybooks';
 import DeadlineRadar from '../components/DeadlineRadar';
+import SpeedToLead from '../components/SpeedToLead';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
 import TitlePacket from '../components/TitlePacket';
@@ -90,7 +91,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 69</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 70</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -148,6 +149,7 @@ export default function Home() {
                 {role === 'wholesaler' && userId && <MarketBoard userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DashboardBand userId={userId} />}
                 {role === 'wholesaler' && userId && <DeadlineRadar userId={userId} />}
+                {role === 'wholesaler' && userId && <SpeedToLead userId={userId} onNavigate={setView} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <SignKit userId={userId} />}

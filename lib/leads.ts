@@ -28,6 +28,7 @@ export interface Lead {
   phones?: string[];
   emails?: string[];
   list_source?: string;
+  created_at?: string;
   motivation_score?: number;
   mctp?: Record<string, unknown>;
   status: LeadStatus;
