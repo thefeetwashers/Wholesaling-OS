@@ -34,6 +34,7 @@ import StaleMoneyBoard from '../components/StaleMoneyBoard';
 import CampaignTracker from '../components/CampaignTracker';
 import MarketWatch from '../components/MarketWatch';
 import KanbanBoard from '../components/KanbanBoard';
+import FieldCapture from '../components/FieldCapture';
 import Paperwork from '../components/Paperwork';
 import TaxExport from '../components/TaxExport';
 import GlobalSearch from '../components/GlobalSearch';
@@ -91,7 +92,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 84: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 85: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -112,7 +113,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 84</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 85</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -233,6 +234,9 @@ export default function Home() {
             )}
             {view === 'board' && (
               <div id="board"><KanbanBoard userId={userId} /></div>
+            )}
+            {view === 'field' && userId && (
+              <div id="field"><FieldCapture userId={userId} /></div>
             )}
             {view === 'comms' && (
               <>

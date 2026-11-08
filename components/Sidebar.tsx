@@ -20,6 +20,7 @@ export const SHELL_VIEWS: ShellView[] = [
   { key: 'assistant', label: 'AI Assistant', icon: '🤖', group: 'Command' },
   { key: 'leads', label: 'Leads', icon: '🏘️', group: 'Pipeline' },
   { key: 'board', label: 'Pipeline Board', icon: '📋', group: 'Pipeline' },
+  { key: 'field', label: 'Field Capture', icon: '📍', group: 'Pipeline' },
   { key: 'comms', label: 'Comms Center', icon: '💬', group: 'Pipeline' },
   { key: 'sellerpage', label: 'Seller Page & Intake', icon: '🎙️', group: 'Pipeline' },
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝', group: 'Pipeline' },
