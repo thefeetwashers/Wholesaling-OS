@@ -5,6 +5,7 @@ import { supabaseConfigured } from '../lib/supabase';
 import { loadDeals, type DealRow } from '../lib/deals';
 import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, loadMilestonesForFiles, updateEscrowFileStatus, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
 import DealAutopsy, { AutopsyLessons } from './DealAutopsy';
+import DealReviews from './DealReviews';
 import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
 
@@ -94,6 +95,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
                   {f.outcome !== 'fell_through' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'fell_through'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'fell_through' } : x))); setSavedMsg('Escrow marked fell through — this counts on the buyer’s record.'); }}>Mark fell through</button>}{' '}
                   {f.outcome && f.outcome !== 'open' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'open'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'open' } : x))); setSavedMsg('Escrow outcome reopened.'); }}>Reopen</button>}
                   <DealAutopsy escrowFileId={f.id} outcome={f.outcome || 'open'} />
+                  <DealReviews userId={userId} escrowFileId={f.id} outcome={f.outcome || 'open'} />
                 </>
               )}
               {f.id && (() => {
