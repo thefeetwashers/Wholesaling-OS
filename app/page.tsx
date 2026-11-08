@@ -28,6 +28,8 @@ import ReferralEngine from '../components/ReferralEngine';
 import OwnerDealDesk from '../components/OwnerDealDesk';
 import ValueReceipt from '../components/ValueReceipt';
 import SealedOffice from '../components/SealedOffice';
+import ClosingCalendar from '../components/ClosingCalendar';
+import StaleMoneyBoard from '../components/StaleMoneyBoard';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
 import TitlePacket from '../components/TitlePacket';
@@ -83,7 +85,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 75: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 76: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -104,7 +106,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 75</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 76</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -167,6 +169,8 @@ export default function Home() {
                 {role === 'wholesaler' && userId && <DeadlineRadar userId={userId} />}
                 {role === 'wholesaler' && userId && <SpeedToLead userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <ValueReceipt userId={userId} />}
+                {role === 'wholesaler' && userId && <ClosingCalendar userId={userId} />}
+                {role === 'wholesaler' && userId && <StaleMoneyBoard userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <SignKit userId={userId} />}
