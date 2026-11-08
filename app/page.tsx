@@ -25,6 +25,7 @@ import ListPlaybooks from '../components/ListPlaybooks';
 import DeadlineRadar from '../components/DeadlineRadar';
 import SpeedToLead from '../components/SpeedToLead';
 import ReferralEngine from '../components/ReferralEngine';
+import OwnerDealDesk from '../components/OwnerDealDesk';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
 import TitlePacket from '../components/TitlePacket';
@@ -80,7 +81,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 72: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 73: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -101,7 +102,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 72</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 73</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -250,7 +251,10 @@ export default function Home() {
               </>
             )}
             {view === 'admin' && (
-              <AdminConsole userId={userId} userEmail={userEmail} />
+              <>
+                <AdminConsole userId={userId} userEmail={userEmail} />
+                {userId && <OwnerDealDesk userId={userId} />}
+              </>
             )}
           </div>
         </div>
