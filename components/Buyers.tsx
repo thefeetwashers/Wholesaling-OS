@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadBuyers, saveBuyer, statesFromInput, type BuyerRow } from '../lib/buyers';
+import ScreenGuard from './ScreenGuard';
 
 // Buyer CRM, ported from the old prototype. Buyers are the wholesaler's own list only.
 // No list of "all buyers in the US" exists — the user builds this list themselves.
 // Buyer Demand Map below counts only buyers entered here, labeled as such.
 interface Buyer { name: string; type: string; states: string; buy_box: string; tier: number; verified_pof: boolean; }
 
-export default function Buyers({ userId }: { userId: string | null }) {
+export default function Buyers({ userId, userEmail }: { userId: string | null; userEmail?: string | null }) {
   const [buyers, setBuyers] = useState<BuyerRow[]>([]);
   const [form, setForm] = useState<Buyer>({ name: '', type: 'cash_buyer', states: '', buy_box: '', tier: 3, verified_pof: false });
   const [mode, setMode] = useState<'local' | 'synced'>('local');
@@ -54,7 +55,7 @@ export default function Buyers({ userId }: { userId: string | null }) {
       </div>
       {buyers.length === 0 && <p>No buyers yet. Add your first buyer above. Empty areas mean: no buyer data yet.</p>}
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to sync.'}</p>
-      <ul>{buyers.map((b) => <li key={b.id || b.name}><strong>{b.name}</strong> — {b.buyer_type}, {(b.states || []).join(', ')}, Your working tier {b.tier}, POF: {b.verified_pof ? 'Yes' : 'No'} — {b.buy_box}</li>)}</ul>
+      <ScreenGuard email={userEmail || ''}><ul>{buyers.map((b) => <li key={b.id || b.name}><strong>{b.name}</strong> — {b.buyer_type}, {(b.states || []).join(', ')}, Your working tier {b.tier}, POF: {b.verified_pof ? 'Yes' : 'No'} — {b.buy_box}</li>)}</ul></ScreenGuard>
     </section>
   );
 }

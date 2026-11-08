@@ -89,7 +89,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 63</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 65</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -184,7 +184,7 @@ export default function Home() {
                 <ListingParser userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <ImportInbox userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <WebhookPanel userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
-                <div id="leads"><Leads key={leadsNonce} userId={userId} onLeads={setLeads} /></div>
+                <div id="leads"><Leads key={leadsNonce} userId={userId} userEmail={userEmail} onLeads={setLeads} /></div>
                 <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
                   No fake leads, buyers, or deals are seeded here. Empty states are
                   honest empty states until you enter your own data. Your buyer list
@@ -213,7 +213,7 @@ export default function Home() {
               </>
             )}
             {view === 'buyers' && (
-              <div id="buyers"><Buyers userId={userId} /></div>
+              <div id="buyers"><Buyers userId={userId} userEmail={userEmail} /></div>
             )}
             {view === 'directory' && (
               <div id="directory"><VendorDirectory userId={userId} /></div>

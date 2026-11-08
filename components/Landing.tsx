@@ -51,6 +51,7 @@ const ROLES: { key: string; icon: string; title: string; body: string; cta: stri
   { key: 'buyer', icon: '💵', title: 'Cash Buyer', body: 'Free forever. Publish your buy box, see deals that match it, build a closing record that speaks for itself.', cta: 'Register as a buyer — free' },
   { key: 'seller', icon: '🏡', title: 'Seller', body: 'Free. Follow your deal, see your price, sign in your own portal when your wholesaler sends you a deal.', cta: 'Register as a seller — free' },
   { key: 'title', icon: '🏛️', title: 'Title Company', body: 'Free. Receive files, track milestones, and be findable by the wholesalers closing with you.', cta: 'Register as title — free' },
+  { key: 'referrer', icon: '🤝', title: 'Referrer', body: 'Free. Know someone who needs to sell? Report the seller you found, follow its status, and earn $1,000 when the deal closes and funds.', cta: 'Register as a referrer — free' },
 ];
 
 const ONLY_HERE: { tag: string; proof: string }[] = [
@@ -126,7 +127,7 @@ export default function Landing({ onPickRole }: { onPickRole: (role: string) => 
       <p style={sub}>These are the platform&rsquo;s own calculators, live on the homepage. Your numbers never leave this page.</p>
       <PublicCalculator />
 
-      <h2 style={h2}>Four doors in — pick yours</h2>
+      <h2 style={h2}>Five doors in — pick yours</h2>
       <p style={sub}>You register under one role and you see that role&rsquo;s dashboard — wholesalers never land in a buyer&rsquo;s portal, sellers never see a wholesaler&rsquo;s office, and nobody sees anyone else&rsquo;s business.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
         {ROLES.map((r) => (

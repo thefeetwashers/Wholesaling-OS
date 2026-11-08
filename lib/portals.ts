@@ -3,13 +3,14 @@ import { supabase, supabaseConfigured } from './supabase';
 // Slice 9 — Full Portals foundation (schema v3). Roles live on profiles.role.
 // Every query here is scoped by Supabase RLS; nothing is faked client-side.
 
-export type PortalRole = 'wholesaler' | 'buyer' | 'seller' | 'title';
-export const PORTAL_ROLES: PortalRole[] = ['wholesaler', 'buyer', 'seller', 'title'];
+export type PortalRole = 'wholesaler' | 'buyer' | 'seller' | 'title' | 'referrer';
+export const PORTAL_ROLES: PortalRole[] = ['wholesaler', 'buyer', 'seller', 'title', 'referrer'];
 export const ROLE_LABELS: Record<PortalRole, string> = {
   wholesaler: 'Wholesaler',
   buyer: 'Cash Buyer',
   seller: 'Seller',
   title: 'Title Company',
+  referrer: 'Referrer',
 };
 
 export interface MyProfile {
@@ -660,4 +661,54 @@ export async function setMyProofOfFunds(userId: string, status: string, note: st
     .update({ pof_status: status, pof_note: note.trim() || null })
     .eq('id', userId);
   if (error) throw error;
+}
+
+// Slice 64 — Referrer lane (schema v4.7). A referrer reports a seller TO
+// the platform owner and sees only their own submissions and a status
+// word. The $1,000 is earned when the referred deal closes and funds;
+// it is recorded on the deal's disbursements by the owner at closing.
+
+export type ReferralStatus = 'received' | 'working' | 'closed' | 'dead';
+
+export interface Referral {
+  id?: string;
+  referrer_id?: string;
+  referrer_email: string;
+  seller_name: string;
+  property_address: string;
+  city: string;
+  state: string;
+  zip: string;
+  seller_phone: string;
+  seller_email: string;
+  relationship: string;
+  notes: string;
+  status: ReferralStatus;
+  created_at?: string;
+}
+
+export async function submitReferral(userId: string, email: string, form: Omit<Referral, 'status'>): Promise<boolean> {
+  if (!supabaseConfigured || !supabase) return false;
+  const { error } = await supabase.from('referrals').insert({ ...form, referrer_id: userId, referrer_email: email, status: 'received' });
+  return !error;
+}
+
+export async function loadMyReferrals(userId: string): Promise<Referral[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.from('referrals').select('*').eq('referrer_id', userId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as Referral[];
+}
+
+export async function loadAllReferrals(): Promise<Referral[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.from('referrals').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as Referral[];
+}
+
+export async function setReferralStatus(id: string, status: ReferralStatus): Promise<boolean> {
+  if (!supabaseConfigured || !supabase) return false;
+  const { error } = await supabase.from('referrals').update({ status }).eq('id', id);
+  return !error;
 }

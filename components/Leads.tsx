@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 import LeadLetter from './LeadLetter';
+import ScreenGuard from './ScreenGuard';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
-export default function Leads({ userId, onLeads }: { userId: string | null; onLeads: (leads: Lead[]) => void }) {
+export default function Leads({ userId, userEmail, onLeads }: { userId: string | null; userEmail?: string | null; onLeads: (leads: Lead[]) => void }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [form, setForm] = useState<Lead>(EMPTY);
   const [filter, setFilter] = useState<string>('all');
@@ -177,6 +178,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
 
       {delMsg && <p style={{ fontSize: 13 }}>{delMsg}</p>}
       {shown.length === 0 && <p>No leads yet. Add your first lead above.</p>}
+      <ScreenGuard email={userEmail || ''}>
       <ul>
         {shown.map((l) => (
           <li key={l.id || l.property_address}>
@@ -210,6 +212,7 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
           </li>
         ))}
       </ul>
+      </ScreenGuard>
     </section>
   );
 }

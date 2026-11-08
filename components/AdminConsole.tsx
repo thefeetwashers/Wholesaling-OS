@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { loadAdminAggregates, loadAdminRoster, setAdminSuspended, type AdminAggregates, type RosterRow } from '../lib/money';
 import { loadCountyDemand, type CountyDemandRow } from '../lib/directories';
 import { getProfileAccess, type ProfileAccess } from '../lib/access';
+import { loadAllReferrals, setReferralStatus, type Referral, type ReferralStatus } from '../lib/portals';
 
 // Owner admin console — visible ONLY to the owner account. Privacy rule
 // (standing): the owner sees billing status and anonymized aggregates,
@@ -22,6 +23,8 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
   const [rMsg, setRMsg] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [demand, setDemand] = useState<CountyDemandRow[] | null>(null);
+  const [refs, setRefs] = useState<Referral[] | null>(null);
+  const [refsErr, setRefsErr] = useState('');
   const [dErr, setDErr] = useState('');
 
   const refreshRoster = () => {
@@ -34,6 +37,7 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
     getProfileAccess(userId).then(setAccess).catch(() => {});
     refreshRoster();
     loadCountyDemand().then(setDemand).catch(() => setDErr('The county Verify Queue is not available yet — schema v4.0 must be run in Supabase first.'));
+    loadAllReferrals().then(setRefs).catch(() => setRefsErr('Referrals are not available yet — schema v4.7 must be run in Supabase first.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, userEmail]);
 
@@ -130,6 +134,44 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
               {d.has_platform
                 ? <span style={{ color: '#4ade80' }}>Platform verified already</span>
                 : <span style={{ color: '#fbbf24' }}>Not platform-verified yet</span>}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <h3 style={{ marginTop: 16 }}>Referrals — sellers reported to you by referrers</h3>
+      <p style={{ fontSize: 12.5, color: '#94a3b8', maxWidth: 760 }}>
+        These are submissions addressed to you by the referrers who sent them — not a peek into
+        anyone&rsquo;s workspace. Work each one like a lead (a referral is not consent), and set its
+        status so the referrer sees where it stands. When a referred deal closes and funds, record the
+        referrer&rsquo;s $1,000 on the deal&rsquo;s disbursements.
+      </p>
+      {refsErr && <p style={{ fontSize: 13, color: '#fbbf24' }}>{refsErr}</p>}
+      {refs === null && !refsErr ? (
+        <p style={{ fontSize: 13 }}>Loading referrals…</p>
+      ) : refs && refs.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No referrals yet.</p>
+      ) : refs ? (
+        <ul style={{ fontSize: 13, paddingLeft: 18 }}>
+          {refs.map((r) => (
+            <li key={r.id} style={{ marginBottom: 8 }}>
+              <strong>{r.property_address}</strong>{r.city ? ` — ${r.city}, ${r.state || ''} ${r.zip || ''}` : ''}
+              {r.seller_name ? ` · seller: ${r.seller_name}` : ''}
+              {` · from ${r.referrer_email} · “${r.relationship}”`}
+              {' '}
+              <select
+                value={r.status}
+                onChange={async (e) => {
+                  const ok = await setReferralStatus(r.id as string, e.target.value as ReferralStatus);
+                  if (ok) loadAllReferrals().then(setRefs).catch(() => {});
+                }}
+              >
+                <option value="received">Received</option>
+                <option value="working">In progress</option>
+                <option value="closed">Closed — $1,000 earned</option>
+                <option value="dead">Not moving forward</option>
+              </select>
+              {r.notes ? <span style={{ color: '#94a3b8' }}> · {r.notes}</span> : null}
             </li>
           ))}
         </ul>

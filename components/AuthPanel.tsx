@@ -98,6 +98,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
           <option value="buyer">Cash Buyer</option>
           <option value="seller">Seller</option>
           <option value="title">Title Company</option>
+          <option value="referrer">Referrer — earn $1,000 per closed referral</option>
         </select>
       </label>
       <button onClick={async () => {
