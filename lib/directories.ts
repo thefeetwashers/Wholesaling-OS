@@ -93,6 +93,93 @@ export const US_STATES: { code: string; name: string }[] = [
   ['WI', 'Wisconsin'], ['WY', 'Wyoming'],
 ].map(([code, name]) => ({ code, name }));
 
+// Slice 57 — My Markets: everything the platform lawfully has for
+// the counties a wholesaler actually works, gathered in one place.
+// A "market" is derived only from the wholesaler's own footprint:
+// counties on their leads plus counties they saved links for. The
+// links shown are the platform's verified county rows, topped up
+// by the wholesaler's own saved rows — never guessed URLs.
+export interface MarketSummary {
+  countyName: string;
+  stateCode: string;
+  stateLabel: string;
+  leadCount: number;
+  clerkUrl: string | null;
+  appraiserUrl: string | null;
+  codeUrl: string | null;
+  hasLinks: boolean;
+  savedByUser: boolean;
+}
+
+export function summarizeMarkets(
+  leads: { county?: string | null; state?: string | null }[],
+  platformRows: CountyLinkRow[],
+  userRows: CountyLinkRow[],
+): MarketSummary[] {
+  const byKey = new Map<string, MarketSummary>();
+  const keyOf = (county: string, stateCode: string) => `${county.trim().toLowerCase()}|${stateCode.trim().toUpperCase()}`;
+  const stateCodeOf = (raw?: string | null): string => {
+    const t = (raw || '').trim();
+    if (!t) return '';
+    if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+    const hit = US_STATES.find((s) => s.name.toLowerCase() === t.toLowerCase());
+    return hit ? hit.code : '';
+  };
+  const ensure = (county: string, stateCode: string, stateLabel: string): MarketSummary => {
+    const k = keyOf(county, stateCode);
+    let m = byKey.get(k);
+    if (!m) {
+      m = {
+        countyName: county, stateCode, stateLabel,
+        leadCount: 0, clerkUrl: null, appraiserUrl: null, codeUrl: null,
+        hasLinks: false, savedByUser: false,
+      };
+      byKey.set(k, m);
+    }
+    return m;
+  };
+  const applyRow = (r: CountyLinkRow, fromUser: boolean) => {
+    const m = ensure(r.county_name, r.state_code, r.state_code);
+    if (r.clerk_court_deeds_url) m.clerkUrl = r.clerk_court_deeds_url;
+    if (r.tax_assessor_gis_url) m.appraiserUrl = r.tax_assessor_gis_url;
+    if (r.code_enforcement_url) m.codeUrl = r.code_enforcement_url;
+    m.hasLinks = !!(m.clerkUrl || m.appraiserUrl || m.codeUrl);
+    if (fromUser) m.savedByUser = true;
+  };
+  for (const r of platformRows) applyRow(r, false);
+  // NOTE: platform rows cover every seeded county — markets are
+  // only the counties the wholesaler touches, so collect link data
+  // here but create market entries only from leads + user rows.
+  const linkData = new Map<string, MarketSummary>();
+  for (const [k, m] of Array.from(byKey.entries())) linkData.set(k, m);
+  byKey.clear();
+  const ensureMarket = (county: string, stateCode: string, stateLabel: string): MarketSummary => {
+    const m = ensure(county, stateCode, stateLabel);
+    const src = linkData.get(keyOf(county, stateCode));
+    if (src) {
+      m.clerkUrl = src.clerkUrl; m.appraiserUrl = src.appraiserUrl; m.codeUrl = src.codeUrl;
+      m.hasLinks = src.hasLinks;
+    }
+    return m;
+  };
+  for (const l of leads) {
+    const county = (l.county || '').trim();
+    if (!county) continue;
+    const code = stateCodeOf(l.state);
+    const m = ensureMarket(county, code, (l.state || '').trim());
+    m.leadCount += 1;
+  }
+  for (const r of userRows) {
+    const m = ensureMarket(r.county_name, r.state_code, r.state_code);
+    if (r.clerk_court_deeds_url) m.clerkUrl = r.clerk_court_deeds_url;
+    if (r.tax_assessor_gis_url) m.appraiserUrl = r.tax_assessor_gis_url;
+    if (r.code_enforcement_url) m.codeUrl = r.code_enforcement_url;
+    m.hasLinks = !!(m.clerkUrl || m.appraiserUrl || m.codeUrl);
+    m.savedByUser = true;
+  }
+  return Array.from(byKey.values()).sort((a, b) => b.leadCount - a.leadCount || a.countyName.localeCompare(b.countyName));
+}
+
 export interface UserCountyInput {
   state_code: string;
   county_name: string;

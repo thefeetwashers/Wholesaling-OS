@@ -106,6 +106,77 @@ export async function updateLeadContacts(
   if (error) throw error;
 }
 
+// Slice 54 — the Distress Radar summary for the dashboard: tag
+// counts across the wholesaler's open leads, plus a WORK-FIRST
+// ranking of which tagged leads to touch first. This is not a
+// distress score and says nothing about any person: the "heat" is
+// computed only from tags and follow-up dates the wholesaler
+// themselves entered, and the formula is printed wherever the
+// number appears: +10 per distress tag on the lead, +15 when the
+// follow-up is due today, +2 per day a follow-up is overdue
+// (capped at +30).
+export interface HeatEntry {
+  lead: Lead;
+  heat: number;
+  reasons: string[];
+}
+
+export interface DistressSummary {
+  counts: Record<string, number>;
+  taggedLeads: number;
+  hottest: HeatEntry[];
+}
+
+function daysBetweenISO(fromISO: string, toISO: string): number {
+  const a = new Date(`${fromISO}T00:00:00Z`).getTime();
+  const b = new Date(`${toISO}T00:00:00Z`).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+export function leadHeat(lead: Lead, tags: DistressTagRow[], todayISO: string): HeatEntry {
+  let heat = 0;
+  const reasons: string[] = [];
+  const n = tags.length;
+  if (n > 0) {
+    heat += n * 10;
+    reasons.push(`${n} distress tag${n === 1 ? '' : 's'} (+${n * 10})`);
+  }
+  if (lead.follow_up_date) {
+    if (lead.follow_up_date < todayISO) {
+      const days = daysBetweenISO(lead.follow_up_date, todayISO);
+      const pts = Math.min(30, days * 2);
+      heat += pts;
+      reasons.push(`follow-up ${days} day${days === 1 ? '' : 's'} overdue (+${pts})`);
+    } else if (lead.follow_up_date === todayISO) {
+      heat += 15;
+      reasons.push('follow-up due today (+15)');
+    }
+  }
+  return { lead, heat, reasons };
+}
+
+export function summarizeDistress(
+  leads: Lead[],
+  tagsByLead: Record<string, DistressTagRow[]>,
+  todayISO: string,
+): DistressSummary {
+  const counts: Record<string, number> = {};
+  for (const t of DISTRESS_TAGS) counts[t.key] = 0;
+  const open = leads.filter((l) => l.status !== 'closed' && l.status !== 'dead');
+  let taggedLeads = 0;
+  const heated: HeatEntry[] = [];
+  for (const l of open) {
+    const tags = tagsByLead[l.id || ''] || [];
+    if (tags.length > 0) {
+      taggedLeads += 1;
+      for (const t of tags) counts[t.tag] = (counts[t.tag] || 0) + 1;
+      heated.push(leadHeat(l, tags, todayISO));
+    }
+  }
+  heated.sort((a, b) => b.heat - a.heat);
+  return { counts, taggedLeads, hottest: heated.slice(0, 5) };
+}
+
 // The human call queue: only leads the wholesaler tagged, worked in
 // follow-up order — overdue first, then due today, then upcoming by
 // date, then no follow-up date; ties break toward more tags (more

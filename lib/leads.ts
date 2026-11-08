@@ -15,6 +15,14 @@ export interface Lead {
   zip?: string;
   owner_name?: string;
   mailing_address?: string;
+  // Slice 56 (schema v4.5): property facts the wholesaler reads off
+  // the county record and enters — parcel/APN, year built, and the
+  // mailing city/state/ZIP that powers the out-of-state owner flag.
+  parcel_id?: string;
+  year_built?: number;
+  mailing_city?: string;
+  mailing_state?: string;
+  mailing_zip?: string;
   phones?: string[];
   emails?: string[];
   list_source?: string;
@@ -128,8 +136,19 @@ export function leadsToCsv(leads: Lead[]): string {
   const rows = leads.map((l) => [
     esc(l.property_address), esc(l.city), esc(l.state), esc(l.zip),
     esc(l.owner_name), esc(l.status), esc(l.follow_up_date), esc(l.list_source),
+    esc(l.parcel_id), esc(l.year_built), esc(l.mailing_address), esc(l.mailing_city), esc(l.mailing_state), esc(l.mailing_zip),
   ].join(','));
-  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source', ...rows].join('\n');
+  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source,parcel_id,year_built,mailing_address,mailing_city,mailing_state,mailing_zip', ...rows].join('\n');
+}
+
+// Slice 56 — the out-of-state owner flag: the property sits in one
+// state and the owner's tax bills go to another, computed only from
+// the two state fields the wholesaler entered. Both must be present
+// and different; anything less is not a flag.
+export function isOutOfStateOwner(lead: Lead): boolean {
+  const ps = (lead.state || '').trim().toUpperCase();
+  const ms = (lead.mailing_state || '').trim().toUpperCase();
+  return !!ps && !!ms && ps !== ms;
 }
 
 export function isOverdue(lead: Lead, today: string): boolean {

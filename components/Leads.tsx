@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadLeads, saveLead, deleteLead, leadsToCsv, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { loadLeads, saveLead, deleteLead, leadsToCsv, isOutOfStateOwner, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
@@ -102,6 +102,12 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
         <input placeholder="State" value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })} />
         <input placeholder="ZIP" value={form.zip || ''} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
         <input placeholder="Owner name" value={form.owner_name || ''} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} />
+        <input placeholder="Parcel / APN (from the county appraiser)" value={form.parcel_id || ''} onChange={(e) => setForm({ ...form, parcel_id: e.target.value })} />
+        <input placeholder="Year built" type="number" value={form.year_built ?? ''} onChange={(e) => setForm({ ...form, year_built: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <input placeholder="Owner mailing address" value={form.mailing_address || ''} onChange={(e) => setForm({ ...form, mailing_address: e.target.value })} />
+        <input placeholder="Mailing city" value={form.mailing_city || ''} onChange={(e) => setForm({ ...form, mailing_city: e.target.value })} />
+        <input placeholder="Mailing state (e.g. NY)" value={form.mailing_state || ''} onChange={(e) => setForm({ ...form, mailing_state: e.target.value })} />
+        <input placeholder="Mailing ZIP" value={form.mailing_zip || ''} onChange={(e) => setForm({ ...form, mailing_zip: e.target.value })} />
         <input placeholder="List source (e.g. driving for dollars)" value={form.list_source || ''} onChange={(e) => setForm({ ...form, list_source: e.target.value })} />
         <input type="date" value={form.follow_up_date || ''} onChange={(e) => setForm({ ...form, follow_up_date: e.target.value })} />
         <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as LeadStatus })}>
@@ -145,6 +151,9 @@ export default function Leads({ userId, onLeads }: { userId: string | null; onLe
             {l.follow_up_date ? ` · follow-up ${l.follow_up_date}` : ''}
             {l.owner_name ? ` · owner: ${l.owner_name}` : ''}
             {l.list_source ? ` · source: ${l.list_source}` : ''}
+            {l.parcel_id ? ` · parcel: ${l.parcel_id}` : ''}
+            {l.year_built ? ` · built ${l.year_built}` : ''}
+            {isOutOfStateOwner(l) ? ' · 📬 out-of-state owner' : ''}
             <ResearchLinks lead={l} />
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}

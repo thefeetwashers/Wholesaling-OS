@@ -14,11 +14,15 @@ import { checkPhone } from '../lib/phone';
 // and reported. Feed-only fields the leads table has no column for
 // (parcel, assessed value, opening bid, auction date) are recognized
 // and written into the lead's notes — visible, never silently dropped.
+// Slice 56 (schema v4.5): parcel/APN graduated from notes to a real
+// leads column, and year built + mailing city/state/ZIP import as
+// real fields too (the mailing state powers the out-of-state flag).
 // Phones/emails are imported ONLY when the file itself contains them
 // and the wholesaler maps those columns. Consent starts 'unknown'.
 
 type FieldKey = 'property_address' | 'city' | 'state' | 'zip' | 'county' | 'owner_name'
-  | 'mailing_address' | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date';
+  | 'mailing_address' | 'mailing_city' | 'mailing_state' | 'mailing_zip' | 'year_built'
+  | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date';
 
 const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'property_address', label: 'Property address *', aliases: ['property_address', 'property address', 'address', 'street address', 'street', 'situs address', 'property'] },
@@ -30,7 +34,11 @@ const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'mailing_address', label: 'Mailing address', aliases: ['mailing_address', 'mailing address', 'mailing', 'owner address'] },
   { key: 'phones', label: 'Phone (only if the file has it)', aliases: ['phone', 'phones', 'phone number', 'mobile', 'cell', 'telephone'] },
   { key: 'emails', label: 'Email (only if the file has it)', aliases: ['email', 'emails', 'email address'] },
-  { key: 'parcel_id', label: 'Parcel / APN (saved to notes)', aliases: ['parcel', 'parcel_id', 'parcel id', 'apn', 'folio', 'account'] },
+  { key: 'mailing_city', label: 'Mailing city', aliases: ['mailing city', 'mailing_city', 'mail city'] },
+  { key: 'mailing_state', label: 'Mailing state', aliases: ['mailing state', 'mailing_state', 'mail state'] },
+  { key: 'mailing_zip', label: 'Mailing ZIP', aliases: ['mailing zip', 'mailing_zip', 'mailing zipcode', 'mail zip'] },
+  { key: 'year_built', label: 'Year built', aliases: ['year built', 'year_built', 'yr built', 'built'] },
+  { key: 'parcel_id', label: 'Parcel / APN', aliases: ['parcel', 'parcel_id', 'parcel id', 'apn', 'folio', 'account'] },
   { key: 'assessed_value', label: 'Assessed value (saved to notes)', aliases: ['assessed', 'assessed value', 'assessed_value', 'market value', 'just value'] },
   { key: 'opening_bid', label: 'Opening bid / amount owed (saved to notes)', aliases: ['opening bid', 'opening_bid', 'bid', 'amount owed', 'total owed', 'liability', 'judgment'] },
   { key: 'auction_date', label: 'Auction / sale date (saved to notes)', aliases: ['auction', 'auction date', 'sale date', 'auction_date', 'sale_date'] },
@@ -133,7 +141,6 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
         if (seen.has(key)) { dupes++; continue; }
         seen.add(key);
         const extra: string[] = [];
-        const parcel = cell(r, 'parcel_id'); if (parcel) extra.push(`Parcel: ${parcel}`);
         const assessed = cell(r, 'assessed_value'); if (assessed) extra.push(`Assessed: ${assessed}`);
         const bid = cell(r, 'opening_bid'); if (bid) extra.push(`Opening bid / owed: ${bid}`);
         const auction = cell(r, 'auction_date'); if (auction) extra.push(`Auction: ${auction}`);
@@ -164,6 +171,11 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
           county: cell(r, 'county') || null,
           owner_name: cell(r, 'owner_name') || null,
           mailing_address: cell(r, 'mailing_address') || null,
+          mailing_city: cell(r, 'mailing_city') || null,
+          mailing_state: cell(r, 'mailing_state') || null,
+          mailing_zip: cell(r, 'mailing_zip') || null,
+          parcel_id: cell(r, 'parcel_id') || null,
+          year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
           phones: phoneOut,
           emails: email ? [email] : [],
           status: 'new',
@@ -252,7 +264,7 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
                   ))}
                 </tbody>
               </table>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>Preview of the first {preview.length} rows with the mapping above. Columns that map to no lead field are not stored, except parcel / assessed / bid / auction, which are saved into the lead's notes.</p>
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>Preview of the first {preview.length} rows with the mapping above. Columns that map to no lead field are not stored, except assessed / bid / auction, which are saved into the lead's notes.</p>
             </div>
           )}
           <button style={{ marginTop: 10 }} disabled={busy} onClick={runImport}>
