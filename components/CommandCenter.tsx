@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadDashboardBand, type DashboardBandData } from '../lib/kpis';
+import { loadFollowUpStreak } from '../lib/autopsy';
 import { loadDeadlines, type DeadlineItem } from '../lib/deadlines';
 import { loadSellerPageSettings } from '../lib/portals';
 
@@ -53,12 +54,14 @@ export function briefingLine(band: DashboardBandData, deadlines: DeadlineItem[])
 
 export default function CommandCenter({ userId, onNavigate }: { userId: string; onNavigate: (view: string) => void }) {
   const [band, setBand] = useState<DashboardBandData | null>(null);
+  const [streak, setStreak] = useState<number | null>(null);
   const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
   const [company, setCompany] = useState('');
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
+    loadFollowUpStreak(userId).then((n) => { if (live) setStreak(n); }).catch(() => {});
     Promise.all([
       loadDashboardBand(userId),
       loadDeadlines(userId).catch(() => [] as DeadlineItem[]),
@@ -106,6 +109,13 @@ export default function CommandCenter({ userId, onNavigate }: { userId: string; 
       <p style={{ fontSize: 15, color: '#cbd5e1', margin: '0 0 18px', maxWidth: 860 }}>
         {band ? briefingLine(band, deadlines) : 'Loading your numbers…'}
       </p>
+      {streak !== null && (
+        <p style={{ fontSize: 13.5, color: streak > 0 ? '#4ade80' : '#94a3b8', margin: '-8px 0 16px' }}>
+          {streak > 0
+            ? `🔥 Follow-up streak: you worked your leads ${streak} of the last 7 days. Follow-up is the business.`
+            : 'No follow-ups logged in the last 7 days — one call today starts the streak.'}
+        </p>
+      )}
 
       {band && (
         <>

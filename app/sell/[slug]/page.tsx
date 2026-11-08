@@ -9,6 +9,7 @@ import {
   type SellerLeadForm,
 } from '../../../lib/portals';
 import VoiceIntake from '../../../components/VoiceIntake';
+import { loadPublicWholesalerStats } from '../../../lib/trust';
 
 // Public seller landing page (Slice 20): /sell/<slug> under the
 // wholesaler's own company name. No account needed. The submission
@@ -31,11 +32,13 @@ export default function SellerPage() {
   // underwrites, the form only asks.
   const [q, setQ] = useState({ roof: '', hvac: '', repairs: '', timeline: '', reason: '' });
   const [sent, setSent] = useState(false);
+  const [closedCount, setClosedCount] = useState<number | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
+    loadPublicWholesalerStats(slug).then(setClosedCount).catch(() => {});
     loadPublicSellerPage(slug)
       .then((p) => { if (p) { setPage(p); setState('ready'); } else setState('missing'); })
       .catch(() => setState('missing'));
@@ -98,6 +101,13 @@ export default function SellerPage() {
         <h1>{page.company}</h1>
         <p>{page.headline || 'Thinking of selling your house? Tell us about it — no obligation.'}</p>
         {page.about && <p style={{ fontSize: 14 }}>{page.about}</p>}
+        {closedCount !== null && (
+          <p style={{ fontSize: 13.5, color: '#4ade80' }}>
+            {closedCount > 0
+              ? `🏆 ${closedCount} deal${closedCount === 1 ? '' : 's'} closed on this platform — counted from closing records, not claimed.`
+              : 'New on this platform — no closings counted yet. Every closing here gets counted.'}
+          </p>
+        )}
       </div>
 
       <VoiceIntake slug={slug} company={page.company} />

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadDeals, type DealRow } from '../lib/deals';
 import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, loadMilestonesForFiles, updateEscrowFileStatus, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
+import DealAutopsy, { AutopsyLessons } from './DealAutopsy';
 import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
 
@@ -92,6 +93,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
                   {f.outcome !== 'closed' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'closed'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'closed' } : x))); setSavedMsg('Escrow marked closed — this counts on the buyer’s record.'); }}>Mark closed</button>}{' '}
                   {f.outcome !== 'fell_through' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'fell_through'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'fell_through' } : x))); setSavedMsg('Escrow marked fell through — this counts on the buyer’s record.'); }}>Mark fell through</button>}{' '}
                   {f.outcome && f.outcome !== 'open' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'open'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'open' } : x))); setSavedMsg('Escrow outcome reopened.'); }}>Reopen</button>}
+                  <DealAutopsy escrowFileId={f.id} outcome={f.outcome || 'open'} />
                 </>
               )}
               {f.id && (() => {
@@ -127,6 +129,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
         </ul>
       )}
       <p style={{ fontSize: 12, color: '#94a3b8' }}>Mark the outcome honestly when a file ends — it becomes part of the buyer’s earned record that other wholesalers see at offer time.</p>
+      <AutopsyLessons />
     </section>
   );
 }
