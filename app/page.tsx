@@ -33,6 +33,7 @@ import ClosingCalendar from '../components/ClosingCalendar';
 import StaleMoneyBoard from '../components/StaleMoneyBoard';
 import CampaignTracker from '../components/CampaignTracker';
 import KanbanBoard from '../components/KanbanBoard';
+import Paperwork from '../components/Paperwork';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
 import TitlePacket from '../components/TitlePacket';
@@ -88,7 +89,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 79: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 80: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -109,7 +110,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 79</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 80</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -239,6 +240,7 @@ export default function Home() {
             {view === 'contracts' && (
               <>
                 <div id="contracts"><Contracts userId={userId} /></div>
+                <Paperwork userId={userId} />
                 <Viewings userId={userId} />
                 <div id="escrow"><Escrow userId={userId} /></div>
                 <TitlePacket userId={userId} />
