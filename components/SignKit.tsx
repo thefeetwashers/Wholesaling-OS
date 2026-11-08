@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { loadSellerPageSettings, type SellerPageSettings } from '../lib/portals';
 import { loadLetterIdentity, saveLetterIdentity, escHtml, openPrintWindow, type LetterIdentity } from '../lib/letter-identity';
 
@@ -15,6 +16,10 @@ import { loadLetterIdentity, saveLetterIdentity, escHtml, openPrintWindow, type 
 export default function SignKit({ userId }: { userId: string }) {
   const [s, setS] = useState<SellerPageSettings | null>(null);
   const [idn, setIdn] = useState<LetterIdentity>(() => loadLetterIdentity());
+  // Slice 91 — the bandit sign's QR code, generated in the browser
+  // from the real page address by the qrcode library: the code
+  // encodes exactly the URL printed under it, nothing else.
+  const [qr, setQr] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -22,10 +27,19 @@ export default function SignKit({ userId }: { userId: string }) {
     return () => { live = false; };
   }, [userId]);
 
-  if (!s) return null;
-
-  const slug = (s.public_slug || '').trim().toLowerCase();
+  const slug = (s?.public_slug || '').trim().toLowerCase();
   const pageUrl = slug ? `https://wholesalingos.thefeetwashers.com/sell/${slug}` : '';
+
+  useEffect(() => {
+    if (!pageUrl) { setQr(''); return; }
+    let live = true;
+    QRCode.toDataURL(pageUrl, { width: 560, margin: 1 })
+      .then((url) => { if (live) setQr(url); })
+      .catch(() => { if (live) setQr(''); });
+    return () => { live = false; };
+  }, [pageUrl]);
+
+  if (!s) return null;
   const biz = idn.biz || s.company || '';
   const headline = s.seller_page_headline || 'We Buy Houses';
 
@@ -69,6 +83,34 @@ ${idn.phone ? `<p>Or call ${idn.you ? escHtml(idn.you) + ' ' : ''}directly: <str
     openPrintWindow('Letter insert / door hanger', html);
   };
 
+  // Slice 91 — the bandit sign: the yard sign's bigger roadside
+  // sibling, carrying the QR code so a driver can reach the page
+  // from the car window. Same honest print pattern: the platform
+  // prints nothing; this opens a print view and you print it.
+  const printBandit = () => {
+    saveLetterIdentity(idn);
+    const html = `
+<style>body{font-family:Arial,sans-serif;margin:0;color:#111;text-align:center}
+.sign{border:8px solid #065f46;border-radius:18px;padding:36px 28px;margin:18px}
+h1{font-size:64px;margin:0 0 6px;color:#065f46;letter-spacing:0.5px}
+.sub{font-size:26px;font-weight:bold;margin:4px 0 14px}
+.qr{width:300px;height:300px}
+.scan{font-size:21px;font-weight:bold;margin-top:10px}
+.url{font-size:22px;font-weight:bold;color:#065f46;margin-top:6px;word-break:break-all}
+.phone{font-size:34px;font-weight:bold;margin-top:10px}
+.biz{font-size:20px;margin-top:4px}</style>
+<div class="sign">
+<h1>${escHtml(headline)}</h1>
+<div class="sub">Cash offer — as-is. No repairs. No cleanout.</div>
+${qr ? `<img class="qr" src="${qr}" alt="QR code to the seller page" />` : ''}
+<div class="scan">Scan to sell your house</div>
+<div class="url">${escHtml(pageUrl.replace('https://', ''))}</div>
+${idn.phone ? `<div class="phone">${escHtml(idn.phone)}</div>` : ''}
+${biz ? `<div class="biz">${escHtml(biz)}</div>` : ''}
+</div>`;
+    openPrintWindow('Bandit sign', html);
+  };
+
   const inp = { background: '#0f172a', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 6, color: '#fff', padding: '6px 9px', fontSize: 13.5, marginRight: 6, marginTop: 4 } as const;
 
   return (
@@ -93,7 +135,19 @@ ${idn.phone ? `<p>Or call ${idn.you ? escHtml(idn.you) + ' ' : ''}directly: <str
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={printSign}>Print yard sign</button>
             <button onClick={printInsert}>Print letter insert / door hanger</button>
+            <button onClick={printBandit}>Print bandit sign with QR</button>
           </div>
+          {qr && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+              <img src={qr} alt="QR code to your seller page" style={{ width: 110, height: 110, background: '#fff', borderRadius: 8 }} />
+              <p style={{ fontSize: 12.5, color: '#94a3b8', margin: 0, maxWidth: 430 }}>
+                This QR code encodes exactly your page address above — scan it with any phone camera to
+                check. Bandit-sign rules vary by city and county: many restrict signs in public
+                rights-of-way and some require permits. Place signs only where you have the right to,
+                and check your local sign ordinance first.
+              </p>
+            </div>
+          )}
         </>
       )}
     </section>
