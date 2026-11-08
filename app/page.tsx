@@ -15,6 +15,7 @@ import Titles from '../components/Titles';
 import Counties from '../components/Counties';
 import AuctionDirectory from '../components/AuctionDirectory';
 import DashboardBand from '../components/DashboardBand';
+import CommandCenter from '../components/CommandCenter';
 import DeadlineRadar from '../components/DeadlineRadar';
 import GlobalSearch from '../components/GlobalSearch';
 import DeadLeadWatch from '../components/DeadLeadWatch';
@@ -72,7 +73,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 47</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 48</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -122,6 +123,7 @@ export default function Home() {
             <GlobalSearch userId={userId} onNavigate={setView} />
             {view === 'dashboard' && (
               <>
+                {role === 'wholesaler' && userId && <CommandCenter userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DashboardBand userId={userId} />}
                 {role === 'wholesaler' && userId && <DeadlineRadar userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
