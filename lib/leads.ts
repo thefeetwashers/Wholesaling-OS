@@ -21,6 +21,11 @@ export interface Lead {
   parcel_id?: string;
   assessed_value?: number | null;
   liens_amount?: number | null;
+  // Slice 81 (schema v5.1): the property's monthly rent and the
+  // seller's asking price, both typed by the wholesaler from the
+  // lease or the listing — the pair behind the 1% rule flag.
+  monthly_rent?: number | null;
+  asking_price?: number | null;
   year_built?: number;
   mailing_city?: string;
   mailing_state?: string;
@@ -162,9 +167,20 @@ export function leadsToCsv(leads: Lead[]): string {
     esc(l.property_address), esc(l.city), esc(l.state), esc(l.zip),
     esc(l.owner_name), esc(l.status), esc(l.follow_up_date), esc(l.list_source),
     esc(l.parcel_id), esc(l.year_built), esc(l.mailing_address), esc(l.mailing_city), esc(l.mailing_state), esc(l.mailing_zip),
-    esc(l.assessed_value), esc(l.liens_amount),
+    esc(l.assessed_value), esc(l.liens_amount), esc(l.monthly_rent), esc(l.asking_price),
   ].join(','));
-  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source,parcel_id,year_built,mailing_address,mailing_city,mailing_state,mailing_zip,assessed_value,liens_amount', ...rows].join('\n');
+  return ['property_address,city,state,zip,owner_name,status,follow_up_date,list_source,parcel_id,year_built,mailing_address,mailing_city,mailing_state,mailing_zip,assessed_value,liens_amount,monthly_rent,asking_price', ...rows].join('\n');
+}
+
+// Slice 81 — the rent-to-price flag: monthly rent as a percentage of
+// the seller's asking price, the classic 1% rule of thumb landlord
+// buyers screen with. Computed only when BOTH figures were entered;
+// it is a screening flag on the wholesaler's own numbers, never a
+// valuation, and it never hides or ranks a lead.
+export function rentFlag(l: Lead): { pct: number; clears: boolean } | null {
+  if (!l.monthly_rent || !l.asking_price || l.asking_price <= 0) return null;
+  const pct = (l.monthly_rent / l.asking_price) * 100;
+  return { pct, clears: pct >= 1 };
 }
 
 // Slice 56 — the out-of-state owner flag: the property sits in one

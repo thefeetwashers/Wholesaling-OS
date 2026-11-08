@@ -22,7 +22,8 @@ import { checkPhone } from '../lib/phone';
 
 type FieldKey = 'property_address' | 'city' | 'state' | 'zip' | 'county' | 'owner_name'
   | 'mailing_address' | 'mailing_city' | 'mailing_state' | 'mailing_zip' | 'year_built'
-  | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date' | 'liens_amount';
+  | 'phones' | 'emails' | 'parcel_id' | 'assessed_value' | 'opening_bid' | 'auction_date' | 'liens_amount'
+  | 'monthly_rent' | 'asking_price';
 
 const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'property_address', label: 'Property address *', aliases: ['property_address', 'property address', 'address', 'street address', 'street', 'situs address', 'property'] },
@@ -41,6 +42,8 @@ const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
   { key: 'parcel_id', label: 'Parcel / APN', aliases: ['parcel', 'parcel_id', 'parcel id', 'apn', 'folio', 'account'] },
   { key: 'assessed_value', label: 'Assessed value (county)', aliases: ['assessed', 'assessed value', 'assessed_value', 'market value', 'just value'] },
   { key: 'liens_amount', label: 'Total liens / mortgage balance', aliases: ['liens', 'total liens', 'liens_amount', 'mortgage balance', 'loan balance', 'total owed', 'amount owed'] },
+  { key: 'monthly_rent', label: 'Monthly rent', aliases: ['monthly rent', 'monthly_rent', 'rent', 'rent amount'] },
+  { key: 'asking_price', label: 'Asking price', aliases: ['asking price', 'asking_price', 'asking', 'list price', 'price'] },
   { key: 'opening_bid', label: 'Opening bid / amount owed (saved to notes)', aliases: ['opening bid', 'opening_bid', 'bid', 'amount owed', 'total owed', 'liability', 'judgment'] },
   { key: 'auction_date', label: 'Auction / sale date (saved to notes)', aliases: ['auction', 'auction date', 'sale date', 'auction_date', 'sale_date'] },
 ];
@@ -178,6 +181,8 @@ export default function ImportInbox({ userId, onAdded }: { userId: string | null
           parcel_id: cell(r, 'parcel_id') || null,
           assessed_value: money(cell(r, 'assessed_value')),
           liens_amount: money(cell(r, 'liens_amount')),
+          monthly_rent: money(cell(r, 'monthly_rent')),
+          asking_price: money(cell(r, 'asking_price')),
           year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
           phones: phoneOut,
           emails: email ? [email] : [],

@@ -105,6 +105,17 @@ const CARDS: { icon: string; title: string; tag: string; steps: string[] }[] = [
       'This is a manual, case-by-case search by design: PACER is the federal courts’ records system, not a list seller, and bulk pulling is not what it exists for.',
     ],
   },
+  {
+    icon: '🏷️',
+    title: 'FSBO & expired listings',
+    tag: 'Tag expired ones “Stale listing” · Script: FSBO (for sale by owner)',
+    steps: [
+      'FSBO sellers are already raising their hand — they listed the house themselves. Browse the for-sale-by-owner listings in your market by hand (the listing sites’ FSBO pages, Craigslist, local classifieds), and write down the address, the asking price, and any rent figure the listing states.',
+      'Expired MLS listings live with agents, not on a public shelf: partner with one or two local agents who will share their own expireds where their brokerage allows, in exchange for first look at the deals you cannot use.',
+      'Add each property as a lead with the asking price entered — if it is rented, the rent too — and the rent-to-price flag on the lead row does the 1% rule math for your landlord buyers.',
+      'Work FSBO sellers with the FSBO script in the Comms Center templates: you are offering a cash alternative alongside their listing, not talking them out of it. Tag expired listings “Stale listing” so they surface in your call queue, and note the listing’s end date in the lead.',
+    ],
+  },
 ];
 
 export default function ListPlaybooks() {

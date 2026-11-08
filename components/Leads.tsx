@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, rentFlag, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 import LeadLetter from './LeadLetter';
 import ScreenGuard from './ScreenGuard';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
@@ -59,6 +59,8 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
         year_built: form.year_built ?? null,
         assessed_value: form.assessed_value ?? null,
         liens_amount: form.liens_amount ?? null,
+        monthly_rent: form.monthly_rent ?? null,
+        asking_price: form.asking_price ?? null,
       } as Lead;
       const row = await updateLead(userId, { ...editForm, id: editingId }).catch(() => null);
       if (row) {
@@ -141,6 +143,8 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
         <input placeholder="Mailing ZIP" value={form.mailing_zip || ''} onChange={(e) => setForm({ ...form, mailing_zip: e.target.value })} />
         <input placeholder="Assessed value (county figure)" type="number" value={form.assessed_value ?? ''} onChange={(e) => setForm({ ...form, assessed_value: e.target.value === '' ? undefined : Number(e.target.value) })} />
         <input placeholder="Total liens / mortgage balance" type="number" value={form.liens_amount ?? ''} onChange={(e) => setForm({ ...form, liens_amount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <input placeholder="Monthly rent (if rented)" type="number" value={form.monthly_rent ?? ''} onChange={(e) => setForm({ ...form, monthly_rent: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <input placeholder="Asking price (if listed)" type="number" value={form.asking_price ?? ''} onChange={(e) => setForm({ ...form, asking_price: e.target.value === '' ? undefined : Number(e.target.value) })} />
         <input placeholder="List source (e.g. driving for dollars)" value={form.list_source || ''} onChange={(e) => setForm({ ...form, list_source: e.target.value })} />
         <input type="date" value={form.follow_up_date || ''} onChange={(e) => setForm({ ...form, follow_up_date: e.target.value })} />
         <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as LeadStatus })}>
@@ -191,6 +195,7 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             {l.year_built ? ` · built ${l.year_built}` : ''}
             {isOutOfStateOwner(l) ? ' · 📬 out-of-state owner' : ''}
             {(() => { const eq = estimatedEquity(l); return eq ? ` · equity ≈ $${eq.equity.toLocaleString()} (${eq.pct}% of assessed)${eq.pct < 30 ? ' · ⚠️ thin equity — verify before spending' : ''}` : ''; })()}
+            {(() => { const rf = rentFlag(l); return rf ? ` · rent $${Number(l.monthly_rent).toLocaleString()}/mo = ${rf.pct.toFixed(2)}% of asking${rf.clears ? ' · ✓ clears the 1% rule' : ' · under the 1% rule'}` : ''; })()}
             <ResearchLinks lead={l} />
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}
