@@ -70,6 +70,41 @@ const CARDS: { icon: string; title: string; tag: string; steps: string[] }[] = [
       'Tag Vacant and/or Out-of-area owner with the date you observed it.',
     ],
   },
+  {
+    icon: '🧲',
+    title: 'Build a list on Propwire, work it here',
+    tag: 'Tag it: Probate / inherited · Pre-foreclosure · Vacant',
+    steps: [
+      'Open your OWN free Propwire account (propwire.com — the Basic tier is free, no card). WholesalingOS does not connect to Propwire and never holds its data — your account, your export.',
+      'Search your state or county and set the Lead Type — Probate/Inherited, Pre-foreclosure, Vacant or Absentee, among their 21 lead types. (Their own pages state a 10,000-download cap for free Basic accounts; the period differs between their FAQ and their Terms, so treat 10,000 per period as the ceiling, not a promise.)',
+      'Download the CSV with the Property & Ownership and Tax columns chosen. Their FAQ promises "Property & Ownership Details" at minimum — open the file and confirm the owner mailing columns are there before you build a mailing on it.',
+      'Drop the CSV into the Import Inbox here: parcel IDs, addresses and mailing fields land as real lead fields, duplicates are caught, and the list source is stamped. Tag the batch with the matching distress tags and work the Call Queue.',
+      'Skip tracing inside Propwire is Propwire’s own paid add-on (10¢ per successful match, inside your own account, under their terms) — it is not a WholesalingOS feature, and the platform never receives or stores those numbers.',
+    ],
+  },
+  {
+    icon: '💵',
+    title: 'Build your cash buyer list',
+    tag: 'Buyers live in the Buyers desk — this card is sourcing',
+    steps: [
+      'Your strongest buyers are the ones who already closed with you: the platform counts their closings and tiers them automatically (Tier 1 = 3+). Sourcing fills the top of that funnel.',
+      'On your own Propwire account, clear the distress filters and set Lead Type to Cash Buyer with Ownership = Corporate/LLC in your ZIPs. Export the CSV; the companies actively buying for cash near your deals are your call list.',
+      'Add the real ones in the Buyers desk with their areas, property types and budget. Their buy box is what matches your future listings — a buyer with no buy box matches nothing.',
+      'Offline still works: local investor meetups and REIA groups are where active local buyers introduce themselves. Add the ones you meet the same way.',
+      'Never buy or import a "national cash buyer database" — the buyers who count are the ones who registered, gave you their criteria, and close. This platform proves buyers by their record, not by a list someone sold you.',
+    ],
+  },
+  {
+    icon: '🏛️',
+    title: 'Bankruptcy filings — PACER',
+    tag: 'No dedicated tag — note the case on the lead',
+    steps: [
+      'Open your own PACER account (pacer.uscourts.gov). Records cost $0.10 per page, capped at $3 per document — and fees are WAIVED when your quarter totals $30 or less, which covers a working wholesaler’s searching.',
+      'Search your federal district for recent Chapter 7 and Chapter 13 filings in your counties. A filing whose schedules list real property is a public-record lead like any other.',
+      'Add the property as a lead with the case number and chapter in the notes and a gentle follow-up date. Bankruptcy property sits under court rules, so a letter offers help and information — never pressure.',
+      'This is a manual, case-by-case search by design: PACER is the federal courts’ records system, not a list seller, and bulk pulling is not what it exists for.',
+    ],
+  },
 ];
 
 export default function ListPlaybooks() {

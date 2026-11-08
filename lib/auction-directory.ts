@@ -81,4 +81,10 @@ export const AUCTION_GROUPS: AuctionGroup[] = [
       { name: 'Charlotte Clerk — tax deed services', url: 'https://taxdeeds.charlotteclerk.com/TaxDeed/Information', operator: 'Charlotte Clerk of Courts (official)', covers: "The Clerk's tax deed page; Charlotte runs BOTH tax deed and foreclosure sales online through its RealForeclose site, linked from this page." },
     ],
   },
+  {
+    title: 'County records, nationwide — every county’s own doors',
+    sources: [
+      { name: 'NETR Online — Public Records Directory', url: 'https://publicrecords.netronline.com/', operator: 'NETR Online (free directory; their separate Data Store sells reports per item)', covers: 'Direct links to county assessor, recorder, tax collector and GIS portals for counties across all 50 states — the door to any county this platform has not hand-verified yet. Directory verified free and open Nov 8, 2026; the links lead to the counties’ own official sites, and the records themselves are the counties’.' },
+    ],
+  },
 ];
