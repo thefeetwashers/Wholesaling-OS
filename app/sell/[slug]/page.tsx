@@ -26,6 +26,10 @@ export default function SellerPage() {
   const [page, setPage] = useState<PublicSellerPage | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [f, setF] = useState<SellerLeadForm>(EMPTY);
+  // Slice 63 — condition questionnaire. The answers ride inside the lead's
+  // notes (no new columns, no fabricated repair estimates); the wholesaler
+  // underwrites, the form only asks.
+  const [q, setQ] = useState({ roof: '', hvac: '', repairs: '', timeline: '', reason: '' });
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +48,17 @@ export default function SellerPage() {
     }
     setBusy(true);
     setErr('');
-    const ok = await submitSellerLead(slug, f);
+    const qLines = [
+      q.roof && `Roof: ${q.roof}`,
+      q.hvac && `HVAC: ${q.hvac}`,
+      q.repairs && `Repairs needed: ${q.repairs}`,
+      q.timeline && `Timeline: ${q.timeline}`,
+      q.reason && `Reason for selling: ${q.reason}`,
+    ].filter(Boolean) as string[];
+    const notes = qLines.length
+      ? [`Seller questionnaire — ${qLines.join(' · ')}`, f.notes].filter(Boolean).join('\n')
+      : f.notes;
+    const ok = await submitSellerLead(slug, { ...f, notes });
     setBusy(false);
     if (ok) setSent(true);
     else setErr('Your details could not be sent. Check the address and name, then try again.');
@@ -108,8 +122,53 @@ export default function SellerPage() {
           <input placeholder="ZIP" value={f.zip}
             onChange={(e) => setF({ ...f, zip: e.target.value })} style={{ width: 110 }} />
         </div>
+        <div style={{ marginTop: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>
+            A few quick questions (optional) — your answers help price your offer accurately.
+          </p>
+          <select value={q.roof} onChange={(e) => setQ({ ...q, roof: e.target.value })}>
+            <option value="">Roof age…</option>
+            <option>Under 10 years old</option>
+            <option>10–20 years old</option>
+            <option>Over 20 years / needs work</option>
+            <option>Not sure</option>
+          </select>{' '}
+          <select value={q.hvac} onChange={(e) => setQ({ ...q, hvac: e.target.value })}>
+            <option value="">Heating &amp; cooling…</option>
+            <option>Working</option>
+            <option>Needs repair</option>
+            <option>Not working / none</option>
+            <option>Not sure</option>
+          </select>{' '}
+          <select value={q.repairs} onChange={(e) => setQ({ ...q, repairs: e.target.value })}>
+            <option value="">Repairs needed…</option>
+            <option>Move-in ready</option>
+            <option>Cosmetic only</option>
+            <option>Moderate repairs</option>
+            <option>Major repairs</option>
+            <option>Full rehab</option>
+          </select>
+          <div style={{ marginTop: 6 }}>
+            <select value={q.timeline} onChange={(e) => setQ({ ...q, timeline: e.target.value })}>
+              <option value="">How soon would you like to sell?…</option>
+              <option>As soon as possible</option>
+              <option>30–60 days</option>
+              <option>A few months</option>
+              <option>Just exploring</option>
+            </select>{' '}
+            <select value={q.reason} onChange={(e) => setQ({ ...q, reason: e.target.value })}>
+              <option value="">Reason for selling…</option>
+              <option>Relocating</option>
+              <option>Inherited property</option>
+              <option>Downsizing</option>
+              <option>Behind on payments</option>
+              <option>Tired of landlording</option>
+              <option>Other / prefer not to say</option>
+            </select>
+          </div>
+        </div>
         <div style={{ marginTop: 6 }}>
-          <textarea placeholder="Anything we should know? Condition, timeline, situation — whatever you're comfortable sharing."
+          <textarea placeholder="Anything else we should know? Whatever you're comfortable sharing."
             value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })}
             rows={3} style={{ width: '100%', maxWidth: 620 }} />
         </div>

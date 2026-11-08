@@ -84,6 +84,30 @@ export default function Landing({ onPickRole }: { onPickRole: (role: string) => 
         ))}
       </div>
 
+      <section style={{ background: '#052e16', border: '1px solid #166534', padding: 22, borderRadius: 12, marginBottom: 18 }}>
+        <h2 style={{ marginTop: 0 }}>Real. Nothing fake. That&rsquo;s why you get 90 days.</h2>
+        <p style={{ fontSize: 15, maxWidth: 760 }}>
+          Fake platforms need your money fast — before you look closely. We do the opposite:
+          <strong> 90 full days free</strong>, before the first $150 is ever charged, so you can test
+          every screen with your own real leads and your own real deals. If something here were fake,
+          90 days is more than enough time to catch it. That&rsquo;s the point.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          <div style={{ background: '#0b1526', border: '1px solid #1f3350', borderRadius: 10, padding: 14 }}>
+            <strong>🚫 No fake numbers</strong>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>No seeded buyers, no invented counters, no projected income. Every figure in your office is counted from a real record — or it isn&rsquo;t shown.</p>
+          </div>
+          <div style={{ background: '#0b1526', border: '1px solid #1f3350', borderRadius: 10, padding: 14 }}>
+            <strong>🚫 No fake features</strong>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>If a button exists, it works. If something needs a key or an account to light up, the screen says so plainly instead of pretending.</p>
+          </div>
+          <div style={{ background: '#0b1526', border: '1px solid #1f3350', borderRadius: 10, padding: 14 }}>
+            <strong>✅ Nothing to hide</strong>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>Your leads stay sealed — even from us. Your data exports with you any time. Judge us the way you&rsquo;d judge any partner: by what survives inspection.</p>
+          </div>
+        </div>
+      </section>
+
       <h2 style={h2}>Everything a wholesaling business runs on — one office</h2>
       <p style={sub}>Built for solo wholesalers and companies, in every U.S. state and territory. Pick a lane:</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
@@ -116,6 +140,19 @@ export default function Landing({ onPickRole }: { onPickRole: (role: string) => 
           </div>
         ))}
       </div>
+
+      <section style={{ background: '#16213a', padding: 20, borderRadius: 12, marginBottom: 18 }}>
+        <h2 style={{ marginTop: 0 }}>Selling your house?</h2>
+        <p style={{ fontSize: 14.5, maxWidth: 760 }}>
+          If a wholesaler sent you here, use <strong>their</strong> link — it opens their own free seller
+          page, and your details go to their desk only, never to a marketplace. If you found us on your
+          own, the platform&rsquo;s first buyer is its operator: <strong>The Feet Washers, Inc.</strong> buys
+          houses for cash in Florida. Reach them at{' '}
+          <a href="mailto:thefeetwashers@gmail.com" style={{ color: '#93c5fd' }}>thefeetwashers@gmail.com</a>{' '}
+          or <a href="tel:+17729716129" style={{ color: '#93c5fd' }}>772-971-6129</a> — a person answers,
+          and there is no fee to talk.
+        </p>
+      </section>
 
       <h2 style={h2}>What experienced wholesalers wish someone had told them</h2>
       <p style={sub}>The lessons that cost the most tuition in this business — written on the wall of your new office, free.</p>

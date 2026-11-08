@@ -89,7 +89,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 62</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 63</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>

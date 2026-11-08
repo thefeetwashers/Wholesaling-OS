@@ -21,9 +21,12 @@ export default function LeadLetter({ lead }: { lead: Lead }) {
 
   const tpl = SCRIPT_TEMPLATES.find((s) => s.key === 'directmail');
 
-  const printLetter = () => {
-    if (!tpl) return;
-    saveLetterIdentity(idn);
+  // One merge, two readers: the inline preview below and the print
+  // window both render THIS text, so what the wholesaler reads is
+  // exactly what prints. (Inline preview added after the Slice 62
+  // live verification found the panel showed fields only.)
+  const mergedBody = (): string => {
+    if (!tpl) return '';
     let body = mergeTemplate(tpl.body, {
       name: lead.owner_name || 'Homeowner',
       you: idn.you || '{you}',
@@ -33,6 +36,13 @@ export default function LeadLetter({ lead }: { lead: Lead }) {
     });
     body = body.split('[your phone]').join(idn.phone || '[your phone]');
     body = body.split('[your email]').join(idn.email || '[your email]');
+    return body;
+  };
+
+  const printLetter = () => {
+    if (!tpl) return;
+    saveLetterIdentity(idn);
+    const body = mergedBody();
     const addrLines = [
       lead.owner_name || '',
       lead.mailing_address || lead.property_address || '',
@@ -64,6 +74,9 @@ export default function LeadLetter({ lead }: { lead: Lead }) {
           <input placeholder="Your business" value={idn.biz} onChange={(e) => setIdn({ ...idn, biz: e.target.value })} style={inp} />
           <input placeholder="Your phone" value={idn.phone} onChange={(e) => setIdn({ ...idn, phone: e.target.value })} style={inp} />
           <input placeholder="Your email" value={idn.email} onChange={(e) => setIdn({ ...idn, email: e.target.value })} style={inp} />
+          <span style={{ display: 'block', marginTop: 8, background: '#111c30', border: '1px solid #263650', borderRadius: 6, padding: 10, whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: 13, lineHeight: 1.5 }}>
+            {mergedBody()}
+          </span>
           <button onClick={printLetter} style={{ marginTop: 6 }}>Open print view</button>
         </span>
       )}
