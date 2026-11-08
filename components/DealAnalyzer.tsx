@@ -1,13 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { calculateMAO, totalMarketplaceCost, isOverMAO } from '../lib/mao';
 import { suggestAssignmentFee, type PropertyKind } from '../lib/fee-guide';
+import { ESTIMATE_TOTAL_KEY } from '../lib/estimator';
 
 export default function DealAnalyzer() {
   const [arv, setArv] = useState(300000);
   const [contractPrice, setContractPrice] = useState(150000);
   const [repairs, setRepairs] = useState(50000);
+  const [fromEstimator, setFromEstimator] = useState(false);
+
+  // Slice 79 — the Repair Estimator feeds this field: a live event
+  // when its "Use this total" button is tapped, and the saved total
+  // on mount so the figure survives navigation. The note under the
+  // field says where the number came from; it stays fully editable.
+  useEffect(() => {
+    const apply = (total: number) => { setRepairs(total); setFromEstimator(true); };
+    try {
+      const saved = localStorage.getItem(ESTIMATE_TOTAL_KEY);
+      if (saved && Number(saved) > 0) apply(Number(saved));
+    } catch { /* no saved estimate — the default stands */ }
+    const onEstimate = (e: Event) => {
+      const total = (e as CustomEvent).detail;
+      if (typeof total === 'number') apply(total);
+    };
+    window.addEventListener('ws-repair-estimate', onEstimate);
+    return () => window.removeEventListener('ws-repair-estimate', onEstimate);
+  }, []);
   const [fee, setFee] = useState(10000);
   const [customFee, setCustomFee] = useState('');
   const [kind, setKind] = useState<PropertyKind>('house');
@@ -18,7 +38,7 @@ export default function DealAnalyzer() {
   const over = isOverMAO(contractPrice, mao);
 
   return (
-    <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
+    <section id="deal-analyzer" style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Deal Analyzer — MAO</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         MAO = (ARV × 0.70) − Repairs − Assignment Fee. Seller A-B view shows
@@ -28,7 +48,10 @@ export default function DealAnalyzer() {
       <div style={{ display: 'grid', gap: 12, maxWidth: 420 }}>
         <label>ARV $ <input type="number" value={arv} onChange={(e) => setArv(Number(e.target.value))} /></label>
         <label>Contract price $ <input type="number" value={contractPrice} onChange={(e) => setContractPrice(Number(e.target.value))} /></label>
-        <label>Repairs $ <input type="number" value={repairs} onChange={(e) => setRepairs(Number(e.target.value))} /></label>
+        <label>Repairs $ <input type="number" value={repairs} onChange={(e) => { setRepairs(Number(e.target.value)); setFromEstimator(false); }} /></label>
+        {fromEstimator && (
+          <p style={{ fontSize: 12.5, color: '#6ee7b7', margin: 0 }}>Set from your Repair Estimator — edit freely.</p>
+        )}
         <div>
           <button onClick={() => setFee(10000)}>$10,000 fee</button>{' '}
           <button onClick={() => setFee(20000)}>$20,000 fee</button>{' '}

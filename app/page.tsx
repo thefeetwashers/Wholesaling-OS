@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DealAnalyzer from '../components/DealAnalyzer';
+import RepairEstimator from '../components/RepairEstimator';
 import RentalAnalyzer from '../components/RentalAnalyzer';
 import AuthPanel from '../components/AuthPanel';
 import Leads from '../components/Leads';
@@ -87,7 +88,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 78: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 79: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -108,7 +109,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 78</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 79</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -221,6 +222,7 @@ export default function Home() {
                 <StaleDollars userId={userId} />
                 <WatchlistProbate />
                 <DeadLeadWatch userId={userId} />
+                <RepairEstimator />
                 <DealAnalyzer />
                 <RentalAnalyzer />
               </>
