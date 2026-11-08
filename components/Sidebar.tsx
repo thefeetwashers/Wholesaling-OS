@@ -24,6 +24,7 @@ export const SHELL_VIEWS: ShellView[] = [
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝', group: 'Pipeline' },
   { key: 'listings', label: 'My Listings', icon: '📣', group: 'Pipeline' },
   { key: 'buyers', label: 'Buyers', icon: '💵', group: 'Network' },
+  { key: 'jvboard', label: 'JV Board', icon: '🤝', group: 'Network' },
   { key: 'directory', label: 'Lenders & Vendors', icon: '🧰', group: 'Network' },
   { key: 'titles', label: 'Title Companies', icon: '🏛️', group: 'Network' },
   { key: 'money', label: 'Money', icon: '📊', group: 'Money' },

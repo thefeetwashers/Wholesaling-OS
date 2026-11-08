@@ -33,6 +33,7 @@ import { supabaseConfigured } from '../lib/supabase';
 import { loadLeads, type Lead } from '../lib/leads';
 import SubscribeButton from '../components/SubscribeButton';
 import PortalHome, { PublicDealsSection } from '../components/PortalHome';
+import JvBoard from '../components/JvBoard';
 import Outreach from '../components/Outreach';
 import CommsCenter from '../components/CommsCenter';
 import StaleDollars from '../components/StaleDollars';
@@ -89,7 +90,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 68</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 69</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -214,6 +215,9 @@ export default function Home() {
             )}
             {view === 'buyers' && (
               <div id="buyers"><Buyers userId={userId} userEmail={userEmail} /></div>
+            )}
+            {view === 'jvboard' && (
+              <div id="jvboard"><JvBoard userId={userId} userEmail={userEmail} /></div>
             )}
             {view === 'directory' && (
               <div id="directory"><VendorDirectory userId={userId} /></div>
