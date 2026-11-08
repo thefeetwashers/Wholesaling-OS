@@ -67,4 +67,6 @@ export const LEDGER: LedgerEntry[] = [
   { slice: 95, date: 'Nov 8, 2026', title: 'WholesalingOS School', verified: 'All four lessons render at /learn; an unknown lesson returns a true 404; the sitemap carries all nine public URLs.' },
   { slice: 96, date: 'Nov 8, 2026', title: 'My States', verified: 'GA + TX saved from the settings card persisted across reload and moved the Auction Feed’s opening state to GA; restored to no saved states and read back empty in SQL.' },
   { slice: 97, date: 'Nov 8, 2026', title: 'Portal Frame Parity', verified: 'All five role desks visited through the role picker; each shows its framed header band above its own tools; role restored to Wholesaler and confirmed in SQL.' },
+  { slice: 98, date: 'Nov 8, 2026', title: 'Verification Ledger', verified: 'The /ledger page renders signed-out with every entry spot-checked (48, 67 with its amber deferral line, 92, 97); the sitemap carries it as the tenth public URL.' },
+  { slice: 99, date: 'Nov 8, 2026', title: 'The Charter', verified: 'The /charter page renders signed-out with the never list, the pricing covenant, and the portability guarantee; linked from the homepage footer, the sitemap (eleven URLs), and the How We Verify page.' },
 ];

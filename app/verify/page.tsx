@@ -97,6 +97,13 @@ export default function VerifyPage() {
           own machinery does not back, write to thefeetwashers@gmail.com and it will be fixed
           or removed.
         </p>
+        <p style={p}>
+          Two companion records keep this public: the{' '}
+          <a href="/ledger" style={{ color: '#7dd3fc' }}>Verification Ledger</a> (what was checked, slice by
+          slice, including the proofs still outstanding) and{' '}
+          <a href="/charter" style={{ color: '#7dd3fc' }}>the Charter</a> (what we promise, in writing,
+          including the price).
+        </p>
       </section>
     </div>
   );

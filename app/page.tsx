@@ -95,7 +95,7 @@ export default function Home() {
     if (userId) { loadLeads(userId).then((rows) => { if (rows) setLeads(rows); }).catch(() => {}); }
   }, [userId]);
 
-  // Slice 98: first-touch subscriber-referral capture. A ?ref=<slug>
+  // Slice 99: first-touch subscriber-referral capture. A ?ref=<slug>
   // on ANY page load is stashed once; AuthPanel resolves it at signup.
   useEffect(() => {
     try {
@@ -116,7 +116,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 98</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 99</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
