@@ -13,6 +13,7 @@ export interface DealRow {
   arv?: number;
   repairs?: number;
   assignment_fee?: number;
+  actual_sale_price?: number | null;
   emd_amount?: number;
   status: string;
   documents?: Record<string, unknown>;

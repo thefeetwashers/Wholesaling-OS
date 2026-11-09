@@ -6,6 +6,7 @@ import { loadDeals, type DealRow } from '../lib/deals';
 import { createListingForDeal, createEscrowFile, loadEscrowFilesForDeal, loadMilestonesForFiles, updateEscrowFileStatus, addEscrowMilestone, setEscrowOutcome, type EscrowFileRow } from '../lib/escrow';
 import DealAutopsy, { AutopsyLessons } from './DealAutopsy';
 import DealReviews from './DealReviews';
+import ClosingCertificate from './ClosingCertificate';
 import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
 
@@ -96,6 +97,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
                   {f.outcome && f.outcome !== 'open' && <button onClick={async () => { await setEscrowOutcome(f.id!, 'open'); setFiles(files.map((x) => (x.id === f.id ? { ...x, outcome: 'open' } : x))); setSavedMsg('Escrow outcome reopened.'); }}>Reopen</button>}
                   <DealAutopsy escrowFileId={f.id} outcome={f.outcome || 'open'} />
                   <DealReviews userId={userId} escrowFileId={f.id} outcome={f.outcome || 'open'} />
+                  <ClosingCertificate file={f} deal={deals.find((d) => d.id === dealId) || null} />
                 </>
               )}
               {f.id && (() => {
