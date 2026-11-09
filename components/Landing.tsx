@@ -239,6 +239,7 @@ export function LandingFooter() {
           <a href="/verify" style={link}>How We Verify</a>
           <a href="/ledger" style={link}>Verification Ledger</a>
           <a href="/charter" style={link}>The Charter</a>
+          <a href="/audit" style={link}>The 10-Minute Audit</a>
           <a href="/learn" style={link}>WholesalingOS School — free lessons</a>
           <span style={{ color: '#94a3b8' }}>WholesalingOS is software, not legal, tax, or investment advice. Contract templates carry an attorney-review flag — use your own attorney for your state.</span>
         </div>
