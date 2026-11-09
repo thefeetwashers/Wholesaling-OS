@@ -9,6 +9,7 @@ import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
 import LeadPhotos from './LeadPhotos';
+import ConsentPassport from './ConsentPassport';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -204,6 +205,9 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             )}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadPhotos userId={userId} lead={l} />
+            )}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <ConsentPassport userId={userId} lead={l} />
             )}
             {' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
