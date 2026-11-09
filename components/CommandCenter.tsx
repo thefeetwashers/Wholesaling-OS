@@ -5,6 +5,7 @@ import { loadDashboardBand, type DashboardBandData } from '../lib/kpis';
 import { loadFollowUpStreak } from '../lib/autopsy';
 import { loadDeadlines, type DeadlineItem } from '../lib/deadlines';
 import { loadSellerPageSettings } from '../lib/portals';
+import ProofCaption from './ProofCaption';
 
 // Slice 48 — the Command Center: a state-of-the-art dashboard head.
 // A greeting hero with a live one-line briefing, a visual pipeline
@@ -109,6 +110,7 @@ export default function CommandCenter({ userId, onNavigate }: { userId: string; 
       <p style={{ fontSize: 15, color: '#cbd5e1', margin: '0 0 18px', maxWidth: 860 }}>
         {band ? briefingLine(band, deadlines) : 'Loading your numbers…'}
       </p>
+      <ProofCaption>Briefing composed from the same counted records as Your numbers below, loaded when this page opened.</ProofCaption>
       {streak !== null && (
         <p style={{ fontSize: 13.5, color: streak > 0 ? '#4ade80' : '#94a3b8', margin: '-8px 0 16px' }}>
           {streak > 0

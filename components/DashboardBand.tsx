@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadDashboardBand, type DashboardBandData } from '../lib/kpis';
+import ProofCaption from './ProofCaption';
 
 // Slice 43 — the dashboard headline band: the wholesaler's four
 // numbers plus the pipeline stage tracker. Definitions are printed
@@ -51,6 +52,7 @@ export default function DashboardBand({ userId }: { userId: string }) {
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginBottom: 16 }}>
       <h2 style={{ marginTop: 0 }}>Your numbers</h2>
+      <ProofCaption>Counted from your own records — your leads, your offers, your signed deals, and your recorded closings. Nothing here is estimated, projected, or borrowed from anyone else’s office.</ProofCaption>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         {card('Revenue — this month', money(band.revenueMonth),
           `${band.revenueMonthCount} closing${band.revenueMonthCount === 1 ? '' : 's'} recorded · ${money(band.revenueYear)} this year (${band.revenueYearCount})`)}

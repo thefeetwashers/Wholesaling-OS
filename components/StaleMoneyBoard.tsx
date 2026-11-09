@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadStaleMoney, type StaleItem } from '../lib/stale-money';
+import ProofCaption from './ProofCaption';
 
 // Slice 76 — stale-money board. Shows only when money is actually
 // sitting still in one of the three recorded situations (see
@@ -29,6 +30,7 @@ export default function StaleMoneyBoard({ userId }: { userId: string }) {
   return (
     <section style={{ background: '#450a0a', border: '1px solid #f59e0b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>💰 Money sitting still — {money(state.total)} across {state.items.length} item{state.items.length === 1 ? '' : 's'}</h2>
+      <ProofCaption>Every item below is a recorded date or amount in your own files — a closing date that passed, an EMD deadline unmet, a disbursement waiting. Nothing projected, nothing guessed.</ProofCaption>
       <p style={{ fontSize: 12.5, color: '#fca5a5' }}>
         Counted from your own records only. Each line names the recorded situation — work the oldest first.
       </p>

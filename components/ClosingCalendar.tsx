@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { loadCalendarEntries, type CalendarEntry } from '../lib/calendar';
+import ProofCaption from './ProofCaption';
 
 // Slice 76 — closing calendar. A plain month grid over the dates on
 // the wholesaler's own records: EMD deadlines and target closings
@@ -65,6 +66,7 @@ export default function ClosingCalendar({ userId }: { userId: string }) {
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>📅 Closing calendar</h2>
+        <ProofCaption>Plotted only from recorded dates — EMD deadlines and closing dates on your escrow files, follow-ups on your leads. Nothing else is placed on this calendar.</ProofCaption>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button type="button" onClick={() => move(-1)} style={{ cursor: 'pointer' }}>← Prev</button>
           <strong>{monthName}</strong>

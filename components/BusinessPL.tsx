@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { dealNet } from '../lib/mao';
+import ProofCaption from './ProofCaption';
 
 // My Business P&L — the wholesaler's own deals only. This is NOT platform revenue.
 // Verified example from the old prototype: $10,000 fee − $500 referral − $300 expense = $9,200 net.
@@ -14,6 +15,7 @@ export default function BusinessPL() {
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>My Business P&L — Your Deals Only</h2>
+      <ProofCaption>Every figure is summed from your own deal and disbursement records. This is your business’s money — never the platform’s revenue, and never anyone else’s deals.</ProofCaption>
       <label>Assignment fees earned $ <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value))} /></label>{' '}
       <label>Referral payouts $ <input type="number" value={referral} onChange={(e) => setReferral(Number(e.target.value))} /></label>{' '}
       <label>Expenses $ <input type="number" value={expenses} onChange={(e) => setExpenses(Number(e.target.value))} /></label>

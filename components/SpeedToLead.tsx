@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { loadLeads, type Lead } from '../lib/leads';
 import { loadAllBuyBoxes, type BuyBox } from '../lib/portals';
 import { ageLabel, countLeadMatches } from '../lib/match';
+import ProofCaption from './ProofCaption';
 
 // Slice 70 — Speed to Lead. The newest leads, first, each with its age
 // and how many buyers' buy boxes match it — so the wholesaler works
@@ -36,6 +37,7 @@ export default function SpeedToLead({ userId, onNavigate }: { userId: string; on
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>⚡ Speed to Lead — newest first</h2>
+      <ProofCaption>Ages and sources are the lead records’ own fields; match counts come from the buy boxes on file, matched when this page loaded.</ProofCaption>
       <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>
         Fresh leads close. Each lead below shows its real age and how many buyers match it by their own
         buy boxes (plain text match on city / state / county — a box with no place set counts as a general buyer).
