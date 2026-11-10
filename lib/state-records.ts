@@ -106,6 +106,162 @@ function joinLines(a: string, b: string): string {
   return [a, b].filter(Boolean).join(' ');
 }
 
+// ---------------------------------------------------------------------------
+// Slice 106 — the panel goes multi-state. Each state is an "engine":
+// its own official service, its own field names, its own where-clause
+// builder and mapper, behind the one StateRecord shape. A state is
+// added to this registry only after its terms have been READ and
+// pass the gate (see ~/workspace/wholesaling-os/production/
+// us-source-map-2026-11-10.md). Florida above is the first engine;
+// Connecticut below is the second.
+
+export type StateCode = 'FL' | 'CT';
+
+export interface StateSourceInfo {
+  code: StateCode;
+  heading: string;
+  sourceLine: string;
+  listSource: string;
+  blurb: string;
+  valueLabel: string;
+  verifyLine: string;
+  yearNoun: string;
+  emptyHint: string;
+}
+
+export const CT_RECORD_SOURCE =
+  'Connecticut GIS Office (OPM) — Connecticut CAMA and Parcel Layer; town assessor data published by the state under CC0 (public domain)';
+
+export const STATE_SOURCES: StateSourceInfo[] = [
+  {
+    code: 'FL',
+    heading: 'Florida state records — live ownership lookup (all 67 counties)',
+    sourceLine: STATE_RECORD_SOURCE,
+    listSource: 'FDOR state records',
+    blurb:
+      'The Florida Department of Revenue publishes the statewide tax roll — owner of record, property and mailing address, parcel, values, last sale — for every county in one official service. Search it live here; add a result as a lead only when it earns a place in your pipeline. The roll is a yearly snapshot republished each August — the county property appraiser is the live record, so verify before you spend money. A public record is not consent: leads land with consent “unknown”. Search it the two ways the state’s index answers instantly: by owner name — everything a person or company owns, statewide — or by parcel ID, from any listing, letter, or county record. Looking up a street address instead? That is the county appraiser’s job, and your county doors are right below — the statewide service does not answer address searches in usable time, so this panel does not pretend to.',
+    valueLabel: 'Just value',
+    verifyLine: 'Verify at the county property appraiser before acting — the roll is a yearly snapshot.',
+    yearNoun: 'roll',
+    emptyHint:
+      'Check the spelling — the roll stores owner names in capitals, and a company may be recorded under its entity name rather than a person’s.',
+  },
+  {
+    code: 'CT',
+    heading: 'Connecticut state records — live ownership lookup (all 169 towns)',
+    sourceLine: CT_RECORD_SOURCE,
+    listSource: 'Connecticut state records',
+    blurb:
+      'The Connecticut GIS Office publishes the statewide parcel and CAMA layer — owner of record, property and mailing address, parcel, assessed and appraised values, last sale — assembled from every town assessor in one official service, released under CC0 (public domain). Search it live here; add a result as a lead only when it earns a place in your pipeline. Towns submit their data to the state once a year, so the town assessor is the live record — verify before you spend money. A few towns suppress ownership entirely; their parcels show the owner as “Current Owner”. A public record is not consent: leads land with consent “unknown”. Search by owner name — everything a person or company owns, statewide — or by parcel ID from any listing, letter, or town record.',
+    valueLabel: 'Appraised value',
+    verifyLine: 'Verify with the town assessor before acting — towns submit this data to the state once a year.',
+    yearNoun: 'collection',
+    emptyHint:
+      'Check the spelling — a company may be recorded under its entity name rather than a person’s, and a few towns suppress owner names entirely (shown as “Current Owner”).',
+  },
+];
+
+const CT_OUT_FIELDS = [
+  'Parcel_ID', 'Location_1', 'Location', 'Property_City', 'Town_Name', 'Property_Zip',
+  'Owner', 'Co_Owner', 'Mailing_Address', 'Mailing_City', 'Mailing_State', 'Mailing_Zip',
+  'Assessed_Total', 'Appraised_Land', 'Appraised_Building', 'Appraised_Outbuilding',
+  'Living_Area', 'AYB', 'Sale_Price', 'Sale_Date', 'CAMA_Collection_Year', 'Valuation_Year',
+];
+
+// Same sanitizing as the Florida builder: uppercase, double the
+// quotes, strip the LIKE wildcards so a search term can never
+// become a pattern of the user's choosing.
+function sanitizeQuery(raw: string): string {
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/'/g, "''")
+    .replace(/[%_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
+export function buildCtWhere(mode: StateSearchMode, raw: string): string | null {
+  const q = sanitizeQuery(raw);
+  if (mode === 'parcel') {
+    if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `Parcel_ID LIKE '${like}'`;
+  }
+  if (q.length < 3) return null;
+  if (mode === 'owner') return `Owner LIKE '%${q}%'`;
+  return null;
+}
+
+export function mapCtFeature(attrs: Record<string, unknown>): StateRecord | null {
+  const address = s(attrs.Location_1) || s(attrs.Location);
+  const parcelId = s(attrs.Parcel_ID).replace(/\s+/g, ' ');
+  if (!address && !parcelId) return null;
+  const owner = s(attrs.Owner);
+  const coOwner = s(attrs.Co_Owner);
+  const ownerName = owner && coOwner ? `${owner} & ${coOwner}` : owner || coOwner;
+  const apprParts = [n(attrs.Appraised_Land), n(attrs.Appraised_Building), n(attrs.Appraised_Outbuilding)];
+  let appraised: number | null = null;
+  for (const p of apprParts) {
+    if (p !== null) appraised = (appraised === null ? 0 : appraised) + p;
+  }
+  const saleDate = s(attrs.Sale_Date);
+  const yearMatch = saleDate.match(/(19|20)\d{2}/);
+  const saleYear = yearMatch ? parseInt(yearMatch[0], 10) : null;
+  let saleMonth = '';
+  const iso = saleDate.match(/^\d{4}-(\d{2})/);
+  const us = saleDate.match(/^(\d{1,2})[/-]\d{1,2}[/-]\d{4}/);
+  if (iso) saleMonth = iso[1];
+  else if (us) saleMonth = us[1].length === 1 ? `0${us[1]}` : us[1];
+  const ayb = n(attrs.AYB);
+  const camaYear = n(attrs.CAMA_Collection_Year);
+  const valYear = n(attrs.Valuation_Year);
+  return {
+    parcelId,
+    ownerName,
+    mailingAddress: s(attrs.Mailing_Address),
+    mailingCity: s(attrs.Mailing_City),
+    mailingState: s(attrs.Mailing_State),
+    mailingZip: s(attrs.Mailing_Zip),
+    address,
+    city: s(attrs.Property_City) || s(attrs.Town_Name),
+    zip: s(attrs.Property_Zip),
+    justValue: appraised,
+    assessedValue: n(attrs.Assessed_Total),
+    yearBuilt: ayb !== null && ayb > 0 ? Math.round(ayb) : null,
+    livingArea: n(attrs.Living_Area),
+    salePrice: n(attrs.Sale_Price),
+    saleYear,
+    saleMonth,
+    rollYear: camaYear !== null ? Math.round(camaYear) : valYear !== null ? Math.round(valYear) : null,
+  };
+}
+
+export interface StateEngine {
+  serviceUrl: string;
+  outFields: string;
+  buildWhere: (mode: StateSearchMode, raw: string) => string | null;
+  mapFeature: (attrs: Record<string, unknown>) => StateRecord | null;
+}
+
+export const STATE_ENGINES: Record<StateCode, StateEngine> = {
+  FL: {
+    serviceUrl:
+      'https://services9.arcgis.com/Gh9awoU677aKree0/ArcGIS/rest/services/Florida_Statewide_Cadastral/FeatureServer/0/query',
+    outFields: OUT_FIELDS.join(','),
+    buildWhere: buildStateWhere,
+    mapFeature: mapStateFeature,
+  },
+  CT: {
+    serviceUrl:
+      'https://services3.arcgis.com/3FL1kr7L4LvwA2Kb/ArcGIS/rest/services/Connecticut_CAMA_and_Parcel_Layer/FeatureServer/0/query',
+    outFields: CT_OUT_FIELDS.join(','),
+    buildWhere: buildCtWhere,
+    mapFeature: mapCtFeature,
+  },
+};
+
 export function mapStateFeature(attrs: Record<string, unknown>): StateRecord | null {
   const address = joinLines(s(attrs.PHY_ADDR1), s(attrs.PHY_ADDR2));
   // Collapse the roll's doubled internal spaces so the ID a user

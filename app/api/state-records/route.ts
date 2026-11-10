@@ -24,12 +24,19 @@
 // Auth: session-verified against Supabase Auth, same pattern as
 // /api/auctions — a subscriber feature, not a public endpoint.
 
-import { buildStateWhere, mapStateFeature, stateOutFields, type StateRecord, type StateSearchMode } from '../../../lib/state-records';
+import { STATE_ENGINES, type StateCode, type StateRecord, type StateSearchMode } from '../../../lib/state-records';
 
 export const dynamic = 'force-dynamic';
 
-const SERVICE_URL =
-  'https://services9.arcgis.com/Gh9awoU677aKree0/ArcGIS/rest/services/Florida_Statewide_Cadastral/FeatureServer/0/query';
+// Slice 106: the route dispatches per state. Each engine in
+// lib/state-records carries its own official service — Florida's
+// FDOR roll and, from this slice, Connecticut's OPM CAMA and Parcel
+// Layer (town assessor data for all 169 municipalities, published
+// by the state under CC0 — public domain; license read on the
+// state's own catalog entry before building). A state joins the
+// registry only when its terms pass the gate; the search discipline
+// is identical for every state: one live query, at most 25 rows,
+// 10-minute cache, nothing stored until the wholesaler adds a lead.
 
 async function verifyUserId(req: Request): Promise<string | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -58,10 +65,13 @@ export async function GET(req: Request) {
   if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
+  const stateParam = (searchParams.get('state') || 'FL').toUpperCase();
+  const state: StateCode = stateParam === 'CT' ? 'CT' : 'FL';
+  const engine = STATE_ENGINES[state];
   const modeParam = (searchParams.get('mode') || 'owner') as StateSearchMode;
   const mode: StateSearchMode = MODES.indexOf(modeParam) >= 0 ? modeParam : 'owner';
   const q = searchParams.get('q') || '';
-  const where = buildStateWhere(mode, q);
+  const where = engine.buildWhere(mode, q);
   if (!where) {
     return Response.json({
       records: [],
@@ -72,7 +82,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const key = `${mode}:${q.trim().toUpperCase()}`;
+  const key = `${state}:${mode}:${q.trim().toUpperCase()}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) {
     return Response.json({ records: hit.records, cached: true });
@@ -85,7 +95,7 @@ export async function GET(req: Request) {
   // after mapping, in this route.
   const qs = new URLSearchParams({
     where,
-    outFields: stateOutFields(),
+    outFields: engine.outFields,
     resultRecordCount: '25',
     returnGeometry: 'false',
     f: 'json',
@@ -95,7 +105,7 @@ export async function GET(req: Request) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 30000);
   try {
-    res = await fetch(`${SERVICE_URL}?${qs.toString()}`, { signal: ctl.signal });
+    res = await fetch(`${engine.serviceUrl}?${qs.toString()}`, { signal: ctl.signal });
   } catch {
     clearTimeout(timer);
     return Response.json({
@@ -126,7 +136,7 @@ export async function GET(req: Request) {
   const features = Array.isArray(body.features) ? body.features : [];
   for (const f of features) {
     if (f && typeof f === 'object' && f.attributes) {
-      const rec = mapStateFeature(f.attributes);
+      const rec = engine.mapFeature(f.attributes);
       if (rec) records.push(rec);
     }
     if (records.length >= 25) break;

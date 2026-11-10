@@ -3,27 +3,27 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { saveLead } from '../lib/leads';
-import { STATE_RECORD_SOURCE, type StateRecord, type StateSearchMode } from '../lib/state-records';
+import { STATE_SOURCES, type StateCode, type StateRecord, type StateSearchMode } from '../lib/state-records';
 
-// Slice 104 — Florida state records lookup. The wholesaler searches
-// the state's own published tax roll (FDOR statewide cadastral —
-// every Florida county, one service) by owner name or parcel ID,
-// and this panel shows the owner of record from the roll. (Address,
-// city and ZIP modes were built, tried three ways live, and cut on
-// Nov 10, 2026 — the statewide service does not answer those fields
-// in usable time; county appraisers answer address questions, and
-// the county doors below are the platform's path for them.)
-// Nothing is stored until the wholesaler taps "Add as lead" on a
-// result; then the lead is created in THEIR office with the roll's
-// provenance and roll year stamped in the notes, consent 'unknown'
-// — a public record is not consent to be contacted. The panel says
-// plainly what the roll is: a yearly snapshot the state republishes
-// each August, with the county appraiser as the live record.
+// Slices 104 + 106 — state records lookup. The wholesaler searches a
+// state's own published roll live — Florida's FDOR statewide
+// cadastral roll (Slice 104) and Connecticut's OPM CAMA and Parcel
+// Layer (Slice 106) — by owner name or parcel ID, and this panel
+// shows the owner of record. A state appears in the selector only
+// after its terms have been read and pass the gate (research map:
+// us-source-map-2026-11-10.md). Nothing is stored until the
+// wholesaler taps "Add as lead" on a result; then the lead is
+// created in THEIR office with that state's provenance and roll /
+// collection year stamped in the notes, consent 'unknown' — a
+// public record is not consent to be contacted. Each state's panel
+// copy says plainly what its data is (a yearly snapshot, who the
+// live record is, and any suppression the state applies).
 // Terms/design notes live in app/api/state-records.
 
 const money = (v: number | null) => (v !== null && v > 0 ? `$${Math.round(v).toLocaleString('en-US')}` : '—');
 
 export default function StateRecords({ userId }: { userId: string | null }) {
+  const [srcCode, setSrcCode] = useState<StateCode>('FL');
   const [mode, setMode] = useState<StateSearchMode>('owner');
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,6 +35,17 @@ export default function StateRecords({ userId }: { userId: string | null }) {
 
   if (!userId) return null;
 
+  const info = STATE_SOURCES.filter((x) => x.code === srcCode)[0] || STATE_SOURCES[0];
+
+  const pickState = (code: StateCode) => {
+    setSrcCode(code);
+    setRecords(null);
+    setError('');
+    setAddMsg('');
+    setAdded([]);
+    setSearched('');
+  };
+
   const search = async () => {
     setBusy(true);
     setError('');
@@ -45,7 +56,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) { setError('Sign in to search the state roll.'); return; }
-      const res = await fetch(`/api/state-records?mode=${mode}&q=${encodeURIComponent(q)}`, {
+      const res = await fetch(`/api/state-records?state=${srcCode}&mode=${mode}&q=${encodeURIComponent(q)}`, {
         headers: { authorization: `Bearer ${token}` },
       });
       const j = (await res.json()) as { records?: StateRecord[]; error?: string };
@@ -65,12 +76,12 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       const today = new Date().toISOString().slice(0, 10);
       const saleBit =
         rec.salePrice !== null && rec.salePrice > 0
-          ? ` Last recorded sale on the roll: ${money(rec.salePrice)}${rec.saleYear ? ` (${rec.saleMonth ? `${rec.saleMonth}/` : ''}${rec.saleYear})` : ''}.`
+          ? ` Last recorded sale on the record: ${money(rec.salePrice)}${rec.saleYear ? ` (${rec.saleMonth ? `${rec.saleMonth}/` : ''}${rec.saleYear})` : ''}.`
           : '';
       const saved = await saveLead(userId, {
         property_address: rec.address || undefined,
         city: rec.city || undefined,
-        state: 'FL',
+        state: info.code,
         zip: rec.zip || undefined,
         owner_name: rec.ownerName || undefined,
         parcel_id: rec.parcelId || undefined,
@@ -81,16 +92,16 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         mailing_state: rec.mailingState || undefined,
         mailing_zip: rec.mailingZip || undefined,
         status: 'new',
-        list_source: 'FDOR state records',
+        list_source: info.listSource,
         consent_status: 'unknown',
         notes:
-          `From ${STATE_RECORD_SOURCE}; roll year ${rec.rollYear ?? 'not stated'}, pulled ${today}. ` +
-          `Just value on the roll: ${money(rec.justValue)}.${saleBit} ` +
-          'Verify at the county property appraiser before acting — the roll is a yearly snapshot.',
+          `From ${info.sourceLine}; ${info.yearNoun} year ${rec.rollYear ?? 'not stated'}, pulled ${today}. ` +
+          `${info.valueLabel} on the record: ${money(rec.justValue)}.${saleBit} ` +
+          info.verifyLine,
       });
       if (!saved) { setAddMsg('That lead could not be saved — sign-in sync is not configured on this deployment.'); return; }
       setAdded((prev) => [...prev, rec.parcelId || rec.address]);
-      setAddMsg(`Added: ${rec.address || rec.parcelId} is now in your Leads, stamped "FDOR state records".`);
+      setAddMsg(`Added: ${rec.address || rec.parcelId} is now in your Leads, stamped "${info.listSource}".`);
     } catch {
       setAddMsg('That lead could not be saved — check the connection and try again.');
     }
@@ -100,19 +111,15 @@ export default function StateRecords({ userId }: { userId: string | null }) {
 
   return (
     <div style={{ borderTop: '1px solid #334155', paddingTop: 12, marginTop: 16 }}>
-      <h3 style={{ marginBottom: 6 }}>Florida state records — live ownership lookup (all 67 counties)</h3>
+      <h3 style={{ marginBottom: 6 }}>{info.heading}</h3>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
-        The Florida Department of Revenue publishes the statewide tax roll — owner of record, property and mailing
-        address, parcel, values, last sale — for every county in one official service. Search it live here; add a
-        result as a lead only when it earns a place in your pipeline. Source: {STATE_RECORD_SOURCE}. The roll is a
-        yearly snapshot republished each August — the county property appraiser is the live record, so verify before
-        you spend money. A public record is not consent: leads land with consent “unknown”. Search it the two ways
-        the state’s index answers instantly: by owner name — everything a person or company owns, statewide — or by
-        parcel ID, from any listing, letter, or county record. Looking up a street address instead? That is the
-        county appraiser’s job, and your county doors are right below — the statewide service does not answer
-        address searches in usable time, so this panel does not pretend to.
+        {info.blurb} Source: {info.sourceLine}.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={srcCode} onChange={(e) => pickState(e.target.value as StateCode)}>
+          <option value="FL">Florida</option>
+          <option value="CT">Connecticut</option>
+        </select>
         <select value={mode} onChange={(e) => setMode(e.target.value as StateSearchMode)}>
           <option value="owner">Owner name</option>
           <option value="parcel">Parcel ID</option>
@@ -121,7 +128,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void search(); }}
-          placeholder={mode === 'parcel' ? 'Parcel ID from the roll' : 'e.g. SMITH JOHN'}
+          placeholder={mode === 'parcel' ? 'Parcel ID from the record' : 'e.g. SMITH JOHN'}
           style={{ flex: '1 1 260px' }}
         />
         <button onClick={() => void search()} disabled={busy || q.trim().length < 3}>
@@ -132,28 +139,27 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       {addMsg && <p style={{ fontSize: 13.5, color: '#4ade80' }}>{addMsg}</p>}
       {records !== null && !error && records.length === 0 && (
         <p style={{ fontSize: 13.5, color: '#94a3b8' }}>
-          No parcels on the roll matched “{searched}”. Check the spelling — the roll stores owner names in
-          capitals, and a company may be recorded under its entity name rather than a person’s.
+          No parcels on the record matched “{searched}”. {info.emptyHint}
         </p>
       )}
       {records !== null && records.length > 0 && (
         <>
           <p style={{ fontSize: 12.5, color: '#94a3b8' }}>
-            {records.length} parcel{records.length === 1 ? '' : 's'} from the {rollYear ?? 'current'} roll — first
+            {records.length} parcel{records.length === 1 ? '' : 's'} from the {rollYear ?? 'current'} {info.yearNoun} — first
             matches only; narrow the search to see others.
           </p>
           <div style={{ display: 'grid', gap: 10 }}>
             {records.map((rec, i) => {
               const key = rec.parcelId || `${rec.address}-${i}`;
               const isAdded = added.indexOf(rec.parcelId || rec.address) >= 0;
-              const outOfState = rec.mailingState && rec.mailingState !== 'FL';
+              const outOfState = rec.mailingState && rec.mailingState !== info.code;
               return (
                 <div key={key} style={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.25)', borderRadius: 12, padding: '12px 14px' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                    {rec.address || 'Address not on roll'} {rec.city ? `· ${rec.city}, FL ${rec.zip}` : ''}
+                    {rec.address || 'Address not on record'} {rec.city ? `· ${rec.city}, ${info.code} ${rec.zip}` : ''}
                   </div>
                   <div style={{ fontSize: 13, color: '#e2e8f0', marginTop: 4 }}>
-                    Owner of record: <strong>{rec.ownerName || '— not on roll'}</strong>
+                    Owner of record: <strong>{rec.ownerName || '— not on record'}</strong>
                     {outOfState ? ' · 📬 out-of-state owner' : ''}
                   </div>
                   <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 3 }}>
@@ -161,7 +167,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
                     {' · '}Parcel: {rec.parcelId || '—'}
                   </div>
                   <div style={{ fontSize: 13, color: '#e2e8f0', marginTop: 6 }}>
-                    Just value {money(rec.justValue)} · Assessed {money(rec.assessedValue)}
+                    {info.valueLabel} {money(rec.justValue)} · Assessed {money(rec.assessedValue)}
                     {rec.yearBuilt ? ` · Built ${rec.yearBuilt}` : ''}
                     {rec.livingArea ? ` · ${Math.round(rec.livingArea).toLocaleString('en-US')} sq ft living` : ''}
                     {rec.salePrice !== null && rec.salePrice > 0
