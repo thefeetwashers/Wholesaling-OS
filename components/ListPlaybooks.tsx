@@ -171,6 +171,17 @@ const CARDS: { icon: string; title: string; tag: string; steps: string[] }[] = [
       'Never contact anyone at a jail or prison, never mention custody or charges in outreach, and check your state’s rules on using criminal records in business before making this a routine. One hand-check on a property you already work is research; anything at scale is a data product you do not have.',
     ],
   },
+  {
+    icon: '📰',
+    title: 'Public notices — the free court-event radar',
+    tag: 'Tag it: by the notice — Probate / Pre-foreclosure / Tax delinquency',
+    steps: [
+      'Open your state’s public-notice door (section 5 of this view — 41 states and territories have a free statewide site, most run by the press association). Search your county with the words the law uses: “notice to creditors” for probate, “notice of sale” or “trustee’s sale” for foreclosure, “tax deed” for tax sales.',
+      'Probate: a Notice to Creditors means an estate is open and a personal representative can sell. Note the decedent’s name, the case number, and the property address when the notice or the court file states it — then run the parcel through State Records (above) for the owner and mailing address of record.',
+      'Foreclosure and tax sales: the notice carries the sale date and the property address. Work backward from the sale date — a seller with a date certain is a motivated conversation, and the courtesy rules on this platform apply: reach out early, plainly, and never at the courthouse steps.',
+      'Mind the window: most doors search the last 12 months free, with an Archive Search behind it (Florida’s current window is 35 days). A weekly 15-minute pass per county beats a monthly binge — notices are perishable, and a worked notice becomes a lead here with its source stamped “Public notices — <state site>”.',
+    ],
+  },
 ];
 
 export default function ListPlaybooks() {
