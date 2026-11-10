@@ -29,7 +29,7 @@ export interface StateRecord {
   rollYear: number | null;
 }
 
-export type StateSearchMode = 'owner' | 'address' | 'parcel' | 'city';
+export type StateSearchMode = 'owner' | 'address' | 'parcel' | 'city' | 'zip';
 
 export const STATE_RECORD_SOURCE =
   'Florida Department of Revenue — statewide cadastral roll (county property appraiser data, Ch. 119 public records)';
@@ -68,8 +68,17 @@ export function buildStateWhere(mode: StateSearchMode, raw: string): string | nu
   }
   if (q.length < 3) return null;
   if (mode === 'owner') return `OWN_NAME LIKE '%${q}%'`;
-  if (mode === 'address') return `PHY_ADDR1 LIKE '%${q}%'`;
-  return `PHY_CITY='${q}'`;
+  // The roll is indexed from the FIRST character of the address
+  // and city fields: prefix searches answer in seconds, while
+  // contains/equality scans of the same fields grind past any
+  // reasonable wait (proven live Nov 9–10, 2026). Address and city
+  // are therefore prefix searches — the address form starts with
+  // the house number, exactly as the roll stores it.
+  if (mode === 'address') return `PHY_ADDR1 LIKE '${q}%'`;
+  if (mode === 'city') return `PHY_CITY LIKE '${q}%'`;
+  const digits = q.replace(/[^0-9]/g, '');
+  if (digits.length !== 5) return null;
+  return `PHY_ZIPCD=${digits}`;
 }
 
 // NOTE (Nov 10, 2026): there is deliberately no server-side

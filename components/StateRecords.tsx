@@ -102,20 +102,23 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         address, parcel, values, last sale — for every county in one official service. Search it live here; add a
         result as a lead only when it earns a place in your pipeline. Source: {STATE_RECORD_SOURCE}. The roll is a
         yearly snapshot republished each August — the county property appraiser is the live record, so verify before
-        you spend money. A public record is not consent: leads land with consent “unknown”.
+        you spend money. A public record is not consent: leads land with consent “unknown”. One roll quirk, stated
+        plainly: the state’s index reads addresses and cities from their first character, so address search starts
+        with the house number — “400 85 DEBARRY AVE”, not “DEBARRY” alone.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={mode} onChange={(e) => setMode(e.target.value as StateSearchMode)}>
           <option value="address">Street address</option>
           <option value="owner">Owner name</option>
           <option value="parcel">Parcel ID</option>
-          <option value="city">City (whole city, A–Z)</option>
+          <option value="city">City</option>
+          <option value="zip">ZIP code</option>
         </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void search(); }}
-          placeholder={mode === 'city' ? 'e.g. FORT PIERCE' : mode === 'parcel' ? 'Parcel ID from the roll' : mode === 'owner' ? 'e.g. SMITH JOHN' : 'e.g. 400 85 DEBARRY'}
+          placeholder={mode === 'zip' ? '5-digit ZIP — e.g. 32073' : mode === 'city' ? 'e.g. FORT PIERCE' : mode === 'parcel' ? 'Parcel ID from the roll' : mode === 'owner' ? 'e.g. SMITH JOHN' : 'House number first — e.g. 400 85 DEBARRY'}
           style={{ flex: '1 1 260px' }}
         />
         <button onClick={() => void search()} disabled={busy || q.trim().length < 3}>
@@ -127,7 +130,8 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       {records !== null && !error && records.length === 0 && (
         <p style={{ fontSize: 13.5, color: '#94a3b8' }}>
           No parcels on the roll matched “{searched}”. Check the spelling — the roll stores names and addresses in
-          capitals and a partial street address (number + street name) usually hits.
+          capitals, and searches read from the start: addresses begin with the house number, city and ZIP read from
+          their first characters.
         </p>
       )}
       {records !== null && records.length > 0 && (
