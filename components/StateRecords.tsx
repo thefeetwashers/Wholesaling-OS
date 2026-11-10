@@ -78,8 +78,18 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         rec.salePrice !== null && rec.salePrice > 0
           ? ` Last recorded sale on the record: ${money(rec.salePrice)}${rec.saleYear ? ` (${rec.saleMonth ? `${rec.saleMonth}/` : ''}${rec.saleYear})` : ''}.`
           : '';
+      // A parcel with no street address on the state record —
+      // vacant land is exactly that — still deserves its lead. It
+      // is labeled by its parcel ID and municipality, a true
+      // statement, and NEVER by the owner's mailing address, which
+      // is a different fact about a possibly different property.
+      const leadAddress =
+        rec.address ||
+        (rec.parcelId
+          ? `Parcel ${rec.parcelId}${rec.city ? ` — ${rec.city}, ${info.code}` : ''} (no street address on the state record)`
+          : '');
       const saved = await saveLead(userId, {
-        property_address: rec.address || undefined,
+        property_address: leadAddress || undefined,
         city: rec.city || undefined,
         state: info.code,
         zip: rec.zip || undefined,
@@ -101,7 +111,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       });
       if (!saved) { setAddMsg('That lead could not be saved — sign-in sync is not configured on this deployment.'); return; }
       setAdded((prev) => [...prev, rec.parcelId || rec.address]);
-      setAddMsg(`Added: ${rec.address || rec.parcelId} is now in your Leads, stamped "${info.listSource}".`);
+      setAddMsg(`Added: ${leadAddress || rec.parcelId} is now in your Leads, stamped "${info.listSource}".`);
     } catch {
       setAddMsg('That lead could not be saved — check the connection and try again.');
     }

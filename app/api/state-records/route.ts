@@ -105,6 +105,15 @@ export async function GET(req: Request) {
   // sort (generic 400 "Invalid query parameters"), while the same
   // queries without the sort succeed. The records are sorted below,
   // after mapping, in this route.
+  function sortRecords(list: StateRecord[]): void {
+    list.sort((a, b) => {
+      const ka = mode === 'owner' ? a.ownerName || a.address : a.address;
+      const kb = mode === 'owner' ? b.ownerName || b.address : b.address;
+      const c = ka.localeCompare(kb);
+      return c !== 0 ? c : a.address.localeCompare(b.address);
+    });
+  }
+
   async function runQuery(whereClause: string): Promise<{ records: StateRecord[] } | { failure: Response }> {
     const qs = new URLSearchParams({
       where: whereClause,
@@ -163,12 +172,7 @@ export async function GET(req: Request) {
       }
       if (out.length >= 25) break;
     }
-    out.sort((a, b) => {
-      const ka = mode === 'owner' ? a.ownerName || a.address : a.address;
-      const kb = mode === 'owner' ? b.ownerName || b.address : b.address;
-      const c = ka.localeCompare(kb);
-      return c !== 0 ? c : a.address.localeCompare(b.address);
-    });
+    sortRecords(out);
     return { records: out };
   }
 
@@ -177,12 +181,32 @@ export async function GET(req: Request) {
   // the token search alone returns lookalikes with the true parcel
   // buried among them). Exact first; the buildWhere token search
   // runs only when no record carries that exact ID.
+  // Slice 109 fix: the exact pass may be a LIST of wheres, run
+  // field by field and merged — Wisconsin's single OR across three
+  // ID fields scanned its 3.5M-row view past the timeout, twice.
   let records: StateRecord[] | null = null;
-  const exactWhere = engine.buildExactWhere ? engine.buildExactWhere(mode, q) : null;
-  if (exactWhere) {
-    const exact = await runQuery(exactWhere);
-    if ('failure' in exact) return exact.failure;
-    if (exact.records.length > 0) records = exact.records;
+  const exactRaw = engine.buildExactWhere ? engine.buildExactWhere(mode, q) : null;
+  const exactList: string[] =
+    exactRaw === null ? [] : Array.isArray(exactRaw) ? exactRaw : [exactRaw];
+  if (exactList.length > 0) {
+    const merged: StateRecord[] = [];
+    const seen = new Set<string>();
+    for (const w of exactList) {
+      const part = await runQuery(w);
+      if ('failure' in part) return part.failure;
+      for (const r of part.records) {
+        const k = `${r.parcelId}|${r.address}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          merged.push(r);
+        }
+      }
+      if (merged.length >= 25) break;
+    }
+    if (merged.length > 0) {
+      sortRecords(merged);
+      records = merged.slice(0, 25);
+    }
   }
   if (records === null) {
     const loose = await runQuery(where);

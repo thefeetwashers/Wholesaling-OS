@@ -426,11 +426,16 @@ export function buildWiWhere(mode: StateSearchMode, raw: string): string | null 
   return null;
 }
 
-export function buildWiExactWhere(mode: StateSearchMode, raw: string): string | null {
+export function buildWiExactWhere(mode: StateSearchMode, raw: string): string[] | null {
   if (mode !== 'parcel') return null;
   const q = sanitizeIdExact(raw);
   if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
-  return `STATEID = '${q}' OR PARCELID = '${q}' OR TAXPARCELID = '${q}'`;
+  // Slice 109 fix: one where PER FIELD, run in sequence and merged
+  // by the route. As a single OR across three fields this query
+  // scanned the whole statewide view and timed out twice in the
+  // first live pass (Nov 10, 2026); owner search on the same layer
+  // answers in seconds, so the fields can answer one at a time.
+  return [`STATEID = '${q}'`, `PARCELID = '${q}'`, `TAXPARCELID = '${q}'`];
 }
 
 export function mapWiFeature(attrs: Record<string, unknown>): StateRecord | null {
@@ -471,11 +476,15 @@ export interface StateEngine {
   serviceUrl: string;
   outFields: string;
   buildWhere: (mode: StateSearchMode, raw: string) => string | null;
-  // Optional exact-match where for parcel mode (Slice 108 fix).
-  // When it returns records, they are the answer; the buildWhere
+  // Optional exact-match where(s) for parcel mode (Slice 108 fix;
+  // generalized in the Slice 109 fix). One where, or a list the
+  // route runs field by field and merges — a single OR across
+  // several ID fields scanned Wisconsin's 3.5M-row view past the
+  // timeout, while single-field equality answers. When the exact
+  // pass returns records, they are the answer; the buildWhere
   // search runs only as the fallback. Engines whose parcel IDs are
   // statewide-unique (FL, CT) do not need it.
-  buildExactWhere?: (mode: StateSearchMode, raw: string) => string | null;
+  buildExactWhere?: (mode: StateSearchMode, raw: string) => string | string[] | null;
   mapFeature: (attrs: Record<string, unknown>) => StateRecord | null;
 }
 
