@@ -72,7 +72,7 @@ async function verifyUserId(req: Request): Promise<string | null> {
   }
 }
 
-interface CacheEntry { at: number; records: StateRecord[] }
+interface CacheEntry { at: number; records: StateRecord[]; exact: boolean }
 const cache = new Map<string, CacheEntry>();
 const CACHE_MS = 10 * 60 * 1000;
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
   const key = `${state}:${mode}:${q.trim().toUpperCase()}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) {
-    return Response.json({ records: hit.records, cached: true });
+    return Response.json({ records: hit.records, cached: true, exact: hit.exact });
   }
 
   // One live query against the state's service, mapped and sorted.
@@ -196,6 +196,10 @@ export async function GET(req: Request) {
   // field by field and merged — Wisconsin's single OR across three
   // ID fields scanned its 3.5M-row view past the timeout, twice.
   let records: StateRecord[] | null = null;
+  // Slice 114: the response reports whether the records came from
+  // the exact-ID pass, so a caller (Check the roll) can tell a
+  // confirmed parcel from a near match without guessing.
+  let exactUsed = false;
   const exactRaw = engine.buildExactWhere ? engine.buildExactWhere(mode, q) : null;
   const exactList: string[] =
     exactRaw === null ? [] : Array.isArray(exactRaw) ? exactRaw : [exactRaw];
@@ -215,6 +219,7 @@ export async function GET(req: Request) {
       if (merged.length >= 25) break;
     }
     if (merged.length > 0) {
+      exactUsed = true;
       sortRecords(merged);
       records = merged.slice(0, 25);
     }
@@ -224,6 +229,6 @@ export async function GET(req: Request) {
     if ('failure' in loose) return loose.failure;
     records = loose.records;
   }
-  cache.set(key, { at: Date.now(), records });
-  return Response.json({ records, cached: false });
+  cache.set(key, { at: Date.now(), records, exact: exactUsed });
+  return Response.json({ records, cached: false, exact: exactUsed });
 }

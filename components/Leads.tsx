@@ -10,6 +10,7 @@ import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
 import LeadPhotos from './LeadPhotos';
 import ConsentPassport from './ConsentPassport';
+import RollCheck from './RollCheck';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -208,6 +209,9 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             )}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <ConsentPassport userId={userId} lead={l} />
+            )}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <RollCheck userId={userId} lead={l} />
             )}
             {' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
