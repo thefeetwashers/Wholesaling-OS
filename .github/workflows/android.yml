@@ -7,10 +7,11 @@ name: Android build (Fastlane)
 # `npx cap add android`, (3) keystore + Play service-account
 # secrets are stored in GitHub Secrets (never in this file).
 
+# Silenced Nov 9, 2026 (owner decision, delegated): manual trigger
+# only until Phase 2 prerequisites exist — the push trigger
+# produced two failure emails on every push to main.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   android:
