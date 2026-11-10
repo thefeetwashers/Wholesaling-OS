@@ -48,6 +48,28 @@ export interface RollAnswer {
   exact: boolean;
 }
 
+// The lit rolls that answer ADDRESS searches (their engines ship an
+// address mode). Florida is the exception — its statewide index
+// answers owner and parcel instantly and address not at all (Slice
+// 104) — so a parcel-less Florida lead is checked by surname plus
+// an address match among the answer, per surnameQuery below.
+export const ROLL_ADDRESS_STATES: ReadonlySet<StateCode> = new Set<StateCode>(['CT', 'MA', 'WI', 'DC', 'CO']);
+
+// The owner-name fallback query for rolls without an address mode.
+// A full multi-token name ("HANCOCK-SMITH ANYALIESE DOMINI") makes
+// Florida's index AND four leading-wildcard scans together — that
+// timed out live (Slice 114 verification, Nov 10, 2026) where a
+// single token answers in seconds. The surname token is the
+// selective one (Florida's roll is surname-first), and the check
+// then matches the lead's ADDRESS among the answer, which is the
+// confirmation that matters.
+export function surnameQuery(ownerName: string): string {
+  const first = ownerName.trim().split(/\s+/)[0] || '';
+  const part = first.split('-')[0] || first;
+  const cleaned = part.replace(/[^A-Za-z]/g, '').toUpperCase();
+  return cleaned || ownerName.trim().toUpperCase();
+}
+
 function normLoose(v: string): string {
   return v
     .toUpperCase()
@@ -87,10 +109,13 @@ function ownerVerdict(leadOwner: string, rec: StateRecord): string {
 export function buildRollStamp(args: {
   today: string;
   state: StateCode;
-  mode: 'parcel' | 'owner';
+  mode: 'parcel' | 'owner' | 'address';
   leadParcel: string;
   leadOwner: string;
   leadAddress: string;
+  // The exact text the roll was queried with — the stamp names what
+  // was actually searched (a surname token is not the full name).
+  queryLabel: string;
   answer: RollAnswer;
 }): string {
   const info = STATE_SOURCES.find((x) => x.code === args.state);
@@ -100,15 +125,29 @@ export function buildRollStamp(args: {
   const head = `Roll check ${args.today} (${STATE_NAMES[args.state]} roll, ${yearNoun} year ${year}): `;
   const records = args.answer.records;
 
+  if (args.mode === 'address') {
+    if (records.length === 0) {
+      return `${head}no roll record at this address.`;
+    }
+    const rec = records[0];
+    if (!args.leadOwner.trim()) {
+      return `${head}the roll lists this address — parcel ${rec.parcelId || '—'}, owner of record ${rec.ownerName || '— not on record'}.`;
+    }
+    if (ownersMatch(args.leadOwner, rec.ownerName)) {
+      return `${head}the roll lists this address — parcel ${rec.parcelId || '—'}; owner of record MATCHES this lead — ${rec.ownerName}.`;
+    }
+    return `${head}the roll lists this address — parcel ${rec.parcelId || '—'}; owner of record DIFFERS — roll: ${rec.ownerName || '— not on record'}; this lead: ${args.leadOwner}.`;
+  }
+
   if (args.mode === 'owner') {
     if (records.length === 0) {
-      return `${head}no roll records under owner name “${args.leadOwner}”.`;
+      return `${head}no roll records under the name searched (“${args.queryLabel}”).`;
     }
     const atAddress = records.find((r) => sameAddress(r.address, args.leadAddress));
     if (atAddress) {
       return `${head}owner search found this address on the roll — parcel ${atAddress.parcelId || '—'}, owner of record ${atAddress.ownerName || '— not on record'}.`;
     }
-    return `${head}this address was not among the roll’s first ${records.length} matches for “${args.leadOwner}” (the roll answers 25 at a time); verify in the State Records panel.`;
+    return `${head}this address was not among the roll’s first ${records.length} matches for the name searched (“${args.queryLabel}”; the roll answers 25 at a time); verify in the State Records panel.`;
   }
 
   // Parcel mode.

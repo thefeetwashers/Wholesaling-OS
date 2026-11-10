@@ -2,8 +2,10 @@
 
 // Slice 114 — Check the roll (per lead). One tap asks the lit
 // state roll about this lead — by parcel ID when the lead carries
-// one, by owner name otherwise — and stamps the verdict into the
-// lead's notes via the ordinary lead update. The verdict language
+// one; otherwise by its street address where the roll answers
+// address searches, or by surname-plus-address-match where it does
+// not (Florida) — and stamps the verdict into the lead's notes via
+// the ordinary lead update. The verdict language
 // is lib/roll-check.ts, whose rules never claim more than the
 // roll's answer established. A lead in a state with no lit roll
 // gets a plain line saying so when it carries a parcel or owner to
@@ -12,7 +14,13 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { updateLeadFields, type Lead } from '../lib/leads';
-import { ROLL_CHECK_STATES, buildRollStamp, type RollAnswer } from '../lib/roll-check';
+import {
+  ROLL_ADDRESS_STATES,
+  ROLL_CHECK_STATES,
+  buildRollStamp,
+  surnameQuery,
+  type RollAnswer,
+} from '../lib/roll-check';
 import type { StateRecord } from '../lib/state-records';
 
 export default function RollCheck({ userId, lead }: { userId: string; lead: Lead }) {
@@ -58,8 +66,20 @@ export default function RollCheck({ userId, lead }: { userId: string; lead: Lead
         setMsg('Sign in to check the roll.');
         return;
       }
-      const mode = hasParcel ? 'parcel' : 'owner';
-      const q = hasParcel ? (lead.parcel_id as string) : (lead.owner_name as string);
+      // Query shape follows the roll (Slice 114 fix): parcel ID
+      // first; where the roll answers address searches, a
+      // parcel-less lead is checked by its address directly;
+      // Florida's index answers neither address nor a full
+      // multi-token name in usable time, so there the check
+      // searches the surname and matches the address among the
+      // answer.
+      const byAddress = !hasParcel && ROLL_ADDRESS_STATES.has(rollState);
+      const mode = hasParcel ? 'parcel' : byAddress ? 'address' : 'owner';
+      const q = hasParcel
+        ? (lead.parcel_id as string)
+        : byAddress
+          ? lead.property_address
+          : surnameQuery(lead.owner_name as string);
       const res = await fetch(
         `/api/state-records?state=${rollState}&mode=${mode}&q=${encodeURIComponent(q)}`,
         { headers: { authorization: `Bearer ${token}` } },
@@ -77,6 +97,7 @@ export default function RollCheck({ userId, lead }: { userId: string; lead: Lead
         leadParcel: lead.parcel_id || '',
         leadOwner: lead.owner_name || '',
         leadAddress: lead.property_address || '',
+        queryLabel: q,
         answer,
       });
       const nextNotes = notes.trim() ? `${notes.replace(/\s+$/, '')} ${stamp}` : stamp;
