@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadCountyLinks, loadStateDirectories, loadUserCounties, saveUserCounty, deleteUserCounty, US_STATES, type CountyLinkRow, type StateDirectoryRow } from '../lib/directories';
+import StateRecords from './StateRecords';
 
 // County records (Slice 22). Two platform-verified layers, both read
 // from Supabase — nothing here is guessed:
@@ -163,6 +164,8 @@ export default function Counties({ userId }: { userId: string | null }) {
         </ul>
       )}
       <p style={{ fontSize: 13 }}>Extraction guide: use the county links above, then import the list yourself. Import gives owner name + mailing address only — never phones or emails.</p>
+
+      <StateRecords userId={userId} />
 
       <h3 style={{ marginBottom: 6 }}>3 · Your own county links — saved to your office</h3>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
