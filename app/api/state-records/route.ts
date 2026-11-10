@@ -43,7 +43,11 @@ export const dynamic = 'force-dynamic';
 // Statewide Parcel Data (Wisconsin Land Information Program /
 // State Cartographer's Office) — the project's schema
 // documentation states the data is in the public domain with no
-// use restrictions. A state joins the registry only when
+// use restrictions. Slice 110 adds the District of Columbia: the
+// ITSPE tax extract (OCFO, via DC GIS), licensed CC BY 4.0 per the
+// federal catalog entry — and the first source here that states a
+// distress fact outright (the tax balance due rides on the record
+// as recordNote). A state joins the registry only when
 // its terms pass the gate; the search discipline is identical for
 // every state: one live query, at most 25 rows, 10-minute cache,
 // nothing stored until the wholesaler adds a lead.
@@ -77,7 +81,9 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const stateParam = (searchParams.get('state') || 'FL').toUpperCase();
   const state: StateCode =
-    stateParam === 'CT' || stateParam === 'MA' || stateParam === 'WI' ? stateParam : 'FL';
+    stateParam === 'CT' || stateParam === 'MA' || stateParam === 'WI' || stateParam === 'DC'
+      ? stateParam
+      : 'FL';
   const engine = STATE_ENGINES[state];
   const modeParam = (searchParams.get('mode') || 'owner') as StateSearchMode;
   const mode: StateSearchMode = MODES.indexOf(modeParam) >= 0 ? modeParam : 'owner';

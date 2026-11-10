@@ -107,6 +107,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         notes:
           `From ${info.sourceLine}; ${info.yearPhrase ? info.yearPhrase : `${info.yearNoun} year`} ${rec.rollYear ?? 'not stated'}, pulled ${today}. ` +
           `${info.valueLabel} on the record: ${money(rec.justValue)}.${saleBit} ` +
+          (rec.recordNote ? `${rec.recordNote} ` : '') +
           info.verifyLine,
       });
       if (!saved) { setAddMsg('That lead could not be saved — sign-in sync is not configured on this deployment.'); return; }
@@ -131,6 +132,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
           <option value="CT">Connecticut</option>
           <option value="MA">Massachusetts</option>
           <option value="WI">Wisconsin</option>
+          <option value="DC">District of Columbia</option>
         </select>
         <select value={mode} onChange={(e) => setMode(e.target.value as StateSearchMode)}>
           <option value="owner">Owner name</option>
@@ -178,6 +180,9 @@ export default function StateRecords({ userId }: { userId: string | null }) {
                     Mailing: {[rec.mailingAddress, rec.mailingCity, rec.mailingState, rec.mailingZip].filter(Boolean).join(', ') || '—'}
                     {' · '}Parcel: {rec.parcelId || '—'}
                   </div>
+                  {rec.recordNote ? (
+                    <div style={{ fontSize: 12.5, color: '#fbbf24', marginTop: 6 }}>⚠ {rec.recordNote}</div>
+                  ) : null}
                   <div style={{ fontSize: 13, color: '#e2e8f0', marginTop: 6 }}>
                     {info.valueLabel} {money(rec.justValue)} · Assessed {money(rec.assessedValue)}
                     {rec.yearBuilt ? ` · Built ${rec.yearBuilt}` : ''}

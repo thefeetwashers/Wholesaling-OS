@@ -27,6 +27,11 @@ export interface StateRecord {
   saleYear: number | null;
   saleMonth: string;
   rollYear: number | null;
+  // Optional one-line fact the source record itself states, shown
+  // on the card and carried into the lead's notes (Slice 110: DC's
+  // tax balance due). Set only from the record's own fields; most
+  // engines leave it undefined.
+  recordNote?: string;
 }
 
 export type StateSearchMode = 'owner' | 'parcel';
@@ -115,7 +120,7 @@ function joinLines(a: string, b: string): string {
 // us-source-map-2026-11-10.md). Florida above is the first engine;
 // Connecticut below is the second.
 
-export type StateCode = 'FL' | 'CT' | 'MA' | 'WI';
+export type StateCode = 'FL' | 'CT' | 'MA' | 'WI' | 'DC';
 
 export interface StateSourceInfo {
   code: StateCode;
@@ -142,6 +147,9 @@ export const MA_RECORD_SOURCE =
 
 export const WI_RECORD_SOURCE =
   'Wisconsin Statewide Parcel Initiative (Wisconsin Land Information Program, Dept. of Administration, and the State Cartographer’s Office) — V12 Statewide Parcel Data; public domain, no use restrictions';
+
+export const DC_RECORD_SOURCE =
+  'District of Columbia Office of the Chief Financial Officer — Integrated Tax System Public Extract (ITSPE), via DC GIS; published under CC BY 4.0 — attribution to the District';
 
 export const STATE_SOURCES: StateSourceInfo[] = [
   {
@@ -196,6 +204,19 @@ export const STATE_SOURCES: StateSourceInfo[] = [
     yearNoun: 'tax roll',
     emptyHint:
       'Check the spelling — owners are recorded as each county holds them, and a company may appear under its entity name rather than a person’s. Kenosha County parcels carry no owner names at all (county redaction).',
+  },
+  {
+    code: 'DC',
+    heading: 'District of Columbia records — live ownership lookup (the whole District)',
+    sourceLine: DC_RECORD_SOURCE,
+    listSource: 'District of Columbia records',
+    blurb:
+      'The District’s Integrated Tax System Public Extract (ITSPE) is the live tax roll of the Office of the Chief Financial Officer — owner of record, property and tax-billing addresses, assessment, last sale — refreshed continually rather than once a year, with each record carrying its own extraction date. It also carries something no other source on this panel has: the total tax balance due on the property, printed on the card whenever the tax office’s own record shows one — a distress signal stated by the source itself, never inferred. The District assesses at full market value, and the tax-billing name and address are where the bills go, which is not always the owner’s home. Verify with the DC Office of Tax and Revenue before you spend money — this extract is a snapshot of a live system. A public record is not consent: leads land with consent “unknown”. Search by owner name, or by SSL — the District’s square, suffix, and lot key, found on any DC property record.',
+    valueLabel: 'Current assessment',
+    verifyLine: 'Verify with the DC Office of Tax and Revenue before acting — this extract is a snapshot of a live tax system.',
+    yearNoun: 'extract',
+    emptyHint:
+      'Check the spelling — owners are recorded as the tax office holds them, and a company may appear under its entity name rather than a person’s. Some District lots are federal or tax-exempt and carry no billing address.',
   },
 ];
 
@@ -472,6 +493,100 @@ export function mapWiFeature(attrs: Record<string, unknown>): StateRecord | null
   };
 }
 
+// ---------------------------------------------------------------------------
+// Slice 110 — District of Columbia (ITSPE). Schema read from the
+// table page itself (Nov 10, 2026): a TABLE (no geometry) on the
+// DCGIS Property_and_Land service. SSL is the parcel key; PREMISEADD
+// the property address (the table carries no premise city/ZIP
+// fields, so those slots stay blank); OWNERNAME the owner; mailing
+// in ADDRESS1/ADDRESS2 + CITYSTZIP, a structured "CITY, ST ZIP"
+// line split ONLY on its exact documented shape. ASSESSMENT is the
+// current total (DC assesses at full market value — one total, two
+// slots, as with MA and WI). SALEDATE and EXTRACTDAT are true date
+// fields (epoch milliseconds in JSON). TOTBALAMT — the total tax
+// balance due — becomes the recordNote when it is above zero: the
+// one distress fact this source states outright.
+
+const DC_OUT_FIELDS = [
+  'SSL', 'PREMISEADD', 'OWNERNAME', 'ADDRESS1', 'ADDRESS2', 'CITYSTZIP',
+  'ASSESSMENT', 'SALEPRICE', 'SALEDATE', 'TOTBALAMT', 'EXTRACTDAT',
+];
+
+export function buildDcWhere(mode: StateSearchMode, raw: string): string | null {
+  const q = sanitizeQuery(raw);
+  if (mode === 'parcel') {
+    if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `SSL LIKE '${like}'`;
+  }
+  if (q.length < 3) return null;
+  if (mode === 'owner') return `OWNERNAME LIKE '%${q}%'`;
+  return null;
+}
+
+export function buildDcExactWhere(mode: StateSearchMode, raw: string): string | null {
+  if (mode !== 'parcel') return null;
+  const q = sanitizeIdExact(raw);
+  if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+  return `SSL = '${q}'`;
+}
+
+function epochYearMonth(v: unknown): { year: number | null; month: string } {
+  const ms = n(v);
+  if (ms === null || ms <= 0) return { year: null, month: '' };
+  const d = new Date(ms);
+  const m = d.getUTCMonth() + 1;
+  return { year: d.getUTCFullYear(), month: m < 10 ? `0${m}` : String(m) };
+}
+
+export function mapDcFeature(attrs: Record<string, unknown>): StateRecord | null {
+  const address = s(attrs.PREMISEADD);
+  const parcelId = s(attrs.SSL).replace(/\s+/g, ' ');
+  if (!address && !parcelId) return null;
+  let mailingCity = '';
+  let mailingState = '';
+  let mailingZip = '';
+  let cityLine = s(attrs.CITYSTZIP);
+  const cm = cityLine.match(/^(.*),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (cm) {
+    mailingCity = cm[1].trim();
+    mailingState = cm[2];
+    mailingZip = cm[3];
+    cityLine = '';
+  }
+  const mailingAddress = [joinLines(s(attrs.ADDRESS1), s(attrs.ADDRESS2)), cityLine]
+    .filter(Boolean)
+    .join(', ');
+  const sale = epochYearMonth(attrs.SALEDATE);
+  const extract = epochYearMonth(attrs.EXTRACTDAT);
+  const assessment = n(attrs.ASSESSMENT);
+  const bal = n(attrs.TOTBALAMT);
+  return {
+    parcelId,
+    ownerName: s(attrs.OWNERNAME),
+    mailingAddress,
+    mailingCity,
+    mailingState,
+    mailingZip,
+    address,
+    city: '',
+    zip: '',
+    justValue: assessment,
+    assessedValue: assessment,
+    yearBuilt: null,
+    livingArea: null,
+    salePrice: n(attrs.SALEPRICE),
+    saleYear: sale.year,
+    saleMonth: sale.month,
+    rollYear: extract.year,
+    recordNote:
+      bal !== null && bal > 0
+        ? `Tax balance due on this record: $${Math.round(bal).toLocaleString('en-US')}.`
+        : undefined,
+  };
+}
+
 export interface StateEngine {
   serviceUrl: string;
   outFields: string;
@@ -518,6 +633,14 @@ export const STATE_ENGINES: Record<StateCode, StateEngine> = {
     buildWhere: buildWiWhere,
     buildExactWhere: buildWiExactWhere,
     mapFeature: mapWiFeature,
+  },
+  DC: {
+    serviceUrl:
+      'https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Property_and_Land_WebMercator/MapServer/53/query',
+    outFields: DC_OUT_FIELDS.join(','),
+    buildWhere: buildDcWhere,
+    buildExactWhere: buildDcExactWhere,
+    mapFeature: mapDcFeature,
   },
 };
 
