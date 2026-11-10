@@ -24,7 +24,7 @@
 // Auth: session-verified against Supabase Auth, same pattern as
 // /api/auctions — a subscriber feature, not a public endpoint.
 
-import { buildStateWhere, mapStateFeature, stateOrderBy, stateOutFields, type StateRecord, type StateSearchMode } from '../../../lib/state-records';
+import { buildStateWhere, mapStateFeature, stateOutFields, type StateRecord, type StateSearchMode } from '../../../lib/state-records';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +78,11 @@ export async function GET(req: Request) {
     return Response.json({ records: hit.records, cached: true });
   }
 
+  // No orderByFields — ever. Live probes (Nov 10, 2026) proved the
+  // FDOR service rejects full-field queries that also ask it to
+  // sort (generic 400 "Invalid query parameters"), while the same
+  // queries without the sort succeed. The records are sorted below,
+  // after mapping, in this route.
   const qs = new URLSearchParams({
     where,
     outFields: stateOutFields(),
@@ -85,15 +90,20 @@ export async function GET(req: Request) {
     returnGeometry: 'false',
     f: 'json',
   });
-  const order = stateOrderBy(mode);
-  if (order) qs.set('orderByFields', order);
 
   let res: Response;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 30000);
   try {
-    res = await fetch(`${SERVICE_URL}?${qs.toString()}`);
+    res = await fetch(`${SERVICE_URL}?${qs.toString()}`, { signal: ctl.signal });
   } catch {
-    return Response.json({ records: [], error: 'The state records service could not be reached just now. Try again in a few minutes.' });
+    clearTimeout(timer);
+    return Response.json({
+      records: [],
+      error: 'The state records service took too long to answer or could not be reached. Try a narrower search — a house number plus street name usually answers fastest.',
+    });
   }
+  clearTimeout(timer);
   if (!res.ok) {
     return Response.json({ records: [], error: `The state records service refused the request (HTTP ${res.status}). Try again shortly.` });
   }
@@ -102,7 +112,15 @@ export async function GET(req: Request) {
     error?: { message?: string };
   } | null;
   if (!body || body.error) {
-    return Response.json({ records: [], error: 'That search did not run — check the spelling and try again.' });
+    // Quote the service's own words — a swallowed error message
+    // cost a full diagnosis round on Nov 9–10, 2026.
+    const svcMsg = body && body.error && body.error.message ? body.error.message : '';
+    return Response.json({
+      records: [],
+      error: svcMsg
+        ? `That search did not run — the state service answered: “${svcMsg}”`
+        : 'That search did not run — check the spelling and try again.',
+    });
   }
   const records: StateRecord[] = [];
   const features = Array.isArray(body.features) ? body.features : [];
@@ -113,6 +131,12 @@ export async function GET(req: Request) {
     }
     if (records.length >= 25) break;
   }
+  records.sort((a, b) => {
+    const ka = mode === 'city' ? a.address : a.ownerName || a.address;
+    const kb = mode === 'city' ? b.address : b.ownerName || b.address;
+    const c = ka.localeCompare(kb);
+    return c !== 0 ? c : a.address.localeCompare(b.address);
+  });
   cache.set(key, { at: Date.now(), records });
   return Response.json({ records, cached: false });
 }

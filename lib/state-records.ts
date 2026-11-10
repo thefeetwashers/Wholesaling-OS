@@ -58,7 +58,13 @@ export function buildStateWhere(mode: StateSearchMode, raw: string): string | nu
     .slice(0, 80);
   if (mode === 'parcel') {
     if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
-    return `PARCEL_ID='${q}' OR PARCELNO='${q}'`;
+    // The roll stores some parcel IDs with doubled spaces inside
+    // ("311803  D0010"), so an exact match misses what the eye sees
+    // as the same ID. Match token-by-token with % between the
+    // tokens instead — whitespace-proof in both directions.
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `PARCEL_ID LIKE '${like}' OR PARCELNO LIKE '${like}'`;
   }
   if (q.length < 3) return null;
   if (mode === 'owner') return `OWN_NAME LIKE '%${q}%'`;
@@ -66,11 +72,12 @@ export function buildStateWhere(mode: StateSearchMode, raw: string): string | nu
   return `PHY_CITY='${q}'`;
 }
 
-export function stateOrderBy(mode: StateSearchMode): string {
-  if (mode === 'city') return 'PHY_ADDR1 ASC';
-  if (mode === 'parcel') return '';
-  return 'OWN_NAME ASC';
-}
+// NOTE (Nov 10, 2026): there is deliberately no server-side
+// ordering helper anymore. Live probes proved the FDOR service
+// rejects queries that carry the full field list TOGETHER WITH an
+// orderByFields clause (generic 400 "Invalid query parameters"),
+// while the same queries without it succeed — the route now sorts
+// the ≤25 mapped records itself.
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
@@ -91,7 +98,10 @@ function joinLines(a: string, b: string): string {
 
 export function mapStateFeature(attrs: Record<string, unknown>): StateRecord | null {
   const address = joinLines(s(attrs.PHY_ADDR1), s(attrs.PHY_ADDR2));
-  const parcelId = s(attrs.PARCEL_ID);
+  // Collapse the roll's doubled internal spaces so the ID a user
+  // sees (and later types back into parcel search) is one clean
+  // string.
+  const parcelId = s(attrs.PARCEL_ID).replace(/\s+/g, ' ');
   if (!address && !parcelId) return null;
   const avNsd = n(attrs.AV_NSD);
   const avSd = n(attrs.AV_SD);
