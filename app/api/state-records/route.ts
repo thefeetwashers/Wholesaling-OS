@@ -39,7 +39,11 @@ export const dynamic = 'force-dynamic';
 // in the layer); MassGIS's own policy page states its data are
 // public records that may be freely redistributed and integrated
 // into commercial products, with credit to MassGIS requested
-// (printed on the panel). A state joins the registry only when
+// (printed on the panel). Slice 109 adds Wisconsin: the V12
+// Statewide Parcel Data (Wisconsin Land Information Program /
+// State Cartographer's Office) — the project's schema
+// documentation states the data is in the public domain with no
+// use restrictions. A state joins the registry only when
 // its terms pass the gate; the search discipline is identical for
 // every state: one live query, at most 25 rows, 10-minute cache,
 // nothing stored until the wholesaler adds a lead.
@@ -72,7 +76,8 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const stateParam = (searchParams.get('state') || 'FL').toUpperCase();
-  const state: StateCode = stateParam === 'CT' || stateParam === 'MA' ? stateParam : 'FL';
+  const state: StateCode =
+    stateParam === 'CT' || stateParam === 'MA' || stateParam === 'WI' ? stateParam : 'FL';
   const engine = STATE_ENGINES[state];
   const modeParam = (searchParams.get('mode') || 'owner') as StateSearchMode;
   const mode: StateSearchMode = MODES.indexOf(modeParam) >= 0 ? modeParam : 'owner';

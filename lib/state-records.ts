@@ -115,7 +115,7 @@ function joinLines(a: string, b: string): string {
 // us-source-map-2026-11-10.md). Florida above is the first engine;
 // Connecticut below is the second.
 
-export type StateCode = 'FL' | 'CT' | 'MA';
+export type StateCode = 'FL' | 'CT' | 'MA' | 'WI';
 
 export interface StateSourceInfo {
   code: StateCode;
@@ -139,6 +139,9 @@ export const CT_RECORD_SOURCE =
 
 export const MA_RECORD_SOURCE =
   'MassGIS (Massachusetts Bureau of Geographic Information) — Massachusetts Property Tax Parcels (Level 3 assessors’ parcels); public records the Commonwealth states may be freely redistributed and integrated into commercial products — credit to MassGIS';
+
+export const WI_RECORD_SOURCE =
+  'Wisconsin Statewide Parcel Initiative (Wisconsin Land Information Program, Dept. of Administration, and the State Cartographer’s Office) — V12 Statewide Parcel Data; public domain, no use restrictions';
 
 export const STATE_SOURCES: StateSourceInfo[] = [
   {
@@ -180,6 +183,19 @@ export const STATE_SOURCES: StateSourceInfo[] = [
     yearPhrase: 'fiscal year',
     emptyHint:
       'Check the spelling — assessors record owner names in capitals, and a company may appear under its entity name rather than a person’s. Boston parcels are not in this layer at all.',
+  },
+  {
+    code: 'WI',
+    heading: 'Wisconsin state records — live ownership lookup (all 72 counties)',
+    sourceLine: WI_RECORD_SOURCE,
+    listSource: 'Wisconsin state records',
+    blurb:
+      'The Wisconsin Statewide Parcel Initiative publishes the V12 parcel database — owner of record, property and mailing address, parcel, assessed value and estimated fair market value — aggregated from all 72 counties’ land information offices in one official service, in the public domain with no use restrictions. Know what this layer does not carry: no year built and no last sale — those facts live in the county records, and this panel leaves them blank rather than borrowing them from anywhere. Counties submit their data to the state once a year, so the county land information office is the live record — verify before you spend money. One county, Kenosha, has removed owner names from its parcels entirely by county resolution, and a few others redact some names — a blank owner there is the county’s choice, not a broken search. A public record is not consent: leads land with consent “unknown”. Search by owner name — everything a person or company owns, statewide — or by parcel ID (state, county, or tax parcel ID).',
+    valueLabel: 'Est. fair market value',
+    verifyLine: 'Verify with the county land information office before acting — counties submit this data to the state once a year.',
+    yearNoun: 'tax roll',
+    emptyHint:
+      'Check the spelling — owners are recorded as each county holds them, and a company may appear under its entity name rather than a person’s. Kenosha County parcels carry no owner names at all (county redaction).',
   },
 ];
 
@@ -377,6 +393,80 @@ export function mapMaFeature(attrs: Record<string, unknown>): StateRecord | null
   };
 }
 
+// ---------------------------------------------------------------------------
+// Slice 109 — Wisconsin (Statewide Parcel Initiative, V12). Schema
+// read from the layer page itself (Nov 10, 2026): owners in
+// OWNERNME1/OWNERNME2, mailing as ONE combined field (PSTLADRESS —
+// carried whole, never split into city/state/ZIP by guessing),
+// site address SITEADRESS with PLACENAME + ZIPCODE, values in
+// CNTASSDVALUE (assessed) and ESTFMKVALUE (estimated fair market),
+// tax roll year as a STRING in TAXROLLYEAR. The layer carries NO
+// year-built and NO last-sale fields — the mapper leaves them
+// blank, honestly. Three parcel IDs exist (STATEID statewide,
+// PARCELID + TAXPARCELID per county); county IDs repeat across
+// counties, so the Massachusetts exact-first pattern applies from
+// day one.
+
+const WI_OUT_FIELDS = [
+  'STATEID', 'PARCELID', 'TAXPARCELID', 'TAXROLLYEAR',
+  'OWNERNME1', 'OWNERNME2', 'PSTLADRESS', 'SITEADRESS', 'SITEADRESS_STAND',
+  'PLACENAME', 'ZIPCODE', 'CNTASSDVALUE', 'ESTFMKVALUE',
+];
+
+export function buildWiWhere(mode: StateSearchMode, raw: string): string | null {
+  const q = sanitizeQuery(raw);
+  if (mode === 'parcel') {
+    if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `STATEID LIKE '${like}' OR PARCELID LIKE '${like}' OR TAXPARCELID LIKE '${like}'`;
+  }
+  if (q.length < 3) return null;
+  if (mode === 'owner') return `OWNERNME1 LIKE '%${q}%' OR OWNERNME2 LIKE '%${q}%'`;
+  return null;
+}
+
+export function buildWiExactWhere(mode: StateSearchMode, raw: string): string | null {
+  if (mode !== 'parcel') return null;
+  const q = sanitizeIdExact(raw);
+  if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+  return `STATEID = '${q}' OR PARCELID = '${q}' OR TAXPARCELID = '${q}'`;
+}
+
+export function mapWiFeature(attrs: Record<string, unknown>): StateRecord | null {
+  const address = s(attrs.SITEADRESS) || s(attrs.SITEADRESS_STAND);
+  const parcelId = (s(attrs.PARCELID) || s(attrs.TAXPARCELID) || s(attrs.STATEID)).replace(/\s+/g, ' ');
+  if (!address && !parcelId) return null;
+  const owner1 = s(attrs.OWNERNME1);
+  const owner2 = s(attrs.OWNERNME2);
+  const ownerName = owner1 && owner2 ? `${owner1} & ${owner2}` : owner1 || owner2;
+  const yrText = s(attrs.TAXROLLYEAR);
+  const yrMatch = yrText.match(/(19|20)\d{2}/);
+  return {
+    parcelId,
+    ownerName,
+    // PSTLADRESS is the county's own combined mailing string
+    // ("123 MAIN ST MADISON WI 53703" in whatever shape the county
+    // submitted). It is carried whole; the separate city/state/ZIP
+    // slots stay blank rather than being parsed out by guesswork.
+    mailingAddress: s(attrs.PSTLADRESS),
+    mailingCity: '',
+    mailingState: '',
+    mailingZip: '',
+    address,
+    city: s(attrs.PLACENAME),
+    zip: s(attrs.ZIPCODE),
+    justValue: n(attrs.ESTFMKVALUE),
+    assessedValue: n(attrs.CNTASSDVALUE),
+    yearBuilt: null,
+    livingArea: null,
+    salePrice: null,
+    saleYear: null,
+    saleMonth: '',
+    rollYear: yrMatch ? parseInt(yrMatch[0], 10) : null,
+  };
+}
+
 export interface StateEngine {
   serviceUrl: string;
   outFields: string;
@@ -411,6 +501,14 @@ export const STATE_ENGINES: Record<StateCode, StateEngine> = {
     buildWhere: buildMaWhere,
     buildExactWhere: buildMaExactWhere,
     mapFeature: mapMaFeature,
+  },
+  WI: {
+    serviceUrl:
+      'https://services3.arcgis.com/n6uYoouQZW75n5WI/arcgis/rest/services/Wisconsin_Statewide_Parcels_DB/FeatureServer/0/query',
+    outFields: WI_OUT_FIELDS.join(','),
+    buildWhere: buildWiWhere,
+    buildExactWhere: buildWiExactWhere,
+    mapFeature: mapWiFeature,
   },
 };
 
