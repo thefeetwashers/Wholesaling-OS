@@ -33,10 +33,16 @@ export const dynamic = 'force-dynamic';
 // FDOR roll and, from this slice, Connecticut's OPM CAMA and Parcel
 // Layer (town assessor data for all 169 municipalities, published
 // by the state under CC0 — public domain; license read on the
-// state's own catalog entry before building). A state joins the
-// registry only when its terms pass the gate; the search discipline
-// is identical for every state: one live query, at most 25 rows,
-// 10-minute cache, nothing stored until the wholesaler adds a lead.
+// state's own catalog entry before building). Slice 108 adds
+// Massachusetts: the MassGIS Property Tax Parcels layer (Level 3
+// assessors' parcels, 350 of 351 cities and towns — Boston is not
+// in the layer); MassGIS's own policy page states its data are
+// public records that may be freely redistributed and integrated
+// into commercial products, with credit to MassGIS requested
+// (printed on the panel). A state joins the registry only when
+// its terms pass the gate; the search discipline is identical for
+// every state: one live query, at most 25 rows, 10-minute cache,
+// nothing stored until the wholesaler adds a lead.
 
 async function verifyUserId(req: Request): Promise<string | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -66,7 +72,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const stateParam = (searchParams.get('state') || 'FL').toUpperCase();
-  const state: StateCode = stateParam === 'CT' ? 'CT' : 'FL';
+  const state: StateCode = stateParam === 'CT' || stateParam === 'MA' ? stateParam : 'FL';
   const engine = STATE_ENGINES[state];
   const modeParam = (searchParams.get('mode') || 'owner') as StateSearchMode;
   const mode: StateSearchMode = MODES.indexOf(modeParam) >= 0 ? modeParam : 'owner';

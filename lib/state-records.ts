@@ -115,7 +115,7 @@ function joinLines(a: string, b: string): string {
 // us-source-map-2026-11-10.md). Florida above is the first engine;
 // Connecticut below is the second.
 
-export type StateCode = 'FL' | 'CT';
+export type StateCode = 'FL' | 'CT' | 'MA';
 
 export interface StateSourceInfo {
   code: StateCode;
@@ -126,11 +126,19 @@ export interface StateSourceInfo {
   valueLabel: string;
   verifyLine: string;
   yearNoun: string;
+  // Optional full phrase for the lead-notes line ("fiscal year
+  // 2026") when "<yearNoun> year <year>" would not read correctly.
+  // Absent it, the notes use "<yearNoun> year" (FL "roll year",
+  // CT "collection year") — unchanged for the states already live.
+  yearPhrase?: string;
   emptyHint: string;
 }
 
 export const CT_RECORD_SOURCE =
   'Connecticut GIS Office (OPM) — Connecticut CAMA and Parcel Layer; town assessor data published by the state under CC0 (public domain)';
+
+export const MA_RECORD_SOURCE =
+  'MassGIS (Massachusetts Bureau of Geographic Information) — Massachusetts Property Tax Parcels (Level 3 assessors’ parcels); public records the Commonwealth states may be freely redistributed and integrated into commercial products — credit to MassGIS';
 
 export const STATE_SOURCES: StateSourceInfo[] = [
   {
@@ -158,6 +166,20 @@ export const STATE_SOURCES: StateSourceInfo[] = [
     yearNoun: 'collection',
     emptyHint:
       'Check the spelling — a company may be recorded under its entity name rather than a person’s, and a few towns suppress owner names entirely (shown as “Current Owner”).',
+  },
+  {
+    code: 'MA',
+    heading: 'Massachusetts state records — live ownership lookup (350 of 351 cities & towns)',
+    sourceLine: MA_RECORD_SOURCE,
+    listSource: 'Massachusetts state records',
+    blurb:
+      'MassGIS publishes the statewide Level 3 assessors’ parcel layer — owner of record, property and mailing address, parcel, assessed values, last sale — for 350 of the Commonwealth’s 351 cities and towns in one official service. Boston is the one exception: the city is not in this layer, so Boston parcels belong to the city’s own assessing records — this panel does not pretend otherwise. Municipalities feed updates to MassGIS on their own cycles, so the city or town assessor is the live record — verify before you spend money. A public record is not consent: leads land with consent “unknown”. Search by owner name — everything a person or company owns, statewide — or by parcel ID, the map/parcel ID on the assessor’s record.',
+    valueLabel: 'Total value',
+    verifyLine: 'Verify with the city or town assessor before acting — municipalities update this layer on their own cycles.',
+    yearNoun: 'fiscal year',
+    yearPhrase: 'fiscal year',
+    emptyHint:
+      'Check the spelling — assessors record owner names in capitals, and a company may appear under its entity name rather than a person’s. Boston parcels are not in this layer at all.',
   },
 ];
 
@@ -238,6 +260,93 @@ export function mapCtFeature(attrs: Record<string, unknown>): StateRecord | null
   };
 }
 
+// ---------------------------------------------------------------------------
+// Slice 108 — Massachusetts (MassGIS). Schema read from the layer
+// page itself (Nov 10, 2026): display field MAP_PAR_ID, owner in
+// OWNER1, site address SITE_ADDR with CITY/ZIP as strings (leading
+// zeros in MA ZIPs survive), mailing in OWN_*, values in TOTAL_VAL,
+// last sale LS_PRICE + LS_DATE (an 8-character string), assessment
+// year in FY. Boston is NOT in this layer (350 of 351 towns).
+
+const MA_OUT_FIELDS = [
+  'MAP_PAR_ID', 'PROP_ID', 'SITE_ADDR', 'LOCATION', 'CITY', 'ZIP',
+  'OWNER1', 'OWN_ADDR', 'OWN_CITY', 'OWN_STATE', 'OWN_ZIP',
+  'TOTAL_VAL', 'YEAR_BUILT', 'RES_AREA', 'LS_PRICE', 'LS_DATE', 'FY',
+];
+
+export function buildMaWhere(mode: StateSearchMode, raw: string): string | null {
+  const q = sanitizeQuery(raw);
+  if (mode === 'parcel') {
+    if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+    // MAP_PAR_IDs join their parts with underscores ("105_42");
+    // sanitizeQuery turns the underscores a user types into
+    // spaces, and the % between tokens spans whatever separator
+    // the record itself uses — the Florida whitespace lesson,
+    // applied to a different separator.
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `MAP_PAR_ID LIKE '${like}' OR PROP_ID LIKE '${like}'`;
+  }
+  if (q.length < 3) return null;
+  if (mode === 'owner') return `OWNER1 LIKE '%${q}%'`;
+  return null;
+}
+
+export function mapMaFeature(attrs: Record<string, unknown>): StateRecord | null {
+  const address = s(attrs.SITE_ADDR) || s(attrs.LOCATION);
+  const parcelId = (s(attrs.MAP_PAR_ID) || s(attrs.PROP_ID)).replace(/\s+/g, ' ');
+  if (!address && !parcelId) return null;
+  // LS_DATE is an 8-character string. Read it as YYYYMMDD first,
+  // then MMDDYYYY; if neither shape holds, keep only the year —
+  // never guess a month the string does not prove.
+  const lsDate = s(attrs.LS_DATE).replace(/[^0-9]/g, '');
+  let saleYear: number | null = null;
+  let saleMonth = '';
+  if (lsDate.length === 8) {
+    const yFirst = parseInt(lsDate.slice(0, 4), 10);
+    const mFirst = parseInt(lsDate.slice(4, 6), 10);
+    const yLast = parseInt(lsDate.slice(4, 8), 10);
+    const mStart = parseInt(lsDate.slice(0, 2), 10);
+    if (yFirst >= 1900 && yFirst <= 2099 && mFirst >= 1 && mFirst <= 12) {
+      saleYear = yFirst;
+      saleMonth = lsDate.slice(4, 6);
+    } else if (yLast >= 1900 && yLast <= 2099 && mStart >= 1 && mStart <= 12) {
+      saleYear = yLast;
+      saleMonth = lsDate.slice(0, 2);
+    }
+  }
+  if (saleYear === null) {
+    const rawDate = s(attrs.LS_DATE);
+    const ym = rawDate.match(/(19|20)\d{2}/);
+    if (ym) saleYear = parseInt(ym[0], 10);
+  }
+  const totalVal = n(attrs.TOTAL_VAL);
+  const yrBlt = n(attrs.YEAR_BUILT);
+  const fy = n(attrs.FY);
+  return {
+    parcelId,
+    ownerName: s(attrs.OWNER1),
+    mailingAddress: s(attrs.OWN_ADDR),
+    mailingCity: s(attrs.OWN_CITY),
+    mailingState: s(attrs.OWN_STATE),
+    mailingZip: s(attrs.OWN_ZIP),
+    address,
+    city: s(attrs.CITY),
+    zip: s(attrs.ZIP),
+    // Massachusetts assesses at full and fair cash value, and the
+    // layer carries one total — it fills both slots honestly
+    // rather than inventing a second figure.
+    justValue: totalVal,
+    assessedValue: totalVal,
+    yearBuilt: yrBlt !== null && yrBlt > 0 ? Math.round(yrBlt) : null,
+    livingArea: n(attrs.RES_AREA),
+    salePrice: n(attrs.LS_PRICE),
+    saleYear,
+    saleMonth,
+    rollYear: fy !== null ? Math.round(fy) : null,
+  };
+}
+
 export interface StateEngine {
   serviceUrl: string;
   outFields: string;
@@ -259,6 +368,13 @@ export const STATE_ENGINES: Record<StateCode, StateEngine> = {
     outFields: CT_OUT_FIELDS.join(','),
     buildWhere: buildCtWhere,
     mapFeature: mapCtFeature,
+  },
+  MA: {
+    serviceUrl:
+      'https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/Massachusetts_Property_Tax_Parcels/FeatureServer/0/query',
+    outFields: MA_OUT_FIELDS.join(','),
+    buildWhere: buildMaWhere,
+    mapFeature: mapMaFeature,
   },
 };
 

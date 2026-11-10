@@ -95,7 +95,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         list_source: info.listSource,
         consent_status: 'unknown',
         notes:
-          `From ${info.sourceLine}; ${info.yearNoun} year ${rec.rollYear ?? 'not stated'}, pulled ${today}. ` +
+          `From ${info.sourceLine}; ${info.yearPhrase ? info.yearPhrase : `${info.yearNoun} year`} ${rec.rollYear ?? 'not stated'}, pulled ${today}. ` +
           `${info.valueLabel} on the record: ${money(rec.justValue)}.${saleBit} ` +
           info.verifyLine,
       });
@@ -119,6 +119,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
         <select value={srcCode} onChange={(e) => pickState(e.target.value as StateCode)}>
           <option value="FL">Florida</option>
           <option value="CT">Connecticut</option>
+          <option value="MA">Massachusetts</option>
         </select>
         <select value={mode} onChange={(e) => setMode(e.target.value as StateSearchMode)}>
           <option value="owner">Owner name</option>
