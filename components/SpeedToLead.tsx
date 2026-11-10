@@ -55,7 +55,9 @@ export default function SpeedToLead({ userId, onNavigate }: { userId: string; on
               {boxes.length === 0
                 ? <span style={{ color: '#94a3b8' }}>no buy boxes on the platform yet</span>
                 : m.buyers > 0
-                  ? <span style={{ color: '#34d399' }}>🎯 {m.buyers} buyer{m.buyers === 1 ? '' : 's'} match ({m.boxes} buy box{m.boxes === 1 ? '' : 'es'})</span>
+                  ? <span style={{ color: '#34d399' }}>🎯 {m.buyers} buyer{m.buyers === 1 ? '' : 's'} match ({m.boxes} buy box{m.boxes === 1 ? '' : 'es'}){m.liveBuyers > 0
+                    ? <span style={{ color: '#34d399' }}> · ✅ {m.liveBuyers} confirmed live</span>
+                    : <span style={{ color: '#fbbf24' }}> · ⚠️ none confirmed in the last 120 days — the matching boxes may be stale</span>}</span>
                   : <span style={{ color: '#94a3b8' }}>no buyer match yet</span>}
               {onNavigate && (
                 <>

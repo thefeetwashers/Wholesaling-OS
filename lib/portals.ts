@@ -48,6 +48,11 @@ export interface BuyBox {
   price_max?: number | null;
   min_beds?: number | null;
   active: boolean;
+  // Slice 116 — liveness: the table has always carried these; the
+  // type now declares them. updated_at is the box's "confirmed on"
+  // (see confirmBuyBox) — created_at until the buyer first confirms.
+  created_at?: string;
+  updated_at?: string;
 }
 
 export async function loadMyBuyBoxes(userId: string): Promise<BuyBox[]> {
@@ -70,6 +75,21 @@ export async function saveBuyBox(userId: string, box: BuyBox): Promise<void> {
 export async function deleteBuyBox(id: string): Promise<void> {
   if (!supabaseConfigured || !supabase) return;
   const { error } = await supabase.from('buy_boxes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Slice 116 — "Still buying": the buyer re-stamps their box's
+// updated_at, which is its confirmed-on date everywhere liveness
+// is judged (lib/match.ts). The criteria are not touched — the
+// confirmation says only "this box still speaks for me, today".
+// Own-box only in effect: the v3 policy lets buyers update solely
+// their own rows.
+export async function confirmBuyBox(id: string): Promise<void> {
+  if (!supabaseConfigured || !supabase) return;
+  const { error } = await supabase
+    .from('buy_boxes')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) throw error;
 }
 

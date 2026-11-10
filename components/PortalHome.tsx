@@ -9,6 +9,7 @@ import {
   loadMyBuyBoxes,
   saveBuyBox,
   deleteBuyBox,
+  confirmBuyBox,
   loadFeed,
   listingMatchesBox,
   loadDashboard,
@@ -42,6 +43,7 @@ import {
 } from '../lib/portals';
 import { supabase } from '../lib/supabase';
 import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTierSummary } from '../lib/buyer-tiers';
+import { boxLiveness } from '../lib/match';
 import ReferrerPortal from './ReferrerPortal';
 import BuyerProofCard from './BuyerProofCard';
 
@@ -393,6 +395,8 @@ function BuyerPortal({ userId }: { userId: string }) {
   const [myOffers, setMyOffers] = useState<OfferRow[]>([]);
   const [offerForm, setOfferForm] = useState<Record<string, { amount: string; message: string }>>({});
   const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const todayISO = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({ label: 'My Buy Box', states: '', counties: '', cities: '', types: '', min: '', max: '', beds: '' });
 
   const refresh = () => {
@@ -406,6 +410,7 @@ function BuyerPortal({ userId }: { userId: string }) {
     <div>
       <h3>Cash Buyer Portal</h3>
       {err && <p style={{ fontSize: 13, color: '#f87171' }}>{err}</p>}
+      {note && <p style={{ fontSize: 13, color: '#34d399' }}>{note}</p>}
       <p style={{ fontSize: 13 }}>Publish a buy box so wholesalers' deals can be matched to you. Comma-separated lists.</p>
       <BuyerRecordCard userId={userId} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -434,13 +439,23 @@ function BuyerPortal({ userId }: { userId: string }) {
       </div>
       {boxes.length > 0 && (
         <ul style={{ fontSize: 13 }}>
-          {boxes.map((b) => (
-            <li key={b.id}>
-              <strong>{b.label}</strong> — {[...b.cities, ...b.states].join(', ') || 'Anywhere'}
-              {b.price_max != null ? ` · up to ${money(Number(b.price_max))}` : ''}
-              {' '}<button onClick={async () => { if (b.id) { await deleteBuyBox(b.id); refresh(); } }}>Delete</button>
-            </li>
-          ))}
+          {boxes.map((b) => {
+            const lv = boxLiveness(b, todayISO);
+            return (
+              <li key={b.id} style={{ marginBottom: 8 }}>
+                <strong>{b.label}</strong> — {[...b.cities, ...b.states].join(', ') || 'Anywhere'}
+                {b.price_max != null ? ` · up to ${money(Number(b.price_max))}` : ''}
+                {' '}<button onClick={async () => { if (b.id) { await deleteBuyBox(b.id); refresh(); } }}>Delete</button>
+                <br />
+                {lv.live ? (
+                  <span style={{ color: '#34d399', fontSize: 12.5 }}>✅ Confirmed {lv.confirmedOn} — live. Wholesalers&rsquo; match counts lead with confirmed-live buyers.</span>
+                ) : (
+                  <span style={{ color: '#fbbf24', fontSize: 12.5 }}>⚠️ Not confirmed since {lv.confirmedOn || '—'} — this box reads as STALE to wholesalers (boxes go stale 120 days after their last confirmation). Confirm it below if you are still buying on these terms.</span>
+                )}
+                {' '}<button onClick={async () => { if (b.id) { try { await confirmBuyBox(b.id); setNote(`Confirmed “${b.label}” as still buying — ${todayISO}.`); refresh(); } catch (e) { setErr(e instanceof Error ? e.message : 'Confirm failed'); } } }}>✓ Still buying — confirm this box</button>
+              </li>
+            );
+          })}
         </ul>
       )}
       <h4>Deal feed — active public listings</h4>
