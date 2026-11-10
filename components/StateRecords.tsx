@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { saveLead } from '../lib/leads';
+import { stampRollSearch } from '../lib/sprint';
 import { STATE_SOURCES, type StateCode, type StateRecord, type StateSearchMode } from '../lib/state-records';
 
 // Slices 104 + 106 — state records lookup. The wholesaler searches a
@@ -61,6 +62,10 @@ export default function StateRecords({ userId }: { userId: string | null }) {
       });
       const j = (await res.json()) as { records?: StateRecord[]; error?: string };
       setRecords(j.records || []);
+      // Slice 113: a roll search that RETURNS records is the
+      // Sprint's first-search evidence — stamped here, by the
+      // search itself (this device), never by a checklist click.
+      if (!j.error && (j.records || []).length > 0) stampRollSearch(srcCode);
       setSearched(q.trim());
       if (j.error) setError(j.error);
     } catch {

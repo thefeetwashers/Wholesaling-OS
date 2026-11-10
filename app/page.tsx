@@ -17,6 +17,7 @@ import Counties from '../components/Counties';
 import AuctionDirectory from '../components/AuctionDirectory';
 import DashboardBand from '../components/DashboardBand';
 import CommandCenter from '../components/CommandCenter';
+import Sprint from '../components/Sprint';
 import DealRadar from '../components/DealRadar';
 import AuctionFeed from '../components/AuctionFeed';
 import Landing, { LandingFooter } from '../components/Landing';
@@ -116,7 +117,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 112</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 113</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -171,6 +172,7 @@ export default function Home() {
             {view === 'dashboard' && (
               <>
                 {role === 'wholesaler' && userId && <CommandCenter userId={userId} onNavigate={setView} />}
+                {role === 'wholesaler' && userId && <Sprint userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DealRadar onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <AuctionFeed onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DistressRadar userId={userId} onNavigate={setView} />}
