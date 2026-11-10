@@ -57,6 +57,7 @@ import CommsCenter from '../components/CommsCenter';
 import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
+import PlatformHealth from '../components/PlatformHealth';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
 import SignKit from '../components/SignKit';
 import AssistantPanel from '../components/AssistantPanel';
@@ -117,7 +118,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 116</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 117</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -288,6 +289,7 @@ export default function Home() {
             {view === 'admin' && (
               <>
                 <AdminConsole userId={userId} userEmail={userEmail} />
+                <PlatformHealth userEmail={userEmail} />
                 {userId && <OwnerDealDesk userId={userId} />}
               </>
             )}
