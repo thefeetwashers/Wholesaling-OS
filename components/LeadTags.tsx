@@ -8,6 +8,7 @@ import {
   loadContactEntries, addContactEntry, updateLeadContacts,
   type DistressTagRow, type ContactEntryRow,
 } from '../lib/distress';
+import { courtesyHold, courtesyHoldLine } from '../lib/courtesy';
 
 // Slice 42 — per-lead distress tags + manual contact entry.
 // Tags: chosen by the wholesaler from the fixed list, each stamped
@@ -131,6 +132,15 @@ export default function LeadTags({
               <button onClick={() => doRemoveTag(t)}>Remove</button>
             </div>
           ))}
+          {(() => {
+            const h = courtesyHold(tags, new Date().toISOString().slice(0, 10));
+            return h ? (
+              <p style={{ fontSize: 13, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', padding: '8px 10px', borderRadius: 8 }}>
+                🤝 {courtesyHoldLine(h)} While it runs, this lead stays out of the call queue and every
+                outreach surface shows the hold.
+              </p>
+            ) : null;
+          })()}
           {remaining.length > 0 && (
             <div style={{ marginTop: 6 }}>
               <select value={newTag} onChange={(e) => setNewTag(e.target.value)}>

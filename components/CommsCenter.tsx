@@ -21,6 +21,8 @@ import {
   channelLinks,
   addToBlocklist,
 } from '../lib/comms';
+import { loadAllTags, type DistressTagRow } from '../lib/distress';
+import { courtesyHold, courtesyHoldLine } from '../lib/courtesy';
 
 // Slice 24 — Comms center. One place to contact a lead across call,
 // text, WhatsApp, and email. Every channel is a link the wholesaler
@@ -35,6 +37,7 @@ const card: React.CSSProperties = { background: '#1e293b', padding: 16, borderRa
 
 export default function CommsCenter({ userId }: { userId: string | null }) {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [tagsByLead, setTagsByLead] = useState<Record<string, DistressTagRow[]>>({});
   const [leadId, setLeadId] = useState('');
   const [tplKey, setTplKey] = useState(SCRIPT_TEMPLATES[0].key);
   const [you, setYou] = useState('');
@@ -57,11 +60,18 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
   });
   const links = lead ? channelLinks(lead, merged) : null;
   const dnc = lead ? isDoNotContact(lead) : false;
+  // Slice 115 — the courtesy hold rides alongside consent and the
+  // blocklist here: visible before any channel opens, never a
+  // hidden block.
+  const hold = lead
+    ? courtesyHold(tagsByLead[lead.id || ''] || [], new Date().toISOString().slice(0, 10))
+    : null;
 
   const refreshLeads = () => { if (userId) loadMyLeads(userId).then(setLeads).catch(() => {}); };
   useEffect(() => {
     if (!userId) return;
     refreshLeads();
+    loadAllTags(userId).then(setTagsByLead).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
@@ -186,6 +196,13 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
             {lead.consent_at ? ` · recorded ${new Date(lead.consent_at).toLocaleDateString()}` : ''}
             {lead.list_source ? ` · Source: ${lead.list_source}` : ''}
           </p>
+          {hold && (
+            <p style={{ fontSize: 13.5, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', padding: 12, borderRadius: 10 }}>
+              🤝 <strong>Courtesy hold.</strong> {courtesyHoldLine(hold)} The channels below still open —
+              the platform does not block you — but the courtesy this office stands for is to wait.
+              If you reach out anyway, that choice is yours, and it is logged like any other outreach.
+            </p>
+          )}
           <p style={{ fontSize: 13, background: '#0f172a', padding: 12, borderRadius: 10, whiteSpace: 'pre-wrap' }}>{merged}</p>
 
           {dnc ? (

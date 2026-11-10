@@ -26,6 +26,7 @@ const RHYTHM_DAYS: Record<DistressTagKey, number> = {
   code_violation: 14,
   vacant: 14,
   probate_inherited: 30,
+  fire_damage: 7,
   pre_foreclosure: 14,
   auction: 7,
   divorce_partition: 30,

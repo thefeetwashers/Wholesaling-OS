@@ -6,6 +6,7 @@ import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOw
 import LeadLetter from './LeadLetter';
 import ScreenGuard from './ScreenGuard';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
+import { courtesyHold } from '../lib/courtesy';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
 import LeadPhotos from './LeadPhotos';
@@ -115,13 +116,19 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
     }
   };
 
+  const todayISO = new Date().toISOString().slice(0, 10);
   let shown = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+  let queueHeldBack = 0;
   if (queueMode) {
-    const todayISO = new Date().toISOString().slice(0, 10);
     shown = shown.filter((l) => {
       const ts = tagsByLead[l.id || ''] || [];
       return ts.length > 0 && (queueTag === 'any' || ts.some((t) => t.tag === queueTag));
     });
+    // Slice 115 — courtesy holds stay OUT of the call queue while
+    // they run, and the held-back count is stated, never silent.
+    const beforeHold = shown.length;
+    shown = shown.filter((l) => !courtesyHold(tagsByLead[l.id || ''] || [], todayISO));
+    queueHeldBack = beforeHold - shown.length;
     shown = sortCallQueue(shown, tagsByLead, todayISO);
   }
 
@@ -188,6 +195,9 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
               {DISTRESS_TAGS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
             <span style={{ fontSize: 12.5, color: '#94a3b8' }}> Overdue follow-ups first. You make the calls — the Comms Center checks consent and the blocklist before any channel opens.</span>
+            {queueHeldBack > 0 && (
+              <span style={{ fontSize: 12.5, color: '#fbbf24' }}> 🤝 {queueHeldBack} {queueHeldBack === 1 ? 'lead' : 'leads'} held back by courtesy holds — {queueHeldBack === 1 ? 'it returns' : 'they return'} to the queue when the hold lifts.</span>
+            )}
           </>
         )}
       </div>
@@ -208,6 +218,7 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             {isOutOfStateOwner(l) ? ' · 📬 out-of-state owner' : ''}
             {(() => { const eq = estimatedEquity(l); return eq ? ` · equity ≈ $${eq.equity.toLocaleString()} (${eq.pct}% of assessed)${eq.pct < 30 ? ' · ⚠️ thin equity — verify before spending' : ''}` : ''; })()}
             {(() => { const rf = rentFlag(l); return rf ? ` · rent $${Number(l.monthly_rent).toLocaleString()}/mo = ${rf.pct.toFixed(2)}% of asking${rf.clears ? ' · ✓ clears the 1% rule' : ' · under the 1% rule'}` : ''; })()}
+            {(() => { const h = courtesyHold(tagsByLead[l.id || ''] || [], todayISO); return h ? <span style={{ color: '#fbbf24' }}> · 🤝 courtesy hold until {h.until}</span> : null; })()}
             <ResearchLinks lead={l} />
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <LeadTags userId={userId} lead={l} tags={tagsByLead[l.id] || []}
@@ -226,7 +237,7 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <button onClick={() => startEdit(l)}>Edit</button>
             )}{' '}
-            <LeadLetter lead={l} />{' '}
+            <LeadLetter lead={l} tags={tagsByLead[l.id || ''] || []} />{' '}
             {confirmId === (l.id || l.property_address) ? (
               <>
                 <button onClick={() => removeLead(l)}>Confirm delete</button>{' '}

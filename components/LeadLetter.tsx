@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { SCRIPT_TEMPLATES, mergeTemplate } from '../lib/scripts-data';
 import { loadLetterIdentity, saveLetterIdentity, escHtml, openPrintWindow, type LetterIdentity } from '../lib/letter-identity';
 import type { Lead } from '../lib/leads';
+import type { DistressTagRow } from '../lib/distress';
+import { courtesyHold, courtesyHoldLine } from '../lib/courtesy';
 
 // Slice 62 — one-click direct-mail letter for a lead. Mail is the
 // lawful front door to a seller: the owner's mailing address is a
@@ -15,7 +17,10 @@ import type { Lead } from '../lib/leads';
 // a print view with a window-envelope address block. Nothing is
 // sent by the platform; the wholesaler prints and mails it.
 
-export default function LeadLetter({ lead }: { lead: Lead }) {
+export default function LeadLetter({ lead, tags }: { lead: Lead; tags?: DistressTagRow[] }) {
+  // Slice 115 — a courtesy hold warns here, on screen only: the
+  // warning is never part of the printed letter.
+  const hold = courtesyHold(tags || [], new Date().toISOString().slice(0, 10));
   const [open, setOpen] = useState(false);
   const [idn, setIdn] = useState<LetterIdentity>(() => loadLetterIdentity());
 
@@ -65,6 +70,12 @@ export default function LeadLetter({ lead }: { lead: Lead }) {
       <button onClick={() => setOpen(!open)} style={{ fontSize: 12.5, padding: '2px 8px' }}>✉️ Letter</button>
       {open && (
         <span style={{ display: 'block', marginTop: 6, background: '#0f172a', padding: 10, borderRadius: 8, fontSize: 13 }}>
+          {hold && (
+            <span style={{ display: 'block', color: '#fbbf24', background: 'rgba(251,191,36,0.08)', padding: '8px 10px', borderRadius: 8, marginBottom: 8 }}>
+              🤝 {courtesyHoldLine(hold)} Consider whether this letter should wait — this warning
+              appears on screen only and never prints.
+            </span>
+          )}
           <span style={{ display: 'block', color: '#94a3b8', marginBottom: 4 }}>
             Your direct-mail letter for this lead, merged and ready to print (addressed to the owner&rsquo;s
             mailing address on the lead). You print and mail it — the platform sends nothing. Your details

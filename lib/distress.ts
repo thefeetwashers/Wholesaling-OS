@@ -16,6 +16,7 @@ export const DISTRESS_TAGS = [
   { key: 'code_violation', label: 'Code violation' },
   { key: 'vacant', label: 'Vacant' },
   { key: 'probate_inherited', label: 'Probate / inherited' },
+  { key: 'fire_damage', label: 'Fire damage' },
   { key: 'pre_foreclosure', label: 'Pre-foreclosure' },
   { key: 'auction', label: 'Auction' },
   { key: 'divorce_partition', label: 'Divorce / partition' },
