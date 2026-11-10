@@ -2,10 +2,11 @@
 
 // Slice 114 — Check the roll (per lead). One tap asks the lit
 // state roll about this lead — by parcel ID when the lead carries
-// one; otherwise by its street address where the roll answers
-// address searches, or by surname-plus-address-match where it does
-// not (Florida) — and stamps the verdict into the lead's notes via
-// the ordinary lead update. The verdict language
+// one, otherwise by surname search with the lead's address matched
+// among the answer (no lit roll answers an address search) — and
+// stamps the verdict into the lead's notes via the ordinary lead
+// update, then hands the new notes to the parent list so an
+// immediate edit cannot overwrite the stamp with stale text. The verdict language
 // is lib/roll-check.ts, whose rules never claim more than the
 // roll's answer established. A lead in a state with no lit roll
 // gets a plain line saying so when it carries a parcel or owner to
@@ -15,7 +16,6 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { updateLeadFields, type Lead } from '../lib/leads';
 import {
-  ROLL_ADDRESS_STATES,
   ROLL_CHECK_STATES,
   buildRollStamp,
   surnameQuery,
@@ -23,7 +23,15 @@ import {
 } from '../lib/roll-check';
 import type { StateRecord } from '../lib/state-records';
 
-export default function RollCheck({ userId, lead }: { userId: string; lead: Lead }) {
+export default function RollCheck({
+  userId,
+  lead,
+  onStamped,
+}: {
+  userId: string;
+  lead: Lead;
+  onStamped?: (notes: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [notes, setNotes] = useState(lead.notes || '');
@@ -66,20 +74,17 @@ export default function RollCheck({ userId, lead }: { userId: string; lead: Lead
         setMsg('Sign in to check the roll.');
         return;
       }
-      // Query shape follows the roll (Slice 114 fix): parcel ID
-      // first; where the roll answers address searches, a
-      // parcel-less lead is checked by its address directly;
-      // Florida's index answers neither address nor a full
-      // multi-token name in usable time, so there the check
-      // searches the surname and matches the address among the
-      // answer.
-      const byAddress = !hasParcel && ROLL_ADDRESS_STATES.has(rollState);
-      const mode = hasParcel ? 'parcel' : byAddress ? 'address' : 'owner';
+      // Query shape (Slice 114, corrected by its own verification):
+      // parcel ID first. A parcel-less lead is checked by owner
+      // name in surname form — no lit roll answers an address
+      // search, a full multi-token name times Florida's index out,
+      // and the punctuated surname-first names on the other rolls
+      // ("SMITH, ROSA L") break a full-phrase search anyway. The
+      // lead's address is then matched among the answer.
+      const mode = hasParcel ? 'parcel' : 'owner';
       const q = hasParcel
         ? (lead.parcel_id as string)
-        : byAddress
-          ? lead.property_address
-          : surnameQuery(lead.owner_name as string);
+        : surnameQuery(lead.owner_name as string);
       const res = await fetch(
         `/api/state-records?state=${rollState}&mode=${mode}&q=${encodeURIComponent(q)}`,
         { headers: { authorization: `Bearer ${token}` } },
@@ -103,6 +108,11 @@ export default function RollCheck({ userId, lead }: { userId: string; lead: Lead
       const nextNotes = notes.trim() ? `${notes.replace(/\s+$/, '')} ${stamp}` : stamp;
       await updateLeadFields(userId, lead.id, { notes: nextNotes });
       setNotes(nextNotes);
+      // Refresh the parent list's copy of this lead in-session, so
+      // the Edit form opened right after shows the stamped notes —
+      // and saving an edit cannot silently overwrite the stamp
+      // with the pre-check text (Slice 114 fix, live-observed).
+      if (onStamped) onStamped(nextNotes);
       setMsg(`${stamp} Stamped into this lead’s notes.`);
     } catch {
       setMsg('The roll check could not be completed just now — the roll may be slow; try again.');

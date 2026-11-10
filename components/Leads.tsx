@@ -48,6 +48,15 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
     setLeads(next); onLeads(next);
   };
 
+  // Slice 114 fix — a roll-check stamp refreshes this lead's notes
+  // in the list immediately (same pattern as onContactsChanged), so
+  // the Edit form cannot open on pre-check notes and overwrite the
+  // stamp on save.
+  const onLeadNotesChanged = (lead: Lead, notes: string) => {
+    const next = leads.map((x) => (x === lead ? { ...x, notes } : x));
+    setLeads(next); onLeads(next);
+  };
+
   const addLead = async () => {
     if (!form.property_address.trim()) return;
     // Slice 61 — the same form now edits: with an editing target it
@@ -211,7 +220,7 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
               <ConsentPassport userId={userId} lead={l} />
             )}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
-              <RollCheck userId={userId} lead={l} />
+              <RollCheck userId={userId} lead={l} onStamped={(notes) => onLeadNotesChanged(l, notes)} />
             )}
             {' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
