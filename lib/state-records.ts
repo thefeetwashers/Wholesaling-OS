@@ -29,7 +29,7 @@ export interface StateRecord {
   rollYear: number | null;
 }
 
-export type StateSearchMode = 'owner' | 'address' | 'parcel' | 'city' | 'zip';
+export type StateSearchMode = 'owner' | 'parcel';
 
 export const STATE_RECORD_SOURCE =
   'Florida Department of Revenue — statewide cadastral roll (county property appraiser data, Ch. 119 public records)';
@@ -68,17 +68,18 @@ export function buildStateWhere(mode: StateSearchMode, raw: string): string | nu
   }
   if (q.length < 3) return null;
   if (mode === 'owner') return `OWN_NAME LIKE '%${q}%'`;
-  // The roll is indexed from the FIRST character of the address
-  // and city fields: prefix searches answer in seconds, while
-  // contains/equality scans of the same fields grind past any
-  // reasonable wait (proven live Nov 9–10, 2026). Address and city
-  // are therefore prefix searches — the address form starts with
-  // the house number, exactly as the roll stores it.
-  if (mode === 'address') return `PHY_ADDR1 LIKE '${q}%'`;
-  if (mode === 'city') return `PHY_CITY LIKE '${q}%'`;
-  const digits = q.replace(/[^0-9]/g, '');
-  if (digits.length !== 5) return null;
-  return `PHY_ZIPCD=${digits}`;
+  return null;
+  // DELIBERATELY no address/city/ZIP modes (Nov 10, 2026): three
+  // query shapes were tried live against this layer — contains,
+  // equality, and prefix — and every search on the physical
+  // address/city/ZIP fields ground past 60 seconds without
+  // answering, while owner-name and parcel-ID searches return in
+  // seconds. On the statewide roll only OWN_NAME and PARCEL_ID
+  // are indexed; the roll is a WHO-owns-it and WHAT-is-this-parcel
+  // book, not a browse-by-address book. Address lookups belong to
+  // the county property appraisers — the platform's county doors
+  // in the same view exist for exactly that, and the panel copy
+  // says so. Modes that time out do not ship.
 }
 
 // NOTE (Nov 10, 2026): there is deliberately no server-side

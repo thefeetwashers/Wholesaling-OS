@@ -51,7 +51,7 @@ interface CacheEntry { at: number; records: StateRecord[] }
 const cache = new Map<string, CacheEntry>();
 const CACHE_MS = 10 * 60 * 1000;
 
-const MODES: StateSearchMode[] = ['owner', 'address', 'parcel', 'city', 'zip'];
+const MODES: StateSearchMode[] = ['owner', 'parcel'];
 
 export async function GET(req: Request) {
   const userId = await verifyUserId(req);
@@ -61,16 +61,6 @@ export async function GET(req: Request) {
   const modeParam = (searchParams.get('mode') || 'owner') as StateSearchMode;
   const mode: StateSearchMode = MODES.indexOf(modeParam) >= 0 ? modeParam : 'owner';
   const q = searchParams.get('q') || '';
-  // Address search is a prefix search on the roll's index, so it
-  // has to start the way the roll stores addresses: house number
-  // first. Say so BEFORE burning a doomed query.
-  if (mode === 'address' && !/^\d/.test(q.trim())) {
-    return Response.json({
-      records: [],
-      error:
-        'Address search on the state roll starts with the house number — e.g. “400 85 DEBARRY AVE”. The roll is indexed from the first character, so a street name alone cannot be scanned. Don’t know the number? Search by owner name or ZIP instead.',
-    });
-  }
   const where = buildStateWhere(mode, q);
   if (!where) {
     return Response.json({
@@ -78,9 +68,7 @@ export async function GET(req: Request) {
       error:
         mode === 'parcel'
           ? 'Type at least 4 characters of the parcel ID.'
-          : mode === 'zip'
-            ? 'Type the full 5-digit ZIP code.'
-            : 'Type at least 3 characters to search the state roll.',
+          : 'Type at least 3 characters to search the state roll.',
     });
   }
 
