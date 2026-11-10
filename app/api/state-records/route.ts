@@ -47,7 +47,11 @@ export const dynamic = 'force-dynamic';
 // ITSPE tax extract (OCFO, via DC GIS), licensed CC BY 4.0 per the
 // federal catalog entry — and the first source here that states a
 // distress fact outright (the tax balance due rides on the record
-// as recordNote). A state joins the registry only when
+// as recordNote). Slice 111 adds Colorado: the Public Parcels
+// composite (OIT GIS Team), whose item terms allow commercial use
+// with attribution and forbid resale of the dataset — a live
+// lookup gives the attribution and never offers the data. A state
+// joins the registry only when
 // its terms pass the gate; the search discipline is identical for
 // every state: one live query, at most 25 rows, 10-minute cache,
 // nothing stored until the wholesaler adds a lead.
@@ -81,7 +85,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const stateParam = (searchParams.get('state') || 'FL').toUpperCase();
   const state: StateCode =
-    stateParam === 'CT' || stateParam === 'MA' || stateParam === 'WI' || stateParam === 'DC'
+    stateParam === 'CT' || stateParam === 'MA' || stateParam === 'WI' || stateParam === 'DC' ||
+    stateParam === 'CO'
       ? stateParam
       : 'FL';
   const engine = STATE_ENGINES[state];

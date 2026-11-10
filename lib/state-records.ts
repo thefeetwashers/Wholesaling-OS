@@ -111,6 +111,22 @@ function joinLines(a: string, b: string): string {
   return [a, b].filter(Boolean).join(' ');
 }
 
+// Money that arrives as TEXT (Slice 111: Colorado counties submit
+// values as strings in their own formats — "250000", "$250,000",
+// "250000.00"). Keep only the numeric characters and parse; text
+// with no number in it is not a value and stays null — the panel
+// shows "—" rather than a guess.
+function moneyFromString(v: unknown): number | null {
+  const asNumber = n(v);
+  if (asNumber !== null) return asNumber;
+  const raw = s(v);
+  if (!raw) return null;
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (!cleaned) return null;
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? null : parsed;
+}
+
 // ---------------------------------------------------------------------------
 // Slice 106 — the panel goes multi-state. Each state is an "engine":
 // its own official service, its own field names, its own where-clause
@@ -120,7 +136,7 @@ function joinLines(a: string, b: string): string {
 // us-source-map-2026-11-10.md). Florida above is the first engine;
 // Connecticut below is the second.
 
-export type StateCode = 'FL' | 'CT' | 'MA' | 'WI' | 'DC';
+export type StateCode = 'FL' | 'CT' | 'MA' | 'WI' | 'DC' | 'CO';
 
 export interface StateSourceInfo {
   code: StateCode;
@@ -150,6 +166,9 @@ export const WI_RECORD_SOURCE =
 
 export const DC_RECORD_SOURCE =
   'District of Columbia Office of the Chief Financial Officer — Integrated Tax System Public Extract (ITSPE), via DC GIS; published under CC BY 4.0 — attribution to the District';
+
+export const CO_RECORD_SOURCE =
+  'State of Colorado, Governor’s Office of Information Technology (OIT) GIS Team — Colorado Public Parcels; county assessor data published for commercial use with attribution to the State of Colorado';
 
 export const STATE_SOURCES: StateSourceInfo[] = [
   {
@@ -217,6 +236,19 @@ export const STATE_SOURCES: StateSourceInfo[] = [
     yearNoun: 'extract',
     emptyHint:
       'Check the spelling — owners are recorded as the tax office holds them, and a company may appear under its entity name rather than a person’s. Some District lots are federal or tax-exempt and carry no billing address.',
+  },
+  {
+    code: 'CO',
+    heading: 'Colorado state records — live ownership lookup (participating counties)',
+    sourceLine: CO_RECORD_SOURCE,
+    listSource: 'Colorado state records',
+    blurb:
+      'The Colorado Public Parcels composite is the state GIS team’s aggregation of county assessor parcels — owner and mailing address, situs address, appraised and taxable values, last sale — collected from the counties annually. The State’s own terms allow commercial use, including in subscription applications, with attribution (given at the top of this panel) — and forbid resale of the dataset itself, which this panel never does: live lookup only, nothing repackaged or offered as data. Coverage is partial by design: counties contribute on their own cycles and some do not contribute at all, so an empty result can mean the county is not in the composite rather than no such owner. Counties also submit values as text in their own formats — a value the panel cannot read as a number shows as “—”, never as a guess. Verify with the county assessor before you spend money. A public record is not consent: leads land with consent “unknown”.',
+    valueLabel: 'Appraised total',
+    verifyLine: 'Verify with the county assessor before acting — counties submit this data to the state on their own cycles.',
+    yearNoun: 'collection',
+    emptyHint:
+      'Check the spelling — and check whether the county participates at all: not every Colorado county contributes parcels to the state composite, and owners are recorded as each county assessor holds them.',
   },
 ];
 
@@ -587,6 +619,84 @@ export function mapDcFeature(attrs: Record<string, unknown>): StateRecord | null
   };
 }
 
+// ---------------------------------------------------------------------------
+// Slice 111 — Colorado (Colorado Public Parcels composite). Schema
+// read from the layer page itself (Nov 10, 2026). The composite's
+// defining trait: nearly every value arrives as a STRING in
+// whatever format the contributing county uses — sale price, both
+// values, and the sale date included. Money is parsed by
+// moneyFromString (unreadable text stays null, never a guess), and
+// the sale month is read only from a date shape that states it
+// plainly (ISO or US slash format); the year is all that is ever
+// inferred, from the one four-digit year in the string. The roll
+// year is the year of dateReceived — when the state collected that
+// county's file. Parcel IDs are county numbers, not statewide
+// keys, so exact search runs field by field across parcel_id and
+// account, the Wisconsin pattern.
+
+const CO_OUT_FIELDS = [
+  'parcel_id', 'account', 'situsAdd', 'sitAddCty', 'sitAddZip', 'owner', 'owner2',
+  'ownerAdd', 'ownAddCty', 'ownAddStt', 'ownAddZip', 'saleDate', 'salePrice',
+  'apprValTot', 'asedValTot', 'dateReceived',
+];
+
+export function buildCoWhere(mode: StateSearchMode, raw: string): string | null {
+  const q = sanitizeQuery(raw);
+  if (mode === 'parcel') {
+    if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+    const tokens = q.split(' ').filter(Boolean);
+    const like = `${tokens.join('%')}%`;
+    return `parcel_id LIKE '${like}' OR account LIKE '${like}'`;
+  }
+  if (q.length < 3) return null;
+  if (mode === 'owner') return `owner LIKE '%${q}%' OR owner2 LIKE '%${q}%'`;
+  return null;
+}
+
+export function buildCoExactWhere(mode: StateSearchMode, raw: string): string[] | null {
+  if (mode !== 'parcel') return null;
+  const q = sanitizeIdExact(raw);
+  if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+  return [`parcel_id = '${q}'`, `account = '${q}'`];
+}
+
+function yearOf(text: string): number | null {
+  const m = text.match(/(19|20)\d\d/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+export function mapCoFeature(attrs: Record<string, unknown>): StateRecord | null {
+  const address = s(attrs.situsAdd);
+  const parcelId = s(attrs.parcel_id).replace(/\s+/g, ' ') || s(attrs.account).replace(/\s+/g, ' ');
+  if (!address && !parcelId) return null;
+  const ownerName = [s(attrs.owner), s(attrs.owner2)].filter(Boolean).join(' & ');
+  const saleText = s(attrs.saleDate);
+  let saleMonth = '';
+  const iso = saleText.match(/^(19|20)\d\d-(0[1-9]|1[0-2])/);
+  const us = saleText.match(/^(0?[1-9]|1[0-2])\//);
+  if (iso) saleMonth = iso[2];
+  else if (us) saleMonth = us[1].length === 1 ? `0${us[1]}` : us[1];
+  return {
+    parcelId,
+    ownerName,
+    mailingAddress: s(attrs.ownerAdd),
+    mailingCity: s(attrs.ownAddCty),
+    mailingState: s(attrs.ownAddStt),
+    mailingZip: s(attrs.ownAddZip),
+    address,
+    city: s(attrs.sitAddCty),
+    zip: s(attrs.sitAddZip),
+    justValue: moneyFromString(attrs.apprValTot),
+    assessedValue: moneyFromString(attrs.asedValTot),
+    yearBuilt: null,
+    livingArea: null,
+    salePrice: moneyFromString(attrs.salePrice),
+    saleYear: yearOf(saleText),
+    saleMonth,
+    rollYear: yearOf(s(attrs.dateReceived)),
+  };
+}
+
 export interface StateEngine {
   serviceUrl: string;
   outFields: string;
@@ -641,6 +751,14 @@ export const STATE_ENGINES: Record<StateCode, StateEngine> = {
     buildWhere: buildDcWhere,
     buildExactWhere: buildDcExactWhere,
     mapFeature: mapDcFeature,
+  },
+  CO: {
+    serviceUrl:
+      'https://gis.colorado.gov/public/rest/services/Address_and_Parcel/Colorado_Public_Parcels/FeatureServer/0/query',
+    outFields: CO_OUT_FIELDS.join(','),
+    buildWhere: buildCoWhere,
+    buildExactWhere: buildCoExactWhere,
+    mapFeature: mapCoFeature,
   },
 };
 

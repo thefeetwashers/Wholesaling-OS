@@ -133,6 +133,7 @@ export default function StateRecords({ userId }: { userId: string | null }) {
           <option value="MA">Massachusetts</option>
           <option value="WI">Wisconsin</option>
           <option value="DC">District of Columbia</option>
+          <option value="CO">Colorado</option>
         </select>
         <select value={mode} onChange={(e) => setMode(e.target.value as StateSearchMode)}>
           <option value="owner">Owner name</option>
