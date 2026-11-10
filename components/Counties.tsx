@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { loadCountyLinks, loadStateDirectories, loadUserCounties, saveUserCounty, deleteUserCounty, US_STATES, type CountyLinkRow, type StateDirectoryRow } from '../lib/directories';
 import StateRecords from './StateRecords';
+import RecordsRequestDesk from './RecordsRequestDesk';
 
 // County records (Slice 22). Two platform-verified layers, both read
 // from Supabase — nothing here is guessed:
@@ -224,6 +225,8 @@ export default function Counties({ userId }: { userId: string | null }) {
           )}
         </>
       )}
+
+      <RecordsRequestDesk userId={userId} />
     </section>
   );
 }
