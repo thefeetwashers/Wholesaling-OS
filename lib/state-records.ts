@@ -274,6 +274,36 @@ const MA_OUT_FIELDS = [
   'TOTAL_VAL', 'YEAR_BUILT', 'RES_AREA', 'LS_PRICE', 'LS_DATE', 'FY',
 ];
 
+// Exact-ID sanitizing for the Slice 108 fix: unlike sanitizeQuery
+// this KEEPS underscores and hyphens, because a Massachusetts
+// map/parcel ID's separators are part of the ID ("7_65_0"). Only
+// the quote (SQL escaping) and % (the one LIKE wildcard that could
+// widen a match) are neutralized; the value is used with =, never
+// LIKE, so _ stays a literal character.
+function sanitizeIdExact(raw: string): string {
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/'/g, "''")
+    .replace(/%/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
+// Slice 108 fix — exact parcel lookup. MassGIS map/parcel IDs are
+// unique only WITHIN a town; the same "7_65_0" shape recurs across
+// towns with different separators, so the token search alone
+// returned 25 lookalikes with the true parcel among them (first
+// live pass, Nov 10, 2026). Parcel mode therefore tries equality
+// on the exact ID first; the route falls back to buildMaWhere's
+// token search only when no record carries that exact ID.
+export function buildMaExactWhere(mode: StateSearchMode, raw: string): string | null {
+  if (mode !== 'parcel') return null;
+  const q = sanitizeIdExact(raw);
+  if (q.replace(/[^A-Z0-9]/g, '').length < 4) return null;
+  return `MAP_PAR_ID = '${q}' OR PROP_ID = '${q}'`;
+}
+
 export function buildMaWhere(mode: StateSearchMode, raw: string): string | null {
   const q = sanitizeQuery(raw);
   if (mode === 'parcel') {
@@ -351,6 +381,11 @@ export interface StateEngine {
   serviceUrl: string;
   outFields: string;
   buildWhere: (mode: StateSearchMode, raw: string) => string | null;
+  // Optional exact-match where for parcel mode (Slice 108 fix).
+  // When it returns records, they are the answer; the buildWhere
+  // search runs only as the fallback. Engines whose parcel IDs are
+  // statewide-unique (FL, CT) do not need it.
+  buildExactWhere?: (mode: StateSearchMode, raw: string) => string | null;
   mapFeature: (attrs: Record<string, unknown>) => StateRecord | null;
 }
 
@@ -374,6 +409,7 @@ export const STATE_ENGINES: Record<StateCode, StateEngine> = {
       'https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/Massachusetts_Property_Tax_Parcels/FeatureServer/0/query',
     outFields: MA_OUT_FIELDS.join(','),
     buildWhere: buildMaWhere,
+    buildExactWhere: buildMaExactWhere,
     mapFeature: mapMaFeature,
   },
 };

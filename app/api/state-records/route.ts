@@ -94,65 +94,96 @@ export async function GET(req: Request) {
     return Response.json({ records: hit.records, cached: true });
   }
 
+  // One live query against the state's service, mapped and sorted.
   // No orderByFields — ever. Live probes (Nov 10, 2026) proved the
   // FDOR service rejects full-field queries that also ask it to
   // sort (generic 400 "Invalid query parameters"), while the same
   // queries without the sort succeed. The records are sorted below,
   // after mapping, in this route.
-  const qs = new URLSearchParams({
-    where,
-    outFields: engine.outFields,
-    resultRecordCount: '25',
-    returnGeometry: 'false',
-    f: 'json',
-  });
+  async function runQuery(whereClause: string): Promise<{ records: StateRecord[] } | { failure: Response }> {
+    const qs = new URLSearchParams({
+      where: whereClause,
+      outFields: engine.outFields,
+      resultRecordCount: '25',
+      returnGeometry: 'false',
+      f: 'json',
+    });
 
-  let res: Response;
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 30000);
-  try {
-    res = await fetch(`${engine.serviceUrl}?${qs.toString()}`, { signal: ctl.signal });
-  } catch {
-    clearTimeout(timer);
-    return Response.json({
-      records: [],
-      error: 'The state records service took too long to answer or could not be reached. Try a narrower search — a house number plus street name usually answers fastest.',
-    });
-  }
-  clearTimeout(timer);
-  if (!res.ok) {
-    return Response.json({ records: [], error: `The state records service refused the request (HTTP ${res.status}). Try again shortly.` });
-  }
-  const body = (await res.json().catch(() => null)) as {
-    features?: { attributes?: Record<string, unknown> }[];
-    error?: { message?: string };
-  } | null;
-  if (!body || body.error) {
-    // Quote the service's own words — a swallowed error message
-    // cost a full diagnosis round on Nov 9–10, 2026.
-    const svcMsg = body && body.error && body.error.message ? body.error.message : '';
-    return Response.json({
-      records: [],
-      error: svcMsg
-        ? `That search did not run — the state service answered: “${svcMsg}”`
-        : 'That search did not run — check the spelling and try again.',
-    });
-  }
-  const records: StateRecord[] = [];
-  const features = Array.isArray(body.features) ? body.features : [];
-  for (const f of features) {
-    if (f && typeof f === 'object' && f.attributes) {
-      const rec = engine.mapFeature(f.attributes);
-      if (rec) records.push(rec);
+    let res: Response;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000);
+    try {
+      res = await fetch(`${engine.serviceUrl}?${qs.toString()}`, { signal: ctl.signal });
+    } catch {
+      clearTimeout(timer);
+      return {
+        failure: Response.json({
+          records: [],
+          error: 'The state records service took too long to answer or could not be reached. Try a narrower search — a house number plus street name usually answers fastest.',
+        }),
+      };
     }
-    if (records.length >= 25) break;
+    clearTimeout(timer);
+    if (!res.ok) {
+      return {
+        failure: Response.json({
+          records: [],
+          error: `The state records service refused the request (HTTP ${res.status}). Try again shortly.`,
+        }),
+      };
+    }
+    const body = (await res.json().catch(() => null)) as {
+      features?: { attributes?: Record<string, unknown> }[];
+      error?: { message?: string };
+    } | null;
+    if (!body || body.error) {
+      // Quote the service's own words — a swallowed error message
+      // cost a full diagnosis round on Nov 9–10, 2026.
+      const svcMsg = body && body.error && body.error.message ? body.error.message : '';
+      return {
+        failure: Response.json({
+          records: [],
+          error: svcMsg
+            ? `That search did not run — the state service answered: “${svcMsg}”`
+            : 'That search did not run — check the spelling and try again.',
+        }),
+      };
+    }
+    const out: StateRecord[] = [];
+    const features = Array.isArray(body.features) ? body.features : [];
+    for (const f of features) {
+      if (f && typeof f === 'object' && f.attributes) {
+        const rec = engine.mapFeature(f.attributes);
+        if (rec) out.push(rec);
+      }
+      if (out.length >= 25) break;
+    }
+    out.sort((a, b) => {
+      const ka = mode === 'owner' ? a.ownerName || a.address : a.address;
+      const kb = mode === 'owner' ? b.ownerName || b.address : b.address;
+      const c = ka.localeCompare(kb);
+      return c !== 0 ? c : a.address.localeCompare(b.address);
+    });
+    return { records: out };
   }
-  records.sort((a, b) => {
-    const ka = mode === 'owner' ? a.ownerName || a.address : a.address;
-    const kb = mode === 'owner' ? b.ownerName || b.address : b.address;
-    const c = ka.localeCompare(kb);
-    return c !== 0 ? c : a.address.localeCompare(b.address);
-  });
+
+  // Slice 108 fix: an engine may offer an exact-ID where for parcel
+  // mode (Massachusetts map/parcel IDs repeat from town to town, so
+  // the token search alone returns lookalikes with the true parcel
+  // buried among them). Exact first; the buildWhere token search
+  // runs only when no record carries that exact ID.
+  let records: StateRecord[] | null = null;
+  const exactWhere = engine.buildExactWhere ? engine.buildExactWhere(mode, q) : null;
+  if (exactWhere) {
+    const exact = await runQuery(exactWhere);
+    if ('failure' in exact) return exact.failure;
+    if (exact.records.length > 0) records = exact.records;
+  }
+  if (records === null) {
+    const loose = await runQuery(where);
+    if ('failure' in loose) return loose.failure;
+    records = loose.records;
+  }
   cache.set(key, { at: Date.now(), records });
   return Response.json({ records, cached: false });
 }
