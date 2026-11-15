@@ -6,6 +6,8 @@ import { loadCountyLinks, loadStateDirectories, loadUserCounties, saveUserCounty
 import StateRecords from './StateRecords';
 import RecordsRequestDesk from './RecordsRequestDesk';
 import PublicNotices from './PublicNotices';
+import PropertyLookup from './PropertyLookup';
+import CsvLeadImporter from './CsvLeadImporter';
 
 // County records (Slice 22). Two platform-verified layers, both read
 // from Supabase — nothing here is guessed:
@@ -166,6 +168,12 @@ export default function Counties({ userId }: { userId: string | null }) {
         </ul>
       )}
       <p style={{ fontSize: 13 }}>Extraction guide: use the county links above, then import the list yourself. Import gives owner name + mailing address only — never phones or emails.</p>
+
+      {/* Slice 123 — the lookup bar and the distress-list importer
+          live on this desk, next to the doors the lists come from:
+          look a parcel up on the roll, or drop a county list in. */}
+      <PropertyLookup userId={userId} />
+      <CsvLeadImporter userId={userId} />
 
       <StateRecords userId={userId} />
 

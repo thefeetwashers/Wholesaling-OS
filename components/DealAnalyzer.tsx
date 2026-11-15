@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { calculateMAO, totalMarketplaceCost, isOverMAO } from '../lib/mao';
 import { suggestAssignmentFee, type PropertyKind } from '../lib/fee-guide';
 import { ESTIMATE_TOTAL_KEY } from '../lib/estimator';
+import { PROPERTY_LOOKUP_MAO_KEY, PROPERTY_LOOKUP_MAO_EVENT, type LookupMaoLoad } from '../lib/property-lookup';
+import PropertyLookup from './PropertyLookup';
 
-export default function DealAnalyzer() {
+export default function DealAnalyzer({ userId }: { userId?: string | null }) {
   const [arv, setArv] = useState(300000);
   const [contractPrice, setContractPrice] = useState(150000);
   const [repairs, setRepairs] = useState(50000);
@@ -31,6 +33,34 @@ export default function DealAnalyzer() {
   const [fee, setFee] = useState(10000);
   const [customFee, setCustomFee] = useState('');
   const [kind, setKind] = useState<PropertyKind>('house');
+  const [fromLookup, setFromLookup] = useState(false);
+
+  // Slice 123 — a property lookup can load this calculator: ARV
+  // from the roll's just value, House/Land from the DOR use code.
+  // Same handoff shape as the Repair Estimator above: a live event
+  // when the analyzer is on screen, and the saved load on mount so
+  // the figure survives navigation. Only ARV and the type are set —
+  // contract price and repairs stay the wholesaler's own numbers.
+  useEffect(() => {
+    const apply = (load: LookupMaoLoad) => {
+      if (typeof load.arv === 'number' && load.arv > 0) setArv(load.arv);
+      if (load.kind === 'house' || load.kind === 'land') setKind(load.kind);
+      setFromLookup(true);
+    };
+    try {
+      const saved = localStorage.getItem(PROPERTY_LOOKUP_MAO_KEY);
+      if (saved) {
+        const load = JSON.parse(saved) as LookupMaoLoad;
+        if (load && typeof load.arv === 'number') apply(load);
+      }
+    } catch { /* no saved lookup — the defaults stand */ }
+    const onLookup = (e: Event) => {
+      const load = (e as CustomEvent).detail as LookupMaoLoad;
+      if (load) apply(load);
+    };
+    window.addEventListener(PROPERTY_LOOKUP_MAO_EVENT, onLookup);
+    return () => window.removeEventListener(PROPERTY_LOOKUP_MAO_EVENT, onLookup);
+  }, []);
   const guide = suggestAssignmentFee(kind, arv, repairs, contractPrice);
 
   const mao = calculateMAO(arv, repairs, fee);
@@ -45,6 +75,11 @@ export default function DealAnalyzer() {
         price only; buyer B-C view shows the full breakdown. Contracts
         require attorney review before use.
       </p>
+      {fromLookup && (
+        <p style={{ fontSize: 12.5, color: '#6ee7b7', margin: 0 }}>ARV and property type loaded from a property lookup — the ARV is the county roll&apos;s just value, not a market valuation. Edit freely.</p>
+      )}
+      {/* Slice 123 — look a property up without leaving the analyzer. */}
+      <PropertyLookup userId={userId ?? null} />
       <div style={{ display: 'grid', gap: 12, maxWidth: 420 }}>
         <label>ARV $ <input type="number" value={arv} onChange={(e) => setArv(Number(e.target.value))} /></label>
         <label>Contract price $ <input type="number" value={contractPrice} onChange={(e) => setContractPrice(Number(e.target.value))} /></label>

@@ -39,6 +39,13 @@ export interface Lead {
   status: LeadStatus;
   notes?: string;
   follow_up_date?: string;
+  // Slice 123: distress-list facts. distress_tag is the signal
+  // the list itself carries (one of the six tags below); the
+  // migration 20261115120000 adds both columns — until it is
+  // applied, the importer stamps the tag into the lead's notes
+  // instead and says so in its result.
+  distress_tag?: string | null;
+  is_absentee_owner?: boolean;
   // Slice 24 (schema v4.1): consent + do-not-contact state.
   do_not_contact?: boolean;
   consent_status?: ConsentStatus;
@@ -106,20 +113,25 @@ export async function updateLead(userId: string, lead: Lead): Promise<Lead | nul
   return data as Lead;
 }
 
-// Slice 30 — batch import for the import inbox. Inserts in chunks of
-// 100. If a chunk fails, it falls back to one-by-one inserts so a single
-// bad row cannot sink the batch, and it reports the database's real
-// error message (PostgREST errors are plain objects, not Errors — the
-// first live test's failure was invisible until this surfaced them).
+// Slice 30 — batch import for the import inbox. Inserts in chunks.
+// Slice 123 — the chunk size is now a parameter: the distress-list
+// importer inserts in 250-row batches; the default 100 keeps the
+// inbox's proven behavior. If a chunk fails, it falls back to
+// one-by-one inserts so a single bad row cannot sink the batch, and
+// it reports the database's real error message (PostgREST errors
+// are plain objects, not Errors — the first live test's failure was
+// invisible until this surfaced them).
 export async function importLeads(
   userId: string,
   rows: Lead[],
+  chunkSize = 100,
 ): Promise<{ inserted: number; error?: string }> {
   if (!supabaseConfigured || !supabase) return { inserted: 0, error: 'not configured' };
   let inserted = 0;
   let firstError: string | undefined;
-  for (let i = 0; i < rows.length; i += 100) {
-    const chunk = rows.slice(i, i + 100).map((r) => ({ ...r, owner_id: userId }));
+  const size = chunkSize > 0 ? chunkSize : 100;
+  for (let i = 0; i < rows.length; i += size) {
+    const chunk = rows.slice(i, i + size).map((r) => ({ ...r, owner_id: userId }));
     const { error } = await supabase.from('leads').insert(chunk);
     if (!error) { inserted += chunk.length; continue; }
     if (!firstError) firstError = error.message || 'database insert failed';
