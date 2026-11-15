@@ -148,7 +148,7 @@ export default function Home() {
         </strong>
       </section>
 
-      {!userId && <Landing onPickRole={pickRole} />}
+      {!userId && <Landing onPickRole={pickRole} userId={userId} />}
       <div id="signin" style={{ marginTop: 16 }}>
         <AuthPanel key={authKey} onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
@@ -237,7 +237,7 @@ export default function Home() {
                 <DeadLeadWatch userId={userId} />
                 <RepairEstimator />
                 <DealAnalyzer />
-                <RentalAnalyzer />
+                <RentalAnalyzer userId={userId} />
               </>
             )}
             {view === 'board' && (
@@ -254,7 +254,7 @@ export default function Home() {
             )}
             {view === 'contracts' && (
               <>
-                <div id="contracts"><Contracts userId={userId} /></div>
+                <div id="contracts"><Contracts userId={userId} userEmail={userEmail} /></div>
                 <Paperwork userId={userId} />
                 <Viewings userId={userId} />
                 <div id="escrow"><Escrow userId={userId} /></div>

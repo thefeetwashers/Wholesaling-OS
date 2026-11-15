@@ -3,14 +3,15 @@ import { supabase, supabaseConfigured } from './supabase';
 // Slice 9 — Full Portals foundation (schema v3). Roles live on profiles.role.
 // Every query here is scoped by Supabase RLS; nothing is faked client-side.
 
-export type PortalRole = 'wholesaler' | 'buyer' | 'seller' | 'title' | 'referrer';
-export const PORTAL_ROLES: PortalRole[] = ['wholesaler', 'buyer', 'seller', 'title', 'referrer'];
+export type PortalRole = 'wholesaler' | 'buyer' | 'seller' | 'title' | 'referrer' | 'lender';
+export const PORTAL_ROLES: PortalRole[] = ['wholesaler', 'buyer', 'seller', 'title', 'referrer', 'lender'];
 export const ROLE_LABELS: Record<PortalRole, string> = {
   wholesaler: 'Wholesaler',
   buyer: 'Cash Buyer',
   seller: 'Seller',
   title: 'Title Company',
   referrer: 'Referrer',
+  lender: 'Capital & Lending Partner',
 };
 
 export interface MyProfile {

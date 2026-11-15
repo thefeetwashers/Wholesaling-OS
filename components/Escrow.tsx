@@ -9,6 +9,7 @@ import DealReviews from './DealReviews';
 import ClosingCertificate from './ClosingCertificate';
 import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
+import RequestFundingModal from './RequestFundingModal';
 
 // Title escrow tracker, ported from the old prototype.
 // Milestones and the EMD countdown are manual: you set the deadline, the app counts down from it.
@@ -60,7 +61,10 @@ export default function Escrow({ userId }: { userId: string | null }) {
   const [referral, setReferral] = useState(0);
   const [deadline, setDeadline] = useState('');
   const [step, setStep] = useState(0);
+  const [showFunding, setShowFunding] = useState(false);
   const net = price + fee - referral;
+  const selectedDeal = deals.find((d) => d.id === dealId);
+  const selectedDocs = (selectedDeal?.documents || {}) as { property_address?: string; state?: string };
 
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
@@ -74,6 +78,34 @@ export default function Escrow({ userId }: { userId: string | null }) {
       <p><strong>Payout net: ${net.toLocaleString()}</strong> (price + fee − referral)</p>
       <label>EMD deadline: <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></label>
       <p>EMD countdown: {deadline ? emdCountdownText(deadline) : 'No deadline set yet.'}</p>
+      <p style={{ fontSize: 13, color: '#fbbf24' }}>
+        ⚑ Have the double-close answer ready — some sellers, lenders and HOAs restrict assignments.
+        Knowing your double-close path — and what it costs — before you sign keeps one clause from killing a funded deal.{' '}
+        <button
+          type="button"
+          onClick={() => setShowFunding(true)}
+          disabled={!userId}
+          style={{ background: '#065f46', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 12px', fontSize: 13.5, fontWeight: 700, cursor: userId ? 'pointer' : 'not-allowed', marginLeft: 6 }}
+        >
+          Request Transactional Funding →
+        </button>
+        {!userId && <span style={{ color: '#94a3b8' }}> Sign in first — a funding request is tied to your account.</span>}
+        {!dealId && userId && <span style={{ color: '#94a3b8' }}> Pick a deal above first — the request prefills from it.</span>}
+      </p>
+      {showFunding && userId && dealId && (
+        <RequestFundingModal
+          userId={userId}
+          prefill={{
+            financingType: 'transactional',
+            dealId,
+            propertyAddress: selectedDocs.property_address,
+            propertyState: selectedDocs.state,
+            purchasePrice: price || undefined,
+          }}
+          onClose={() => setShowFunding(false)}
+          onSubmitted={() => setShowFunding(false)}
+        />
+      )}
       <ol>
         {MILESTONES.map((m, i) => (
           <li key={m} style={{ opacity: i <= step ? 1 : 0.5 }}>

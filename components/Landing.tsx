@@ -4,7 +4,7 @@ import PublicCalculator from './PublicCalculator';
 
 // Slice 60 — the public homepage below the hero: what the office
 // does, organized the way a wholesaler's business actually runs;
-// the real calculators; the four doors (roles); honest pricing;
+// the real calculators; the six doors (roles); honest pricing;
 // an FAQ that answers the questions wholesalers actually ask —
 // including the ones other platforms dodge; the lessons
 // experienced wholesalers say every beginner forgets; and a
@@ -41,7 +41,7 @@ export const FAQS: { q: string; a: string }[] = [
   { q: 'Does the platform find leads for me automatically?', a: 'It hands you the doors and the routines, not a scraped database: official county playbooks, a government-auction radar and live feed, and a seller page that brings motivated sellers to you. Lists you build or lawfully buy import in one drop. Anyone promising you free nationwide probate lists "while you sleep" is selling you a terms-of-service violation with your name on the account.' },
   { q: 'Will it call or text sellers for me?', a: 'No — and that is deliberate. Federal law treats AI and bulk outreach to people who never consented as illegal telemarketing, with fines per message. The platform is your call desk: your queue, your scripts, one tap to send from your own accounts, every send consent-checked and logged.' },
   { q: 'Which states and counties does it cover?', a: 'All 50 states and U.S. territories — you can run a wholesaling business anywhere in the U.S. from this office. Florida is the deepest today (all 67 counties with verified clerk/appraiser/code doors); every other state is reachable through its official state directory and the nationwide NETR county portal, and counties deepen as wholesalers work them.' },
-  { q: 'I am a cash buyer / seller / title company. What do I get?', a: 'Your own free portal. Buyers publish buy boxes and see matching deals; sellers see their deal and their price — never the wholesaler\'s fee; title companies track their files. Register under your role below and you land in your dashboard, not the wholesaler\'s.' },
+  { q: 'I am a cash buyer / seller / title company / lender. What do I get?', a: 'Your own free portal. Buyers publish buy boxes and see matching deals; sellers see their deal and their price — never the wholesaler\'s fee; title companies track their files; lenders publish their lending criteria and review only the commercial deal packets wholesalers chose to share with them. Register under your role below and you land in your dashboard, not the wholesaler\'s.' },
   { q: 'Can my team work in my account?', a: 'Today an account is one wholesaler\'s office. Team seats are the next big build on our public roadmap — until then, JV partners split deals with you through the JV tools and keep their own offices.' },
   { q: 'Is my data sold or shared?', a: 'Never. Your leads, buyers, and deals are yours, exportable by you at any time (CSV), and never sold, shared, or used to train anything.' },
 ];
@@ -52,6 +52,7 @@ const ROLES: { key: string; icon: string; title: string; body: string; cta: stri
   { key: 'seller', icon: '🏡', title: 'Seller', body: 'Free. Follow your deal, see your price, sign in your own portal when your wholesaler sends you a deal.', cta: 'Register as a seller — free' },
   { key: 'title', icon: '🏛️', title: 'Title Company', body: 'Free. Receive files, track milestones, and be findable by the wholesalers closing with you.', cta: 'Register as title — free' },
   { key: 'referrer', icon: '🤝', title: 'Referrer', body: 'Free. Know someone who needs to sell? Report the seller you found, follow its status, and earn $1,000 when the deal closes and funds.', cta: 'Register as a referrer — free' },
+  { key: 'lender', icon: '🏦', title: 'Capital & Lending Partner', body: 'Free. Publish your lending criteria, review opt-in commercial deal packets, and fund verified real estate investors and double closings.', cta: 'Register as a lender — free' },
 ];
 
 const ONLY_HERE: { tag: string; proof: string }[] = [
@@ -65,7 +66,7 @@ const ONLY_HERE: { tag: string; proof: string }[] = [
   { tag: '💸 One flat fee. No cut of your deals.', proof: '90 days free, then $150/month. Your assignment fees are 100% yours — the platform never takes a percentage of a closing.' },
 ];
 
-export default function Landing({ onPickRole }: { onPickRole: (role: string) => void }) {
+export default function Landing({ onPickRole, userId }: { onPickRole: (role: string) => void; userId?: string | null }) {
   return (
     <div>
       <script
@@ -139,9 +140,9 @@ export default function Landing({ onPickRole }: { onPickRole: (role: string) => 
 
       <h2 style={h2}>Run your first deal&rsquo;s numbers — right here, free</h2>
       <p style={sub}>These are the platform&rsquo;s own calculators, live on the homepage. Your numbers never leave this page.</p>
-      <PublicCalculator />
+      <PublicCalculator userId={userId} />
 
-      <h2 style={h2}>Five doors in — pick yours</h2>
+      <h2 style={h2}>Six doors in — pick yours</h2>
       <p style={sub}>You register under one role and you see that role&rsquo;s dashboard — wholesalers never land in a buyer&rsquo;s portal, sellers never see a wholesaler&rsquo;s office, and nobody sees anyone else&rsquo;s business.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
         {ROLES.map((r) => (
@@ -184,7 +185,7 @@ export default function Landing({ onPickRole }: { onPickRole: (role: string) => 
       <div style={panel}>
         <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0 }}>
           <strong>90 days free.</strong> Then <strong>$150/month</strong> for wholesalers — the only platform fee there is.
-          Buyers, sellers, and title companies are free. No per-deal cut, no percentage of your assignment fee,
+          Buyers, sellers, title companies, and lenders are free. No per-deal cut, no percentage of your assignment fee,
           no charge for the calculators, playbooks, or scripts. If a feature ever costs extra, it will say so
           here first — that is the deal.
         </p>
@@ -213,7 +214,7 @@ export function LandingFooter() {
           <div style={{ fontWeight: 800, fontSize: 15, color: '#fff' }}>WholesalingOS</div>
           <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.6, margin: '8px 0 0' }}>
             The wholesaling office that does what it says: real records, real math, real closings —
-            for wholesalers, buyers, sellers, and title companies in all 50 states and U.S. territories.
+            for wholesalers, buyers, sellers, title companies, and lenders in all 50 states and U.S. territories.
             Operated by The Feet Washers, Inc., Florida.
           </p>
         </div>
@@ -229,7 +230,7 @@ export function LandingFooter() {
           <strong style={{ color: '#fff' }}>The platform</strong>
           <a href="#signin" style={link}>Create your account</a>
           <a href="#signin" style={link}>Sign in</a>
-          <span style={{ color: '#94a3b8' }}>90 days free · then $150/mo · buyers, sellers &amp; title free</span>
+          <span style={{ color: '#94a3b8' }}>90 days free · then $150/mo · buyers, sellers, title &amp; lenders free</span>
           <span style={{ color: '#94a3b8' }}>Questions: thefeetwashers@gmail.com</span>
         </div>
         <div style={col}>
@@ -244,6 +245,17 @@ export function LandingFooter() {
           <span style={{ color: '#94a3b8' }}>WholesalingOS is software, not legal, tax, or investment advice. Contract templates carry an attorney-review flag — use your own attorney for your state.</span>
         </div>
       </div>
+      <section style={{ marginTop: 18, background: '#0f172a', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 10, padding: '14px 16px' }}>
+        <strong style={{ color: '#fff', fontSize: 13.5 }}>Commercial Lending &amp; Referral Disclosure</strong>
+        <p style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.6, margin: '6px 0 0' }}>
+          All financing through WholesalingOS is strictly for commercial, non-owner-occupied investment
+          real estate made to active business entities (LLCs/Corporations). The Feet Washers, Inc.
+          provides direct short-term transactional funding subject to state statutory rate caps, while
+          acting solely as a commercial referral partner/ISO for Fix-and-Flip, Bridge, and DSCR loans.
+          Zero upfront borrower fees are charged. Nothing here is a funding commitment or legal advice —
+          have your own attorney review any loan documents before you sign them.
+        </p>
+      </section>
       <p style={{ fontSize: 12, color: '#64748b', marginTop: 18 }}>
         © {new Date().getFullYear()} The Feet Washers, Inc. Wholesaling laws differ by state — know yours before you contract.
       </p>

@@ -38,7 +38,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
     // can switch role in Your Portal.
     try {
       const pending = localStorage.getItem('ws_pending_role');
-      if (pending && ['wholesaler', 'buyer', 'seller', 'title'].includes(pending)) {
+      if (pending && ['wholesaler', 'buyer', 'seller', 'title', 'referrer', 'lender'].includes(pending)) {
         await supabase.from('profiles').update({ role: pending }).eq('id', id);
         localStorage.removeItem('ws_pending_role');
       }
@@ -114,6 +114,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
           <option value="seller">Seller</option>
           <option value="title">Title Company</option>
           <option value="referrer">Referrer — earn $1,000 per closed referral</option>
+          <option value="lender">Capital &amp; Lending Partner</option>
         </select>
       </label>
       <button onClick={async () => {

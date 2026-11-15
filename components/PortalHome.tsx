@@ -46,6 +46,7 @@ import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTier
 import { boxLiveness } from '../lib/match';
 import ReferrerPortal from './ReferrerPortal';
 import BuyerProofCard from './BuyerProofCard';
+import LenderDashboard from './LenderDashboard';
 
 // Full Portals home (Slices 9-10). One signed-in home, routed by
 // profiles.role: wholesaler command dashboard + offers inbox + buyer
@@ -70,16 +71,18 @@ const ROLE_BAND: Record<string, { icon: string; line: string }> = {
   seller: { icon: '🏠', line: 'Link a deal your wholesaler sent you, review what is yours, and sign when you are ready. You see your price — never the wholesaler’s fee.' },
   title: { icon: '🏛️', line: 'Link your company listing, see the escrow files assigned to you, and keep their milestones and dates in front of everyone who depends on them.' },
   referrer: { icon: '📨', line: 'Send a seller to the company desk, track the referral’s status, and earn $1,000 when the deal closes and funds — recorded on the deal itself.' },
+  lender: { icon: '🏦', line: 'Publish your lending criteria, review only the commercial deal packets wholesalers chose to share with matched lenders, and move them through their statuses. Nothing here is a funding commitment.' },
 };
 
 export default function PortalHome({ userId }: { userId: string | null }) {
   const [role, setRole] = useState<PortalRole | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   useEffect(() => {
     if (!userId) return;
     loadMyProfile(userId)
-      .then((p) => setRole(p?.role ?? 'wholesaler'))
+      .then((p) => { setRole(p?.role ?? 'wholesaler'); setUserEmail(p?.email ?? null); })
       .catch(() => setRole('wholesaler'));
   }, [userId]);
 
@@ -130,6 +133,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
           {role === 'seller' && <SellerPortal userId={userId} />}
           {role === 'title' && <TitlePortal userId={userId} />}
           {role === 'referrer' && <ReferrerPortal userId={userId} />}
+          {role === 'lender' && <LenderDashboard userId={userId} userEmail={userEmail} />}
         </>
       )}
     </section>

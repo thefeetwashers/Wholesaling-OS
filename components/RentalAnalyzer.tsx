@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { analyzeRental, type RentalInputs } from '../lib/rental';
+import RequestFundingModal from './RequestFundingModal';
 
 // Slice 37 — rental & DSCR analyzer. A wholesaler's buyers are
 // landlords and funds who underwrite cash flow, not just MAO. Every
@@ -43,8 +44,10 @@ function ratio(v: number | null): string {
   return v === null ? '—' : v.toFixed(2);
 }
 
-export default function RentalAnalyzer() {
+export default function RentalAnalyzer({ userId }: { userId?: string | null }) {
   const [inp, setInp] = useState<RentalInputs>(START);
+  const [showFunding, setShowFunding] = useState(false);
+  const [fundingNote, setFundingNote] = useState('');
   const r = analyzeRental(inp);
   const ready = inp.purchasePrice > 0 && inp.monthlyRent > 0;
 
@@ -82,6 +85,27 @@ export default function RentalAnalyzer() {
         </div>
       ) : (
         <p style={{ fontSize: 13.5 }}>Enter at least a purchase price and a monthly rent to see the analysis.</p>
+      )}
+      <div style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (userId) { setFundingNote(''); setShowFunding(true); }
+            else setFundingNote('Sign in first — a funding request is tied to your account.');
+          }}
+          style={{ background: '#065f46', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 14px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Match with a DSCR / Bridge Lender →
+        </button>
+        {fundingNote && <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '8px 0 0' }}>{fundingNote}</p>}
+      </div>
+      {showFunding && userId && (
+        <RequestFundingModal
+          userId={userId}
+          prefill={{ financingType: 'dscr', purchasePrice: inp.purchasePrice || undefined, monthlyRent: inp.monthlyRent || undefined }}
+          onClose={() => setShowFunding(false)}
+          onSubmitted={() => setShowFunding(false)}
+        />
       )}
     </section>
   );

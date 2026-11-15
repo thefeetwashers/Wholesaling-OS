@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { calculateMAO, totalMarketplaceCost, jvSplit, dealNet } from '../lib/mao';
 import { suggestAssignmentFee, feeRoom } from '../lib/fee-guide';
 import { analyzeRental } from '../lib/rental';
+import RequestFundingModal from './RequestFundingModal';
 
 // Slice 60 — the public deal-math suite. The same pure libraries
 // the in-app analyzers run on (lib/mao, lib/fee-guide, lib/rental),
@@ -19,7 +20,9 @@ const field = { background: '#0f172a', border: '1px solid rgba(148,163,184,0.35)
 const label = { fontSize: 12.5, color: '#94a3b8', display: 'block', marginBottom: 4 } as const;
 const panel = { background: '#16213a', border: '1px solid rgba(148,163,184,0.28)', borderRadius: 14, padding: '16px 18px' } as const;
 
-export default function PublicCalculator() {
+export default function PublicCalculator({ userId }: { userId?: string | null }) {
+  const [showFunding, setShowFunding] = useState(false);
+  const [fundingNote, setFundingNote] = useState('');
   const [arv, setArv] = useState('300000');
   const [repairs, setRepairs] = useState('50000');
   const [contract, setContract] = useState('150000');
@@ -97,7 +100,28 @@ export default function PublicCalculator() {
           <div>Rent-to-price: <strong>{calc.rental.onePctRulePct.toFixed(2)}%</strong> <span style={{ color: '#94a3b8', fontSize: 13 }}>(1.00% or better is the classic landlord screen)</span></div>
           <div>NOI ≈ <strong>{money(calc.rental.noi)}</strong>/yr · DSCR ≈ <strong>{calc.rental.dscr != null ? calc.rental.dscr.toFixed(2) : '—'}</strong> <span style={{ color: '#94a3b8', fontSize: 13 }}>(at 20% down, 7%, 30 yrs, before taxes/insurance — lenders want 1.20+; the full analyzer inside runs it with every cost)</span></div>
         </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (userId) { setFundingNote(''); setShowFunding(true); }
+              else setFundingNote('Sign in or create an account first — a funding request is tied to your account, and only you (and the matched lender or operator) can see it.');
+            }}
+            style={{ background: '#065f46', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 14px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Match with a DSCR / Bridge Lender →
+          </button>
+          {fundingNote && <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '8px 0 0' }}>{fundingNote}</p>}
+        </div>
       </div>
+      {showFunding && userId && (
+        <RequestFundingModal
+          userId={userId}
+          prefill={{ financingType: 'dscr', purchasePrice: num(price), monthlyRent: num(rent) }}
+          onClose={() => setShowFunding(false)}
+          onSubmitted={() => setShowFunding(false)}
+        />
+      )}
     </div>
   );
 }
