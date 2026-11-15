@@ -5,6 +5,7 @@ import { calculateMAO, totalMarketplaceCost, jvSplit, dealNet } from '../lib/mao
 import { suggestAssignmentFee, feeRoom } from '../lib/fee-guide';
 import { analyzeRental } from '../lib/rental';
 import RequestFundingModal from './RequestFundingModal';
+import VendorBidModal from './VendorBidModal';
 
 // Slice 60 — the public deal-math suite. The same pure libraries
 // the in-app analyzers run on (lib/mao, lib/fee-guide, lib/rental),
@@ -20,9 +21,12 @@ const field = { background: '#0f172a', border: '1px solid rgba(148,163,184,0.35)
 const label = { fontSize: 12.5, color: '#94a3b8', display: 'block', marginBottom: 4 } as const;
 const panel = { background: '#16213a', border: '1px solid rgba(148,163,184,0.28)', borderRadius: 14, padding: '16px 18px' } as const;
 
-export default function PublicCalculator({ userId }: { userId?: string | null }) {
+export default function PublicCalculator({ userId, onOpenJvRoom }: { userId?: string | null; onOpenJvRoom?: () => void }) {
   const [showFunding, setShowFunding] = useState(false);
   const [fundingNote, setFundingNote] = useState('');
+  const [showBid, setShowBid] = useState(false);
+  const [bidNote, setBidNote] = useState('');
+  const [jvNote, setJvNote] = useState('');
   const [arv, setArv] = useState('300000');
   const [repairs, setRepairs] = useState('50000');
   const [contract, setContract] = useState('150000');
@@ -59,7 +63,21 @@ export default function PublicCalculator({ userId }: { userId?: string | null })
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div><span style={label}>After-repair value (ARV)</span><input style={field} value={arv} onChange={(e) => setArv(e.target.value)} inputMode="numeric" /></div>
-          <div><span style={label}>Repairs</span><input style={field} value={repairs} onChange={(e) => setRepairs(e.target.value)} inputMode="numeric" /></div>
+          <div>
+            <span style={label}>Repairs</span>
+            <input style={field} value={repairs} onChange={(e) => setRepairs(e.target.value)} inputMode="numeric" />
+            <button
+              type="button"
+              onClick={() => {
+                if (userId) { setBidNote(''); setShowBid(true); }
+                else setBidNote('Sign in or create an account first — a bid request is tied to your account.');
+              }}
+              style={{ background: 'none', border: 'none', color: '#7dd3fc', fontSize: 12.5, padding: '6px 0 0', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' }}
+            >
+              Need a real repair estimate? Request an Inspector / Contractor Bid →
+            </button>
+            {bidNote && <span style={{ display: 'block', fontSize: 12, color: '#fbbf24', marginTop: 4 }}>{bidNote}</span>}
+          </div>
           <div><span style={label}>Your contract price with the seller</span><input style={field} value={contract} onChange={(e) => setContract(e.target.value)} inputMode="numeric" /></div>
           <div>
             <span style={label}>Property type</span>
@@ -91,6 +109,19 @@ export default function PublicCalculator({ userId }: { userId?: string | null })
           <div>JV split of {money(calc.fee.suggested)}: you <strong>{money(calc.split.partnerA)}</strong> · partner <strong>{money(calc.split.partnerB)}</strong></div>
           <div>Net if you run it solo: <strong style={{ color: '#6ee7b7' }}>{money(calc.net)}</strong> <span style={{ color: '#94a3b8', fontSize: 13 }}>(fee − referral − expenses — before taxes; assignment income is ordinary income, set your share aside)</span></div>
         </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (userId && onOpenJvRoom) onOpenJvRoom();
+              else setJvNote('Sign in or create an account first — the JV Deal Room is inside your office.');
+            }}
+            style={{ background: '#065f46', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 14px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Post or Browse JV Deals →
+          </button>
+          {jvNote && <p style={{ fontSize: 12.5, color: '#fbbf24', margin: '8px 0 0' }}>{jvNote}</p>}
+        </div>
         <h3 style={{ margin: '18px 0 4px', fontSize: 16 }}>Selling to a landlord? The 1% rule + DSCR</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div><span style={label}>Price your buyer pays</span><input style={field} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" /></div>
@@ -120,6 +151,13 @@ export default function PublicCalculator({ userId }: { userId?: string | null })
           prefill={{ financingType: 'dscr', purchasePrice: num(price), monthlyRent: num(rent) }}
           onClose={() => setShowFunding(false)}
           onSubmitted={() => setShowFunding(false)}
+        />
+      )}
+      {showBid && userId && (
+        <VendorBidModal
+          userId={userId}
+          initialRepairs={num(repairs)}
+          onClose={() => setShowBid(false)}
         />
       )}
     </div>

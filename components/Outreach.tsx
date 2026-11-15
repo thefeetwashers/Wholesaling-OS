@@ -14,6 +14,7 @@ import {
   type OutreachChannel,
 } from '../lib/outreach';
 import type { Lead } from '../lib/leads';
+import MailCreditsWidget from './MailCreditsWidget';
 
 // Slice 12 — Scripts & outreach. The 8 templates are the user's own
 // prototype templates. Nothing here sends: email opens the user's mail
@@ -187,6 +188,7 @@ export default function Outreach({ userId }: { userId: string | null }) {
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         This queue is a manual send list — WholesalingOS never auto-sends messages or auto-dials.
       </p>
+      <MailCreditsWidget userId={userId} />
     </section>
   );
 }

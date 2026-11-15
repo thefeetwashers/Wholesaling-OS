@@ -44,9 +44,10 @@ import {
 import { supabase } from '../lib/supabase';
 import { buyerTier, completionRatePct, compareBuyerTierSummaries, type BuyerTierSummary } from '../lib/buyer-tiers';
 import { boxLiveness } from '../lib/match';
-import ReferrerPortal from './ReferrerPortal';
+import ScoutPortal, { ScoutClaimBoard, MyClaimedLeads } from './ScoutPortal';
 import BuyerProofCard from './BuyerProofCard';
 import LenderDashboard from './LenderDashboard';
+import { loadMySchoolBadge } from '../lib/school';
 
 // Full Portals home (Slices 9-10). One signed-in home, routed by
 // profiles.role: wholesaler command dashboard + offers inbox + buyer
@@ -132,7 +133,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
           {role === 'buyer' && <><BuyerProofCard userId={userId} /><BuyerPortal userId={userId} /></>}
           {role === 'seller' && <SellerPortal userId={userId} />}
           {role === 'title' && <TitlePortal userId={userId} />}
-          {role === 'referrer' && <ReferrerPortal userId={userId} />}
+          {role === 'referrer' && <ScoutPortal userId={userId} role={role} />}
           {role === 'lender' && <LenderDashboard userId={userId} userEmail={userEmail} />}
         </>
       )}
@@ -143,15 +144,27 @@ export default function PortalHome({ userId }: { userId: string | null }) {
 function WholesalerDashboard({ userId }: { userId: string }) {
   const [dash, setDash] = useState<DashboardData | null>(null);
   const [err, setErr] = useState('');
+  const [verifiedOperator, setVerifiedOperator] = useState(false);
   useEffect(() => {
     loadDashboard(userId).then(setDash).catch((e) => setErr(e instanceof Error ? e.message : 'Load failed'));
+    loadMySchoolBadge(userId).then(setVerifiedOperator).catch(() => {});
   }, [userId]);
   if (err) return <p style={{ fontSize: 13, color: '#f87171' }}>{err}</p>;
   if (!dash) return <p style={{ fontSize: 13 }}>Loading your dashboard…</p>;
   const stages = ['new', 'contacted', 'qualified', 'under_contract', 'assigned', 'closed'];
   return (
     <div>
-      <h3>Wholesaler Dashboard — your numbers, live</h3>
+      <h3>
+        Wholesaler Dashboard — your numbers, live{' '}
+        {verifiedOperator && (
+          <span
+            title="Completed the 7-day bootcamp and passed the Day 7 check"
+            style={{ display: 'inline-block', fontSize: 12, fontWeight: 700, color: '#0f766e', background: '#ccfbf1', border: '1px solid #99f6e4', borderRadius: 999, padding: '3px 10px', verticalAlign: 'middle' }}
+          >
+            ✓ Verified Operator
+          </span>
+        )}
+      </h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <div style={stat}><strong style={{ fontSize: 20 }}>{dash.leadsTotal}</strong><br />Leads (yours)</div>
         <div style={stat}><strong style={{ fontSize: 20 }}>{dash.followUpsDue}</strong><br />Follow-ups due</div>
@@ -169,6 +182,8 @@ function WholesalerDashboard({ userId }: { userId: string }) {
       <EarnedBuyerTiers userId={userId} />
       <MyListings userId={userId} />
       <BuyerDemand />
+      <ScoutClaimBoard userId={userId} />
+      <MyClaimedLeads userId={userId} />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
         Every number above is counted from your own leads, deals, listings, and offers in Supabase.
         The full KPI scorecard arrives in Slice 14.

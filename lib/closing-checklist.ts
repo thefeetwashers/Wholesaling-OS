@@ -88,6 +88,16 @@ export function closingChecklist(file: ChecklistFile, milestoneNames: string[], 
     detail: has('Closing scheduled') ? 'Milestone recorded' : file.target_closing_date ? `Target date ${file.target_closing_date}` : 'No date recorded yet',
   });
 
+  // Slice 122 — vacant / landlord insurance, required by the lender
+  // before the wire releases. Done only when the wholesaler records
+  // the "Insurance bound" milestone on the file; otherwise pending.
+  items.push({
+    key: 'insurance',
+    label: 'Bind Vacant / Landlord Insurance (Required by Lender)',
+    state: has('Insurance bound') ? 'done' : 'pending',
+    detail: has('Insurance bound') ? 'Insurance bound — milestone recorded' : 'Not bound yet — required by the lender',
+  });
+
   if (file.outcome === 'fell_through' || file.file_status === 'aborted_cancelled') {
     items.push({ key: 'closed', label: 'Closed / funded', state: 'attention', detail: 'File ended — fell through' });
   } else if (file.outcome === 'closed' || file.file_status === 'successfully_closed' || has('Closed / funded')) {

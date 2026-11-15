@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import PublicCalculator from './PublicCalculator';
+import VendorRegistrationModal from './VendorRegistrationModal';
 
 // Slice 60 — the public homepage below the hero: what the office
 // does, organized the way a wholesaler's business actually runs;
@@ -51,7 +53,7 @@ const ROLES: { key: string; icon: string; title: string; body: string; cta: stri
   { key: 'buyer', icon: '💵', title: 'Cash Buyer', body: 'Free forever. Publish your buy box, see deals that match it, build a closing record that speaks for itself.', cta: 'Register as a buyer — free' },
   { key: 'seller', icon: '🏡', title: 'Seller', body: 'Free. Follow your deal, see your price, sign in your own portal when your wholesaler sends you a deal.', cta: 'Register as a seller — free' },
   { key: 'title', icon: '🏛️', title: 'Title Company', body: 'Free. Receive files, track milestones, and be findable by the wholesalers closing with you.', cta: 'Register as title — free' },
-  { key: 'referrer', icon: '🤝', title: 'Referrer', body: 'Free. Know someone who needs to sell? Report the seller you found, follow its status, and earn $1,000 when the deal closes and funds.', cta: 'Register as a referrer — free' },
+  { key: 'referrer', icon: '🤝', title: 'Referrer', body: 'Free. Spot a vacant or distressed property? Snap a photo from your phone, track it live, and earn $1,000 at the title company closing table.', cta: 'Register as a referrer — free' },
   { key: 'lender', icon: '🏦', title: 'Capital & Lending Partner', body: 'Free. Publish your lending criteria, review opt-in commercial deal packets, and fund verified real estate investors and double closings.', cta: 'Register as a lender — free' },
 ];
 
@@ -66,7 +68,7 @@ const ONLY_HERE: { tag: string; proof: string }[] = [
   { tag: '💸 One flat fee. No cut of your deals.', proof: '90 days free, then $150/month. Your assignment fees are 100% yours — the platform never takes a percentage of a closing.' },
 ];
 
-export default function Landing({ onPickRole, userId }: { onPickRole: (role: string) => void; userId?: string | null }) {
+export default function Landing({ onPickRole, userId, onOpenJvRoom }: { onPickRole: (role: string) => void; userId?: string | null; onOpenJvRoom?: () => void }) {
   return (
     <div>
       <script
@@ -140,7 +142,7 @@ export default function Landing({ onPickRole, userId }: { onPickRole: (role: str
 
       <h2 style={h2}>Run your first deal&rsquo;s numbers — right here, free</h2>
       <p style={sub}>These are the platform&rsquo;s own calculators, live on the homepage. Your numbers never leave this page.</p>
-      <PublicCalculator userId={userId} />
+      <PublicCalculator userId={userId} onOpenJvRoom={onOpenJvRoom} />
 
       <h2 style={h2}>Six doors in — pick yours</h2>
       <p style={sub}>You register under one role and you see that role&rsquo;s dashboard — wholesalers never land in a buyer&rsquo;s portal, sellers never see a wholesaler&rsquo;s office, and nobody sees anyone else&rsquo;s business.</p>
@@ -204,11 +206,14 @@ export default function Landing({ onPickRole, userId }: { onPickRole: (role: str
   );
 }
 
-export function LandingFooter() {
+export function LandingFooter({ userId }: { userId?: string | null }) {
+  const [showVendor, setShowVendor] = useState(false);
+  const [vendorNote, setVendorNote] = useState('');
   const col = { display: 'flex', flexDirection: 'column' as const, gap: 7, fontSize: 13.5 };
   const link = { color: '#7dd3fc', textDecoration: 'none' } as const;
   return (
     <footer style={{ marginTop: 36, borderTop: '1px solid rgba(148,163,184,0.3)', paddingTop: 22 }}>
+      {showVendor && userId && <VendorRegistrationModal userId={userId} onClose={() => setShowVendor(false)} />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18 }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, color: '#fff' }}>WholesalingOS</div>
@@ -232,6 +237,18 @@ export function LandingFooter() {
           <a href="#signin" style={link}>Sign in</a>
           <span style={{ color: '#94a3b8' }}>90 days free · then $150/mo · buyers, sellers, title &amp; lenders free</span>
           <span style={{ color: '#94a3b8' }}>Questions: thefeetwashers@gmail.com</span>
+          <a
+            href="#signin"
+            style={link}
+            onClick={(e) => {
+              e.preventDefault();
+              if (userId) setShowVendor(true);
+              else setVendorNote('Sign in or create an account first — vendor registration is tied to your account.');
+            }}
+          >
+            Are you a Licensed Contractor, Inspector, or Appraiser? Join the Vendor Directory →
+          </a>
+          {vendorNote && <span style={{ color: '#fbbf24', fontSize: 12.5 }}>{vendorNote}</span>}
         </div>
         <div style={col}>
           <strong style={{ color: '#fff' }}>Legal</strong>
@@ -241,7 +258,7 @@ export function LandingFooter() {
           <a href="/ledger" style={link}>Verification Ledger</a>
           <a href="/charter" style={link}>The Charter</a>
           <a href="/audit" style={link}>The 10-Minute Audit</a>
-          <a href="/learn" style={link}>WholesalingOS School — free lessons</a>
+          <a href="/school" style={link}>WholesalingOS School — free lessons</a>
           <span style={{ color: '#94a3b8' }}>WholesalingOS is software, not legal, tax, or investment advice. Contract templates carry an attorney-review flag — use your own attorney for your state.</span>
         </div>
       </div>

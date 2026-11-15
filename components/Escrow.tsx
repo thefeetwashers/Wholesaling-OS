@@ -10,6 +10,16 @@ import ClosingCertificate from './ClosingCertificate';
 import { closingChecklist, nextMilestone } from '../lib/closing-checklist';
 import { emdCountdownText } from '../lib/contracts';
 import RequestFundingModal from './RequestFundingModal';
+import SellerAdvanceRequest from './SellerAdvanceRequest';
+import { loadAllAdvanceRequestsForOperator, setAdvanceStatus, type SellerAdvanceRequest as AdvanceRow, type SellerAdvanceStatus } from '../lib/seller-advance';
+import { loadMyProfile } from '../lib/portals';
+import { OPERATOR_EMAIL } from '../lib/funding';
+
+// Slice 122 — investor insurance quote. The partner URL comes only
+// from NEXT_PUBLIC_INSURANCE_PARTNER_URL; it is UNSET today, so the
+// button does not render a link — it says plainly that no partner
+// is configured. No insurer is named or hardcoded here.
+const INSURANCE_PARTNER_URL = process.env.NEXT_PUBLIC_INSURANCE_PARTNER_URL || '';
 
 // Title escrow tracker, ported from the old prototype.
 // Milestones and the EMD countdown are manual: you set the deadline, the app counts down from it.
@@ -26,12 +36,15 @@ export default function Escrow({ userId }: { userId: string | null }) {
   const [files, setFiles] = useState<EscrowFileRow[]>([]);
   const [milestones, setMilestones] = useState<Record<string, string[]>>({});
   const [savedMsg, setSavedMsg] = useState('');
+  const [myEmail, setMyEmail] = useState<string | null>(null);
   useEffect(() => {
     if (userId && supabaseConfigured) {
       loadDeals(userId).then((rows) => { if (rows) setDeals(rows); }).catch(() => {});
+      loadMyProfile(userId).then((p) => setMyEmail(p?.email || null)).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+  const isOperator = (myEmail || '').toLowerCase() === OPERATOR_EMAIL;
   useEffect(() => {
     if (userId && supabaseConfigured && dealId) {
       loadEscrowFilesForDeal(userId, dealId).then((rows) => {
@@ -145,6 +158,20 @@ export default function Escrow({ userId }: { userId: string | null }) {
                         <span key={it.key} style={{ marginRight: 10 }} title={it.detail}>{icon(it.state)} {it.label}{it.state === 'attention' ? ` — ${it.detail}` : ''}</span>
                       ))}
                     </span>
+                    <span style={{ display: 'block', marginTop: 6 }}>
+                      🛡️ Bind Vacant / Landlord Insurance (Required by Lender){' '}
+                      {INSURANCE_PARTNER_URL ? (
+                        <a href={INSURANCE_PARTNER_URL} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc' }}>Get Investor Insurance Quote →</a>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>No insurance partner configured yet — ask the operator for an introduction.</span>
+                      )}
+                      {' '}
+                      {names.includes('Insurance bound') ? (
+                        <span style={{ color: '#34d399' }}>✓ Insurance bound</span>
+                      ) : (
+                        <button onClick={async () => { await addEscrowMilestone(userId!, f.id!, 'Insurance bound'); setMilestones({ ...milestones, [f.id!]: [...names, 'Insurance bound'] }); setSavedMsg('Milestone recorded: Insurance bound'); }}>Record: Insurance bound</button>
+                      )}
+                    </span>
                     {next && <button onClick={async () => { await addEscrowMilestone(userId!, f.id!, next); setMilestones({ ...milestones, [f.id!]: [...names, next] }); setSavedMsg(`Milestone recorded: ${next}`); }}>Record next step: {next}</button>}{' '}
                     <label>EMD: <select value={f.emd_status || 'awaiting_wire'} onChange={async (e) => { const v = e.target.value; await updateEscrowFileStatus(f.id!, { emd_status: v }); setFiles(files.map((x) => (x.id === f.id ? { ...x, emd_status: v } : x))); }}>
                       <option value="awaiting_wire">Awaiting</option>
@@ -164,8 +191,70 @@ export default function Escrow({ userId }: { userId: string | null }) {
           ))}
         </ul>
       )}
+      {userId && <SellerAdvanceRequest userId={userId} dealId={dealId || null} />}
+      {isOperator && <OperatorAdvanceReview operatorEmail={myEmail} />}
       <p style={{ fontSize: 12, color: '#94a3b8' }}>Mark the outcome honestly when a file ends — it becomes part of the buyer’s earned record that other wholesalers see at offer time.</p>
       <AutopsyLessons />
     </section>
+  );
+}
+
+// Slice 122 — operator review list for seller moving advance
+// requests. The operator sees every request in the Escrow desk and
+// moves it through review. Approving here does not move money —
+// the advance itself is agreed outside this table and repaid out
+// of closing proceeds. No email is sent.
+function OperatorAdvanceReview({ operatorEmail }: { operatorEmail: string | null }) {
+  const [rows, setRows] = useState<AdvanceRow[]>([]);
+  const [msg, setMsg] = useState('');
+  const refresh = () => {
+    if (operatorEmail !== OPERATOR_EMAIL) return;
+    loadAllAdvanceRequestsForOperator(operatorEmail).then(setRows).catch(() => {});
+  };
+  useEffect(refresh, [operatorEmail]);
+  if (operatorEmail !== OPERATOR_EMAIL) return null;
+  const move = async (id: string, status: SellerAdvanceStatus) => {
+    try {
+      await setAdvanceStatus(id, status, operatorEmail);
+      setMsg(`Request moved to ${status}.`);
+      refresh();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Could not move the request.');
+    }
+  };
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', marginTop: 12, color: '#0f172a' }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Operator desk — seller advance requests</h3>
+      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+        Requests only — no advance is promised or guaranteed by a request, and approving one here moves no money. Any advance is agreed
+        separately and repaid out of closing proceeds.
+      </p>
+      {msg && <p style={{ fontSize: 13, color: '#0f766e' }}>{msg}</p>}
+      {rows.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#64748b' }}>No seller advance requests yet.</p>
+      ) : (
+        rows.map((r) => (
+          <div key={r.id} style={{ borderTop: '1px solid #f1f5f9', padding: '8px 0' }}>
+            <p style={{ fontSize: 13, margin: '0 0 6px' }}>
+              <strong>${Number(r.amount_requested).toLocaleString()}</strong> — {r.seller_name || 'seller not named'} — status:{' '}
+              <strong>{r.status}</strong> · {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
+              {r.reason ? <><br />Reason: {r.reason}</> : null}
+            </p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(['under_review', 'approved', 'declined', 'repaid'] as SellerAdvanceStatus[]).map((s) => (
+                <button
+                  key={s}
+                  disabled={r.status === s}
+                  onClick={() => move(r.id!, s)}
+                  style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: r.status === s ? 'default' : 'pointer', fontSize: 12, opacity: r.status === s ? 0.5 : 1 }}
+                >
+                  {s.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }

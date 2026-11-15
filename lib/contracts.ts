@@ -327,6 +327,249 @@ Lender: ______________________________  Date: __________
 ${ATTORNEY_REVIEW_BANNER}`;
 }
 
+// ---------------------------------------------------------------------------
+// Slice 122 — JV Co-Wholesaling Split Agreement + Scout Finder's Fee
+// Agreement. Templates only, not legal advice. Both carry the
+// attorney-review banner top and bottom. Neither document is ever
+// signed in-app: signing happens between the two parties, and
+// generating a document confirms nothing — no deal, no funding, no
+// payout. The JV agreement is generated only after a JV match (both
+// sides opted in); the property address is entered by the originator
+// at generation time and is never shown in the JV Room before a
+// match. The Scout agreement is generated only for a CLAIMED scout
+// lead, never an unclaimed one. All URLs say
+// https://wholesalingos.thefeetwashers.com — never the home-care
+// site.
+// ---------------------------------------------------------------------------
+
+export interface JVSplitAgreementFields {
+  effective_date: string;
+  party_a_entity: string;
+  party_a_state: string;
+  party_a_address: string;
+  party_a_email: string;
+  party_a_phone: string;
+  party_b_entity: string;
+  party_b_state: string;
+  party_b_address: string;
+  party_b_email: string;
+  party_b_phone: string;
+  contract_date: string;
+  property_address: string;
+  contract_price: number | null;
+  title_company: string;
+  title_officer_email: string;
+  closing_date: string;
+  party_a_split_percent: number | null;
+  party_b_split_percent: number | null;
+  approved_expenses: number | null;
+  property_state: string;
+  party_a_signer: string;
+  party_a_title: string;
+  party_b_signer: string;
+  party_b_title: string;
+}
+
+export const JV_SPLIT_MERGE_TAGS = [
+  '{{effective_date}}',
+  '{{party_a_entity}}',
+  '{{party_a_state}}',
+  '{{party_a_address}}',
+  '{{party_a_email}}',
+  '{{party_a_phone}}',
+  '{{party_b_entity}}',
+  '{{party_b_state}}',
+  '{{party_b_address}}',
+  '{{party_b_email}}',
+  '{{party_b_phone}}',
+  '{{contract_date}}',
+  '{{property_address}}',
+  '{{contract_price}}',
+  '{{title_company}}',
+  '{{title_officer_email}}',
+  '{{closing_date}}',
+  '{{party_a_split_percent}}',
+  '{{party_b_split_percent}}',
+  '{{approved_expenses}}',
+  '{{property_state}}',
+  '{{party_a_signer}}',
+  '{{party_a_title}}',
+  '{{party_b_signer}}',
+  '{{party_b_title}}',
+] as const;
+
+export function buildJVSplitAgreement(f: JVSplitAgreementFields): string {
+  const blank = (v: string | null | undefined) => (v && v.trim() ? v : '[not given]');
+  const splitA = f.party_a_split_percent != null ? `${f.party_a_split_percent}%` : '[percent not given]';
+  const splitB = f.party_b_split_percent != null ? `${f.party_b_split_percent}%` : '[percent not given]';
+  return `${ATTORNEY_REVIEW_BANNER}
+
+JOINT VENTURE (JV) CO-WHOLESALING SPLIT AGREEMENT
+
+This template is software-generated for operational convenience and carries an attorney-review flag. Wholesaling and joint venture laws differ by state. Have licensed real estate counsel in your state review and approve this agreement before signing or submitting to title.
+
+Effective date: ${f.effective_date || '[date not given]'}  (merge tag: {{effective_date}})
+
+PARTIES
+Party A (Originating Wholesaler — holds the Underlying Contract):
+  Entity: ${blank(f.party_a_entity)}  (merge tag: {{party_a_entity}})
+  State of organization: ${blank(f.party_a_state)}  (merge tag: {{party_a_state}})
+  Address: ${blank(f.party_a_address)}  (merge tag: {{party_a_address}})
+  Email: ${blank(f.party_a_email)}  (merge tag: {{party_a_email}})
+  Phone: ${blank(f.party_a_phone)}  (merge tag: {{party_a_phone}})
+
+Party B (JV Partner — disposition / dispo):
+  Entity: ${blank(f.party_b_entity)}  (merge tag: {{party_b_entity}})
+  State of organization: ${blank(f.party_b_state)}  (merge tag: {{party_b_state}})
+  Address: ${blank(f.party_b_address)}  (merge tag: {{party_b_address}})
+  Email: ${blank(f.party_b_email)}  (merge tag: {{party_b_email}})
+  Phone: ${blank(f.party_b_phone)}  (merge tag: {{party_b_phone}})
+
+SECTION 1 — SUBJECT PROPERTY & UNDERLYING PURCHASE CONTRACT
+1.1 Subject Property: ${blank(f.property_address)}  (merge tag: {{property_address}})
+1.2 Underlying Contract: the purchase contract dated ${f.contract_date || '[date not given]'}  (merge tag: {{contract_date}}), under which Party A holds equitable interest in the Subject Property, at a contract price of ${moneyOrBlank(f.contract_price)}  (merge tag: {{contract_price}}).
+1.3 Title company: ${blank(f.title_company)}  (merge tag: {{title_company}}); title officer email: ${blank(f.title_officer_email)}  (merge tag: {{title_officer_email}}).
+1.4 Target closing date: ${f.closing_date || '[date not given]'}  (merge tag: {{closing_date}}).
+1.5 The property address in this agreement is shared only between the two parties to it. It was not shown in the JV Deal Room before the match.
+
+SECTION 2 — DIVISION OF RESPONSIBILITIES
+2.1 Party A shall: (a) maintain the Underlying Contract in good standing and comply with its terms; (b) coordinate seller communications, property access, and any addenda; (c) provide Party B with the executed Underlying Contract and confirmation that a clear title order has been placed.
+2.2 Party B shall: (a) market the equitable contract rights ONLY — never advertising ownership of the physical property — to vetted cash buyers, in strict compliance with the wholesaling and advertising laws of the state where the Subject Property sits; (b) secure a qualified End-Buyer; (c) collect the End-Buyer's non-refundable earnest money deposit into escrow with ${blank(f.title_company)}; (d) deliver a signed Assignment of Contract or B-to-C Purchase Agreement for closing.
+2.3 Neither party shall advertise, list, or represent the Subject Property as property it owns.
+
+SECTION 3 — NET PROFIT SPLIT & CLOSING TABLE DISBURSEMENT
+3.1 Net JV Profit means the gross assignment fee or double-close spread actually received at closing, minus documented, mutually approved third-party transaction costs — such as transactional funding fees, double-close title and recording costs, or approved scout referral payouts — totaling ${moneyOrBlank(f.approved_expenses)}  (merge tag: {{approved_expenses}}).
+3.2 The Net JV Profit is split as follows: Party A ${splitA}  (merge tag: {{party_a_split_percent}}), Party B ${splitB}  (merge tag: {{party_b_split_percent}}). The two shares total 100%.
+3.3 The title company shall disburse each party's share as a separate line item on the HUD-1 / ALTA settlement statement, wired directly to each party. No party collects the other's share.
+3.4 Platform Fee Disclaimer: In accordance with WholesalingOS (https://wholesalingos.thefeetwashers.com) terms, 0% of the Net JV Profit is payable to the software platform. The platform takes no cut of any JV split, assignment fee, or closing.
+
+SECTION 4 — NON-CIRCUMVENTION & CONFIDENTIALITY ("SEALED OFFICE" PROTECTION)
+4.1 For 24 months from the Effective Date, Party B shall not contact, negotiate with, or bypass to the Seller (or the Seller's heirs, successors, or assigns) regarding the Subject Property, and Party A shall not bypass Party B to market to an End-Buyer introduced by Party B.
+4.2 Each party shall keep the other's business information, buyer lists, and the terms of this agreement confidential, and shall not disclose them except to its own attorney, title company, or as required by law.
+4.3 Liquidated damages for a breach of this Section 4: the full profit share the non-breaching party would have earned under Section 3, plus reasonable attorneys' fees and collection costs. The parties agree this is a genuine pre-estimate of the loss, not a penalty.
+
+SECTION 5 — INDEPENDENT CONTRACTORS & GOVERNING LAW
+5.1 This agreement is solely for the Subject Property. It creates no general partnership, agency, employment, or joint liability between the parties beyond this one transaction.
+5.2 Each party is responsible for its own taxes, including any Form 1099 reporting on amounts it receives.
+5.3 This agreement is governed by the laws of ${blank(f.property_state)}  (merge tag: {{property_state}}). Any dispute is resolved under the laws of that state.
+
+SIGNATURES
+Party A:
+  Signed: ______________________________  Date: __________
+  Name: ${blank(f.party_a_signer)}  (merge tag: {{party_a_signer}})
+  Title: ${blank(f.party_a_title)}  (merge tag: {{party_a_title}})
+
+Party B:
+  Signed: ______________________________  Date: __________
+  Name: ${blank(f.party_b_signer)}  (merge tag: {{party_b_signer}})
+  Title: ${blank(f.party_b_title)}  (merge tag: {{party_b_title}})
+
+${ATTORNEY_REVIEW_BANNER}`;
+}
+
+export interface ScoutFinderFeeFields {
+  effective_date: string;
+  wholesaler_entity: string;
+  wholesaler_state: string;
+  wholesaler_address: string;
+  wholesaler_email: string;
+  wholesaler_phone: string;
+  scout_name: string;
+  scout_address: string;
+  scout_email: string;
+  scout_phone: string;
+  property_address: string;
+  submission_date: string;
+  title_company: string;
+  title_officer_email: string;
+  payout_amount: number | null;
+  property_state: string;
+  wholesaler_signer: string;
+}
+
+export const SCOUT_FINDER_MERGE_TAGS = [
+  '{{effective_date}}',
+  '{{wholesaler_entity}}',
+  '{{wholesaler_state}}',
+  '{{wholesaler_address}}',
+  '{{wholesaler_email}}',
+  '{{wholesaler_phone}}',
+  '{{scout_name}}',
+  '{{scout_address}}',
+  '{{scout_email}}',
+  '{{scout_phone}}',
+  '{{property_address}}',
+  '{{submission_date}}',
+  '{{title_company}}',
+  '{{title_officer_email}}',
+  '{{payout_amount}}',
+  '{{property_state}}',
+  '{{wholesaler_signer}}',
+] as const;
+
+export function buildScoutFinderFeeAgreement(f: ScoutFinderFeeFields): string {
+  const blank = (v: string | null | undefined) => (v && v.trim() ? v : '[not given]');
+  const payout =
+    f.payout_amount != null
+      ? `$${Number(f.payout_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '$1,000.00';
+  return `${ATTORNEY_REVIEW_BANNER}
+
+PROPERTY SCOUT / REFERRER FINDER'S FEE AGREEMENT
+
+This template is provided for operational convenience and carries an attorney-review flag. Real estate licensing and finder's fee laws vary strictly by state (including Florida Statutes Chapter 475). Have a licensed real estate attorney in your state review and approve this agreement before executing or submitting to a title company.
+
+Effective date: ${f.effective_date || '[date not given]'}  (merge tag: {{effective_date}})
+
+PARTIES
+Principal (acquiring wholesaler):
+  Entity: ${blank(f.wholesaler_entity)}  (merge tag: {{wholesaler_entity}})
+  State: ${blank(f.wholesaler_state)}  (merge tag: {{wholesaler_state}})
+  Address: ${blank(f.wholesaler_address)}  (merge tag: {{wholesaler_address}})
+  Email: ${blank(f.wholesaler_email)}  (merge tag: {{wholesaler_email}})
+  Phone: ${blank(f.wholesaler_phone)}  (merge tag: {{wholesaler_phone}})
+
+Scout (referrer):
+  Name: ${blank(f.scout_name)}  (merge tag: {{scout_name}})
+  Address: ${blank(f.scout_address)}  (merge tag: {{scout_address}})
+  Email: ${blank(f.scout_email)}  (merge tag: {{scout_email}})
+  Phone: ${blank(f.scout_phone)}  (merge tag: {{scout_phone}})
+
+SECTION 1 — SUBMITTED PROPERTY INFORMATION
+1.1 Property: ${blank(f.property_address)}  (merge tag: {{property_address}})
+1.2 Submission date / timestamp: ${f.submission_date || '[date not given]'}  (merge tag: {{submission_date}})
+1.3 Title company: ${blank(f.title_company)}  (merge tag: {{title_company}}); title officer email: ${blank(f.title_officer_email)}  (merge tag: {{title_officer_email}})
+
+SECTION 2 — STRICT SCOPE OF SCOUT'S ROLE
+2.1 The Scout's role is information only: providing the street address and publicly visible condition notes and photos of the property.
+2.2 The Scout is PROHIBITED from: contacting or soliciting the property owner; negotiating with the owner; quoting prices; drafting or presenting contracts; showing or marketing the property; or performing any other act that requires a real estate broker or sales associate license.
+2.3 The Principal handles 100% of owner outreach, valuation, negotiation, and contracting. The Scout has no authority to speak for, bind, or represent the Principal in any way.
+
+SECTION 3 — CONTINGENT $1,000 FINDER'S FEE & CLOSING TABLE PAYOUT
+3.1 Flat fee: ${payout}  (merge tag: {{payout_amount}}), payable ONLY if this submitted lead — an unclaimed, actionable lead at submission — results in a closed acquisition or assignment by the Principal within 180 days of the submission date.
+3.2 The fee is 100% contingent on closing and funding. If the transaction fails to close for any reason, $0 is owed.
+3.3 Payment is made by direct title disbursement as a HUD-1 / ALTA settlement statement line item at the closing table, upon receipt of the Scout's completed IRS Form W-9.
+3.4 Prior-knowledge exclusion: no fee is owed if the Principal already held this property in its active pipeline before the submission, as verified by timestamped database records. The submission timestamp in Section 1.2 is the record that decides it.
+
+SECTION 4 — INDEPENDENT CONTRACTOR & TAX RESPONSIBILITY
+4.1 The Scout is an independent contractor, not an employee, partner, or agent of the Principal or of THE FEET WASHERS, INC.
+4.2 The Scout is responsible for their own taxes on any fee received. The Principal will issue IRS Form 1099-NEC for $600 or more paid to the Scout in a calendar year, as required by law.
+
+SECTION 5 — GOVERNING LAW
+5.1 This agreement is governed by the laws of ${blank(f.property_state)}  (merge tag: {{property_state}}).
+
+SIGNATURES
+Principal (Wholesaler):
+  Signed: ______________________________  Date: __________
+  Name: ${blank(f.wholesaler_signer)}  (merge tag: {{wholesaler_signer}})
+
+Scout:
+  Signed: ______________________________  Date: __________
+  Name: ${blank(f.scout_name)}  (merge tag: {{scout_name}})
+
+${ATTORNEY_REVIEW_BANNER}`;
+}
+
 export function emdCountdownText(deadlineIso: string, now: Date = new Date()): string {
   const ms = new Date(deadlineIso).getTime() - now.getTime();
   if (Number.isNaN(ms)) return 'Set an EMD deadline to start the countdown.';
