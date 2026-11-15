@@ -128,6 +128,15 @@ export interface FundingRequest {
   routing_track: RoutingTrack;
   assigned_lender_id?: string | null;
   status: FundingStatus;
+  // Slice 120 — exact fee per deal (item 1) and fee-paid
+  // confirmation (item 3). All start empty: fee_percentage NULL
+  // means no exact percent agreed yet (the notice shows the range),
+  // fee_paid false until the operator records the money arriving.
+  fee_percentage?: number | null;
+  fee_amount?: number | null;
+  fee_paid?: boolean;
+  fee_paid_at?: string | null;
+  fee_paid_amount?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -163,7 +172,7 @@ function requireSupabase() {
 }
 
 const FUNDING_SELECT =
-  'id, requester_id, deal_id, financing_type, borrowing_entity_name, entity_state, business_purpose_certified, no_upfront_fee_acknowledged, property_address, property_state, purchase_price, loan_amount_requested, estimated_arv, rehab_budget, monthly_rent, target_closing_date, title_company_name, title_officer_email, routing_track, assigned_lender_id, status, created_at, updated_at';
+  'id, requester_id, deal_id, financing_type, borrowing_entity_name, entity_state, business_purpose_certified, no_upfront_fee_acknowledged, property_address, property_state, purchase_price, loan_amount_requested, estimated_arv, rehab_budget, monthly_rent, target_closing_date, title_company_name, title_officer_email, routing_track, assigned_lender_id, status, fee_percentage, fee_amount, fee_paid, fee_paid_at, fee_paid_amount, created_at, updated_at';
 
 const LENDER_BOX_SELECT =
   'id, lender_id, company_name, lending_types, states_covered, min_loan_amount, max_loan_amount, max_ltv_percent, min_dscr, partner_agreement_accepted, partner_agreement_accepted_at, is_verified_partner, created_at, updated_at';
@@ -248,17 +257,193 @@ export async function submitFundingRequest(
     .select(FUNDING_SELECT)
     .single();
   if (error) throw error;
-  return data as FundingRequest;
+  const created = data as FundingRequest;
+  // Slice 120, item 5: the submission itself is the first history
+  // row (old status: none). Swallowed on failure — the request
+  // stands even if the history table is not migrated yet.
+  if (created?.id) {
+    await logStatusChange(created.id, {
+      oldStatus: null,
+      newStatus: 'submitted',
+      actorRole: 'requester',
+      changedBy: userId,
+      note: 'Funding request submitted.',
+    }).catch(() => {});
+  }
+  return created;
 }
 
 export async function setFundingRequestStatus(
   requestId: string,
-  status: FundingStatus
+  status: FundingStatus,
+  opts?: {
+    oldStatus?: FundingStatus | null;
+    actorRole?: 'requester' | 'operator' | 'lender';
+    userId?: string;
+    note?: string;
+  }
 ): Promise<void> {
   const client = requireSupabase();
   const { error } = await client
     .from('funding_requests')
     .update({ status })
+    .eq('id', requestId);
+  if (error) throw error;
+  // Slice 120, item 5: log the change. The log is audit, not the
+  // update itself — if the history insert is refused (e.g. the
+  // migration has not been applied yet), the status change still
+  // stands and the failure is swallowed, never thrown.
+  if (opts?.userId && opts?.actorRole) {
+    await logStatusChange(requestId, {
+      oldStatus: opts.oldStatus ?? null,
+      newStatus: status,
+      actorRole: opts.actorRole,
+      changedBy: opts.userId,
+      note: opts.note || null,
+    }).catch(() => {});
+  }
+}
+
+// Slice 120, item 5 — status history. One row per status change;
+// the table has no update or delete policy, so rows are append-only.
+export type HistoryActorRole = 'requester' | 'operator' | 'lender';
+
+export interface FundingStatusHistory {
+  id?: string;
+  funding_request_id: string;
+  changed_by?: string | null;
+  actor_role?: HistoryActorRole | null;
+  old_status?: string | null;
+  new_status?: string | null;
+  note?: string | null;
+  created_at?: string;
+}
+
+const HISTORY_SELECT =
+  'id, funding_request_id, changed_by, actor_role, old_status, new_status, note, created_at';
+
+export async function logStatusChange(
+  requestId: string,
+  entry: {
+    oldStatus: FundingStatus | string | null;
+    newStatus: FundingStatus | string;
+    actorRole: HistoryActorRole;
+    changedBy: string;
+    note?: string | null;
+  }
+): Promise<FundingStatusHistory> {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('funding_request_history')
+    .insert({
+      funding_request_id: requestId,
+      changed_by: entry.changedBy,
+      actor_role: entry.actorRole,
+      old_status: entry.oldStatus,
+      new_status: entry.newStatus,
+      note: entry.note || null,
+    })
+    .select(HISTORY_SELECT)
+    .single();
+  if (error) throw error;
+  return data as FundingStatusHistory;
+}
+
+// RLS decides what this account may see — the requester sees their
+// own requests' history, the operator direct-track history, matched
+// lenders ISO-track history. Anything else comes back empty.
+export async function loadFundingRequestHistory(
+  requestId: string
+): Promise<FundingStatusHistory[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('funding_request_history')
+    .select(HISTORY_SELECT)
+    .eq('funding_request_id', requestId)
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return (data || []) as FundingStatusHistory[];
+}
+
+// Slice 120, item 4 — matched-lender COUNT only. Returns a number,
+// never names, companies, emails, or criteria: the query counts
+// verified, agreement-accepted boxes covering this state and program
+// and returns only the count. A requester learns how many lenders
+// can see their packet — never who they are.
+export async function countMatchedLenders(
+  propertyState: string | null | undefined,
+  financingType: FundingType
+): Promise<number> {
+  if (!supabaseConfigured || !supabase || !propertyState) return 0;
+  const { count, error } = await supabase
+    .from('lender_boxes')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_verified_partner', true)
+    .eq('partner_agreement_accepted', true)
+    .contains('states_covered', [propertyState])
+    .contains('lending_types', [financingType]);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+// Slice 120, item 1 — operator only: set the exact agreed fee
+// percent (1.5–2.0) on a request. The dollar amount is computed
+// here from the request's own loan amount — never typed in by hand,
+// never invented. The client-side email check is a UI guard; the
+// database CHECK refuses anything outside 1.5–2.0 regardless.
+export async function setFundingFee(
+  requestId: string,
+  feePercentage: number,
+  operatorEmail: string | null
+): Promise<number> {
+  if (operatorEmail !== OPERATOR_EMAIL) {
+    throw new Error('Only the operator account can set the agreed fee.');
+  }
+  if (!Number.isFinite(feePercentage) || feePercentage < 1.5 || feePercentage > 2.0) {
+    throw new Error('The agreed fee must be between 1.5% and 2.0%.');
+  }
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('funding_requests')
+    .select('loan_amount_requested')
+    .eq('id', requestId)
+    .single();
+  if (error) throw error;
+  const loanAmount = (data as { loan_amount_requested?: number | null } | null)?.loan_amount_requested;
+  const feeAmount =
+    loanAmount != null ? (Number(loanAmount) * feePercentage) / 100 : null;
+  const { error: updateError } = await client
+    .from('funding_requests')
+    .update({ fee_percentage: feePercentage, fee_amount: feeAmount })
+    .eq('id', requestId);
+  if (updateError) throw updateError;
+  return feeAmount ?? 0;
+}
+
+// Slice 120, item 3 — operator only: mark the referral fee received
+// after closing, with the amount actually received and the date it
+// arrived. Defaults are set by the UI (amount = fee_amount, date =
+// today); nothing here claims a fee arrived before it is recorded.
+export async function markFeePaid(
+  requestId: string,
+  amount: number | null,
+  paidAt: string | null,
+  operatorEmail: string | null
+): Promise<void> {
+  if (operatorEmail !== OPERATOR_EMAIL) {
+    throw new Error('Only the operator account can mark a fee received.');
+  }
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Enter the fee amount actually received.');
+  }
+  const client = requireSupabase();
+  const { error } = await client
+    .from('funding_requests')
+    .update({
+      fee_paid: true,
+      fee_paid_amount: amount,
+      fee_paid_at: paidAt || new Date().toISOString(),
+    })
     .eq('id', requestId);
   if (error) throw error;
 }

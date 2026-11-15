@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { dealFromContract, loadDeals, saveDeal, type DealRow } from '../lib/deals';
-import { sellerView, buyerView, titlePackage, canSignBC, buildTransactionalNote, buildTitleEscrowLetter, buildReferralFeeNotice, referralFeeAmount, FUNDING_MERGE_TAGS, type DealContract, type SigStatus, type FundingPacketFields } from '../lib/contracts';
-import { loadMyFundingRequests, loadDirectFundingRequests, OPERATOR_EMAIL, type FundingRequest } from '../lib/funding';
+import { sellerView, buyerView, titlePackage, canSignBC, buildTransactionalNote, buildTitleEscrowLetter, buildReferralFeeNotice, buildTermSheet, addBusinessDays, referralFeeAmount, FUNDING_MERGE_TAGS, type DealContract, type SigStatus, type FundingPacketFields } from '../lib/contracts';
+import { loadMyFundingRequests, loadDirectFundingRequests, loadFundingRequestHistory, countMatchedLenders, setFundingRequestStatus, setFundingFee, markFeePaid, OPERATOR_EMAIL, FUNDING_STATUSES, type FundingRequest, type FundingStatus, type FundingStatusHistory } from '../lib/funding';
 
 const EMPTY: DealContract = {
   property_address: '', city: '', state: '', seller_name: '', buyer_name: '',
@@ -13,12 +13,59 @@ const EMPTY: DealContract = {
   ab_status: 'Draft', jv_status: 'Not a JV deal', bc_status: 'Draft',
 };
 
+// Slice 120, item 5 — the status history of one funding request:
+// new status, who moved it (requester / operator / lender), when,
+// and any note. Read from the real history rows; RLS decides what
+// this account may see, so an empty list can also mean "not yours".
+export function FundingHistoryList({ requestId, version }: { requestId: string; version?: number }) {
+  const [rows, setRows] = useState<FundingStatusHistory[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    loadFundingRequestHistory(requestId)
+      .then((r) => { setRows(r); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [requestId, version]);
+  if (!loaded) return null;
+  if (rows.length === 0) {
+    return <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>No status history recorded yet.</p>;
+  }
+  return (
+    <div style={{ marginTop: 6 }}>
+      <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 2px' }}>Status history:</p>
+      <ul style={{ fontSize: 12, color: '#cbd5e1', margin: 0, paddingLeft: 16 }}>
+        {rows.map((h) => (
+          <li key={h.id}>
+            {h.created_at ? new Date(h.created_at).toLocaleString() : ''} — {h.actor_role || '—'}: {h.old_status || '(new)'} → {h.new_status || '—'}{h.note ? ` — ${h.note}` : ''}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function feeReceivedBadge(r: FundingRequest): string | null {
+  if (!r.fee_paid) return null;
+  const amount = r.fee_paid_amount != null ? `$${Number(r.fee_paid_amount).toLocaleString()}` : 'amount not recorded';
+  const when = r.fee_paid_at ? new Date(r.fee_paid_at).toLocaleDateString() : 'date not recorded';
+  return `✅ Fee received: ${amount} on ${when}`;
+}
+
 export default function Contracts({ userId, userEmail }: { userId: string | null; userEmail?: string | null }) {
   const [c, setC] = useState<DealContract>(EMPTY);
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [mode, setMode] = useState<'local' | 'synced'>('local');
   const [savedMsg, setSavedMsg] = useState('');
   const [fundingRequests, setFundingRequests] = useState<FundingRequest[]>([]);
+  // Slice 120 — the requester's own ISO-network requests (not in the
+  // direct-track packet list above) and the matched-lender count for
+  // each, plus the operator's per-request fee inputs.
+  const [myIsoRequests, setMyIsoRequests] = useState<FundingRequest[]>([]);
+  const [matchedCounts, setMatchedCounts] = useState<Record<string, number>>({});
+  const [feePctInput, setFeePctInput] = useState<Record<string, string>>({});
+  const [feePaidAmtInput, setFeePaidAmtInput] = useState<Record<string, string>>({});
+  const [feePaidDateInput, setFeePaidDateInput] = useState<Record<string, string>>({});
+  const [feeMsg, setFeeMsg] = useState('');
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [packetFor, setPacketFor] = useState<string | null>(null);
   const [packetText, setPacketText] = useState('');
   const [packetTags, setPacketTags] = useState<{ tag: string; value: string }[]>([]);
@@ -34,7 +81,20 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
         loadDirectFundingRequests().then((rows) => setFundingRequests(rows)).catch(() => {});
       } else {
         loadMyFundingRequests(userId)
-          .then((rows) => setFundingRequests(rows.filter((r) => r.routing_track === 'direct_feet_washers')))
+          .then((rows) => {
+            setFundingRequests(rows.filter((r) => r.routing_track === 'direct_feet_washers'));
+            // Slice 120, item 4: the requester's ISO-network packets,
+            // with a matched-lender COUNT only — never names or
+            // contacts. Counted per packet from the real lender boxes.
+            const iso = rows.filter((r) => r.routing_track === 'wholesale_iso_network');
+            setMyIsoRequests(iso);
+            iso.forEach((r) => {
+              if (!r.id) return;
+              countMatchedLenders(r.property_state, r.financing_type)
+                .then((n) => setMatchedCounts((prev) => ({ ...prev, [r.id as string]: n })))
+                .catch(() => {});
+            });
+          })
           .catch(() => {});
       }
     }
@@ -112,10 +172,12 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
             {isOperator
               ? 'Operator view: direct-track funding requests (transactional, routed to The Feet Washers, Inc.). ISO-network packets are not listed here — they belong to the matched lenders.'
               : 'Your direct-track funding requests (transactional, routed to The Feet Washers, Inc.).'}
-            {' '}Generating a packet renders the three documents below — the Transactional
-            Promissory Note, the Title Escrow &amp; Wire Instruction Letter, and the
-            Commission / Referral Fee Disbursement Notice — populated from the request. It
-            does not fund anything, sign anything, or confirm any funding.
+            {' '}Generating a packet renders the four documents below — the Transactional
+            Promissory Note, the Title Escrow &amp; Wire Instruction Letter, the
+            Commission / Referral Fee Disbursement Notice, and the Commercial Funding
+            Term Sheet (labelled DRAFT until the request reaches term_sheet_issued) —
+            populated from the request. It does not fund anything, sign anything, or
+            confirm any funding.
           </p>
           {fundingRequests.length === 0 ? (
             <p style={{ fontSize: 13 }}>No direct-track funding requests yet.</p>
@@ -139,6 +201,14 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                         title_officer_email: r.title_officer_email || '',
                         purchase_price: r.purchase_price ?? null,
                         estimated_arv: r.estimated_arv ?? null,
+                        financing_type: r.financing_type,
+                        // Slice 120, item 1: the exact agreed percent
+                        // when the operator set one; otherwise the
+                        // notice keeps the 1.5%–2.0% range.
+                        referral_fee_percent: r.fee_percentage ?? null,
+                        // Slice 120, item 2: DRAFT until the request
+                        // reaches term_sheet_issued (or later).
+                        term_sheet_draft: !['term_sheet_issued', 'clear_to_close', 'funded'].includes(r.status),
                         // Direct track: the lender is The Feet Washers, Inc.
                         // itself, so the fee notice is addressed to it
                         // alongside the title company.
@@ -147,7 +217,8 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                       const note = buildTransactionalNote(fields);
                       const letter = buildTitleEscrowLetter(fields);
                       const feeNotice = buildReferralFeeNotice(fields);
-                      setPacketText(`${note}\n\n----------------------------------------\n\n${letter}\n\n----------------------------------------\n\n${feeNotice}`);
+                      const termSheet = buildTermSheet(fields);
+                      setPacketText(`${note}\n\n----------------------------------------\n\n${letter}\n\n----------------------------------------\n\n${feeNotice}\n\n----------------------------------------\n\n${termSheet}`);
                       setPacketTags([
                         { tag: '{{loan_amount}}', value: fields.loan_amount != null ? `$${Number(fields.loan_amount).toLocaleString()}` : '[amount not given]' },
                         { tag: '{{effective_date}}', value: fields.effective_date },
@@ -160,12 +231,103 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                         { tag: '{{lender_company}}', value: fields.lender_company || '[lender company not given]' },
                         { tag: '{{fee_percentage}}', value: fields.referral_fee_percent != null ? `${fields.referral_fee_percent}%` : '1.5%–2.0% (exact percent agreed before closing)' },
                         { tag: '{{fee_amount}}', value: referralFeeAmount(fields.loan_amount, fields.referral_fee_percent) },
+                        { tag: '{{financing_type}}', value: fields.financing_type || '[type not given]' },
+                        { tag: '{{interest_rate}}', value: 'TO BE AGREED — no rate is stated in the term sheet' },
+                        { tag: '{{loan_term_months}}', value: 'TO BE AGREED — no term is stated in the term sheet' },
+                        { tag: '{{maturity_date}}', value: fields.financing_type === 'transactional' ? addBusinessDays(fields.closing_date, 3) : 'to be agreed with the lender' },
                       ]);
                       setPacketFor(r.id || null);
                     }}
                   >
                     Generate Transactional Funding Packet
                   </button>
+                  {/* Slice 120, item 3 — the requester sees the badge only once the fee is recorded. */}
+                  {feeReceivedBadge(r) && <><br /><span>{feeReceivedBadge(r)}</span></>}
+                  {r.fee_percentage != null && (
+                    <><br /><span>Agreed fee: {r.fee_percentage}%{r.fee_amount != null ? ` = $${Number(r.fee_amount).toLocaleString()}` : ''}</span></>
+                  )}
+                  {isOperator && userId && (
+                    <div style={{ marginTop: 8, display: 'grid', gap: 6, maxWidth: 520 }}>
+                      <label style={{ fontSize: 12.5 }}>
+                        Status:{' '}
+                        <select
+                          value={r.status}
+                          onChange={async (e) => {
+                            const next = e.target.value as FundingStatus;
+                            try {
+                              await setFundingRequestStatus(r.id!, next, { oldStatus: r.status, actorRole: 'operator', userId });
+                              setFundingRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: next } : x)));
+                              setHistoryVersion((v) => v + 1);
+                              setFeeMsg(`Status set to ${next} — logged in the history below.`);
+                            } catch (err2) {
+                              setFeeMsg(err2 instanceof Error ? err2.message : 'Status update failed.');
+                            }
+                          }}
+                        >
+                          {FUNDING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </label>
+                      <label style={{ fontSize: 12.5 }}>
+                        Agreed fee % (1.5–2.0):{' '}
+                        <input
+                          inputMode="decimal"
+                          placeholder={r.fee_percentage != null ? String(r.fee_percentage) : 'e.g. 1.75'}
+                          value={feePctInput[r.id || ''] ?? ''}
+                          onChange={(e) => setFeePctInput((prev) => ({ ...prev, [r.id as string]: e.target.value }))}
+                          style={{ width: 90 }}
+                        />{' '}
+                        <button
+                          onClick={async () => {
+                            const pct = parseFloat((feePctInput[r.id || ''] || '').replace(/[%]/g, ''));
+                            try {
+                              const amount = await setFundingFee(r.id!, pct, userEmail ?? null);
+                              setFundingRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, fee_percentage: pct, fee_amount: amount } : x)));
+                              setFeeMsg(`Agreed fee set to ${pct}%${amount ? ` = $${amount.toLocaleString()}` : ' — no loan amount on the request, so no dollar amount was computed'}.`);
+                            } catch (err2) {
+                              setFeeMsg(err2 instanceof Error ? err2.message : 'Setting the fee failed.');
+                            }
+                          }}
+                        >
+                          Set agreed fee %
+                        </button>
+                      </label>
+                      {!r.fee_paid && (
+                        <label style={{ fontSize: 12.5 }}>
+                          Mark referral fee received — amount ${' '}
+                          <input
+                            inputMode="numeric"
+                            placeholder={r.fee_amount != null ? String(Math.round(Number(r.fee_amount))) : 'amount received'}
+                            value={feePaidAmtInput[r.id || ''] ?? ''}
+                            onChange={(e) => setFeePaidAmtInput((prev) => ({ ...prev, [r.id as string]: e.target.value }))}
+                            style={{ width: 110 }}
+                          />{' '}
+                          date{' '}
+                          <input
+                            type="date"
+                            value={feePaidDateInput[r.id || ''] ?? ''}
+                            onChange={(e) => setFeePaidDateInput((prev) => ({ ...prev, [r.id as string]: e.target.value }))}
+                          />{' '}
+                          <button
+                            onClick={async () => {
+                              const amount = parseFloat((feePaidAmtInput[r.id || ''] || '').replace(/[$,]/g, '')) || (r.fee_amount != null ? Number(r.fee_amount) : null);
+                              const date = feePaidDateInput[r.id || ''] || new Date().toISOString().slice(0, 10);
+                              try {
+                                await markFeePaid(r.id!, amount, date ? `${date}T12:00:00` : null, userEmail ?? null);
+                                setFundingRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, fee_paid: true, fee_paid_amount: amount, fee_paid_at: date ? `${date}T12:00:00` : null } : x)));
+                                setFeeMsg('Referral fee marked received.');
+                              } catch (err2) {
+                                setFeeMsg(err2 instanceof Error ? err2.message : 'Marking the fee received failed.');
+                              }
+                            }}
+                          >
+                            Mark referral fee received
+                          </button>
+                        </label>
+                      )}
+                      {feeMsg && <p style={{ fontSize: 12, margin: 0 }}>{feeMsg}</p>}
+                    </div>
+                  )}
+                  {r.id && <FundingHistoryList requestId={r.id} version={historyVersion} />}
                 </li>
               ))}
             </ul>
@@ -196,6 +358,32 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                 This is a template packet, not a signed note and not a funding confirmation. No
                 signature is rendered here — signatures happen on paper, after attorney review.
               </p>
+            </div>
+          )}
+          {/* Slice 120, item 4 — the requester's own ISO-network packets:
+              status, matched-lender COUNT only (never names or contacts),
+              the fee-received badge, and the status history. */}
+          {!isOperator && myIsoRequests.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ margin: '0 0 4px' }}>My ISO-network funding requests</h4>
+              <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '0 0 8px' }}>
+                These packets went to the ISO network of verified partner lenders. The count below
+                is how many verified lenders cover this state and program — their names, companies,
+                and criteria are never shown to you.
+              </p>
+              <ul style={{ fontSize: 13 }}>
+                {myIsoRequests.map((r) => (
+                  <li key={r.id} style={{ marginBottom: 10 }}>
+                    <strong>{r.property_address || 'Property address not given'}</strong> · {r.financing_type} · {r.property_state || '—'} · status: {r.status}
+                    <br />
+                    {r.id && matchedCounts[r.id] != null
+                      ? `${matchedCounts[r.id]} verified lender(s) cover this state and program.`
+                      : 'Counting verified lenders that cover this state and program…'}
+                    {feeReceivedBadge(r) && <><br /><span>{feeReceivedBadge(r)}</span></>}
+                    {r.id && <FundingHistoryList requestId={r.id} />}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </section>

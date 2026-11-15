@@ -6,6 +6,7 @@ import {
   routingFor,
   routingLabel,
   submitFundingRequest,
+  countMatchedLenders,
   US_STATES,
   type FundingType,
 } from '../lib/funding';
@@ -98,6 +99,19 @@ export default function RequestFundingModal({
       setMessage(
         `Request submitted — routed ${track === 'direct_feet_washers' ? 'direct to The Feet Washers, Inc.' : 'to verified partner lenders in the ISO network'}. Status: submitted.`
       );
+      // Slice 120, item 4: right after an ISO submission, tell the
+      // requester how many verified lenders cover this state and
+      // program — a count only, never names or contacts. Counted
+      // from the real lender boxes; a failed count is simply omitted.
+      if (track !== 'direct_feet_washers') {
+        countMatchedLenders(propertyState, financingType)
+          .then((n) => {
+            setMessage(
+              `Request submitted — routed to verified partner lenders in the ISO network. Status: submitted. ${n} verified lender(s) cover this state and program.`
+            );
+          })
+          .catch(() => {});
+      }
       onSubmitted?.();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Submission failed — nothing was sent.');

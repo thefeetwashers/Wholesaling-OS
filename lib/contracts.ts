@@ -81,6 +81,15 @@ export interface FundingPacketFields {
   purchase_price?: number | null;
   estimated_arv?: number | null;
   referral_fee_percent?: number | null;
+  // Term sheet only (Slice 120, item 2). Interest rate and loan term
+  // are NEVER invented: they arrive as "to be agreed" placeholders
+  // unless the operator enters real values.
+  financing_type?: string;
+  interest_rate?: string | null;
+  loan_term_months?: string | null;
+  // True while the request has not reached term_sheet_issued: the
+  // document is labelled DRAFT — terms to be agreed.
+  term_sheet_draft?: boolean;
   // Recipient of the referral-fee notice alongside the title company.
   // Direct track: The Feet Washers, Inc. itself. ISO track: the assigned
   // lender's company, when known — otherwise left as not given.
@@ -99,6 +108,10 @@ export const FUNDING_MERGE_TAGS = [
   '{{lender_company}}',
   '{{fee_percentage}}',
   '{{fee_amount}}',
+  '{{financing_type}}',
+  '{{interest_rate}}',
+  '{{loan_term_months}}',
+  '{{maturity_date}}',
 ] as const;
 
 // Referral / origination fee math for the disbursement notice.
@@ -264,6 +277,52 @@ Name: Erna Julien, Authorized Officer
 Date: ${f.effective_date || '[date not given]'}
 
 No bank account number is printed in this notice. Bank coordinates travel only on the signed Corporate Wire Sheet & IRS Form W-9 attachment, never inside the platform.
+
+${ATTORNEY_REVIEW_BANNER}`;
+}
+
+export function buildTermSheet(f: FundingPacketFields): string {
+  // Maturity: transactional double closes mature at closing + 3
+  // business days (the same helper the Note uses). Every other
+  // program has no maturity in this template — it is agreed with
+  // the lender, never assumed here.
+  const maturity =
+    f.financing_type === 'transactional'
+      ? addBusinessDays(f.closing_date, 3)
+      : '[to be agreed with the lender — the closing + 3 business days maturity applies to transactional double closes only]';
+  const feePercentText =
+    f.referral_fee_percent != null
+      ? `${f.referral_fee_percent}%`
+      : '1.5%–2.0% (exact percent agreed before closing)';
+  const feeAmount = referralFeeAmount(f.loan_amount, f.referral_fee_percent);
+  const draftLine = f.term_sheet_draft
+    ? '\nDRAFT — TERMS TO BE AGREED. This term sheet is a draft until the request reaches term_sheet_issued. No term below is final.\n'
+    : '';
+  return `${ATTORNEY_REVIEW_BANNER}
+${draftLine}
+COMMERCIAL FUNDING TERM SHEET — DRAFT TERMS
+(Template only — not a funding commitment, not a loan agreement)
+
+Borrower (entity): ${f.borrower_entity || '[entity not given]'}, ${f.borrower_state || '[state not given]'}  (merge tags: {{borrower_entity}}, {{borrower_state}})
+Property: ${f.property_address || '[address not given]'}  (merge tag: {{property_address}})
+Financing type: ${f.financing_type || '[type not given]'}  (merge tag: {{financing_type}})
+Loan amount requested: ${moneyOrBlank(f.loan_amount)}  (merge tag: {{loan_amount}})
+Purchase price: ${moneyOrBlank(f.purchase_price)}
+Estimated ARV: ${moneyOrBlank(f.estimated_arv)}
+Target closing date: ${f.closing_date || '[date not given]'}  (merge tag: {{closing_date}})
+Maturity: ${maturity}  (merge tag: {{maturity_date}})
+Title company: ${f.title_company || '[title company not given]'}  (merge tag: {{title_company}})
+
+1. Interest rate: ${f.interest_rate || 'TO BE AGREED — no rate is stated here'}  (merge tag: {{interest_rate}})
+2. Loan term: ${f.loan_term_months || 'TO BE AGREED — no term is stated here'}  (merge tag: {{loan_term_months}})
+3. Referral fee: ${feePercentText} of the funded loan amount = ${feeAmount}, shown on the HUD/ALTA settlement statement, payable to The Feet Washers, Inc.  (merge tags: {{fee_percentage}}, {{fee_amount}})
+4. Commercial purpose only. This financing is strictly for a commercial, non-owner-occupied investment real estate purpose by an active business entity (LLC/Corporation). It is not a consumer loan, and no upfront borrower fee is charged.
+5. Escrow conditions (summary — the full conditions are in the Title Company Conditional Escrow & Wire Instruction Letter): (a) A-to-B and B-to-C files at the same title company; (b) 100% of B-to-C cash-to-close verified in escrow with executed B-to-C documents; (c) simultaneous / same-day back-to-back disbursement; (d) direct payoff wire of principal plus the agreed return on the B-to-C HUD/ALTA; (e) immediate full wire return by 5:00 PM EST on the target closing date if both closings do not fund.
+6. Rate cap — Florida Statutes Chapter 687. Any return charged under the final loan documents shall not exceed the maximum rate permitted under Florida Statutes Chapter 687 (usury).
+7. This term sheet is not a commitment to fund. Funding is subject to the lender's own underwriting, the escrow conditions above, and each party's attorney review of the final loan documents before signing.
+
+Borrower: ______________________________  Date: __________
+Lender: ______________________________  Date: __________
 
 ${ATTORNEY_REVIEW_BANNER}`;
 }

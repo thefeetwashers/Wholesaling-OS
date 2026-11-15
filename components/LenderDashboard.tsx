@@ -18,6 +18,7 @@ import {
   type LenderBox,
   type LenderBoxWithEmail,
 } from '../lib/funding';
+import { FundingHistoryList } from './Contracts';
 
 // Lender desk. Two tabs: the opt-in deal packets this lender is
 // matched to (RLS decides the match — a packet that is not listed
@@ -66,6 +67,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [historyVersion, setHistoryVersion] = useState(0);
 
   const isOperator = userEmail === OPERATOR_EMAIL;
   const [allBoxes, setAllBoxes] = useState<LenderBoxWithEmail[]>([]);
@@ -191,8 +193,11 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
                     onChange={async (e) => {
                       const next = e.target.value as FundingStatus;
                       try {
-                        await setFundingRequestStatus(r.id!, next);
+                        // Slice 120, item 5: the change is logged with
+                        // the lender as the actor.
+                        await setFundingRequestStatus(r.id!, next, { oldStatus: r.status, actorRole: 'lender', userId });
                         setStatusMsg(`Packet status set to ${next}.`);
+                        setHistoryVersion((v) => v + 1);
                         refresh();
                       } catch (err2) {
                         setStatusMsg(err2 instanceof Error ? err2.message : 'Status update failed.');
@@ -201,6 +206,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
                   >
                     {FUNDING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  {r.id && <FundingHistoryList requestId={r.id} version={historyVersion} />}
                 </li>
               ))}
             </ul>
