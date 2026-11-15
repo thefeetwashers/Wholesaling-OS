@@ -46,6 +46,16 @@ export interface Lead {
   // instead and says so in its result.
   distress_tag?: string | null;
   is_absentee_owner?: boolean;
+  // Slice 124: two-step seller form facts. is_partial is true
+  // while the seller has finished step 1 (address + contact) but
+  // not step 2; the dashboard shows these as "Partial — step 1
+  // only". property_type / condition / occupancy / timeline are
+  // the step-2 toggles. Consent already has columns above.
+  is_partial?: boolean;
+  property_type?: string | null;
+  condition?: string | null;
+  occupancy?: string | null;
+  timeline?: string | null;
   // Slice 24 (schema v4.1): consent + do-not-contact state.
   do_not_contact?: boolean;
   consent_status?: ConsentStatus;

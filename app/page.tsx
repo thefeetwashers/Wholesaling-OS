@@ -59,6 +59,7 @@ import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import PlatformHealth from '../components/PlatformHealth';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
+import StorefrontSettingsCard from '../components/StorefrontSettings';
 import SignKit from '../components/SignKit';
 import AssistantPanel from '../components/AssistantPanel';
 import AddFromLink from '../components/AddFromLink';
@@ -118,7 +119,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 123</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 124</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -189,6 +190,7 @@ export default function Home() {
                 {role === 'wholesaler' && userId && <WeeklyReport userId={userId} />}
                 <div id="dashboard"><PortalHome userId={userId} /></div>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                {role === 'wholesaler' && userId && <StorefrontSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <MyStatesCard userId={userId} />}
                 {role === 'wholesaler' && userId && <SignKit userId={userId} />}
                 <PublicDealsSection />
@@ -206,6 +208,7 @@ export default function Home() {
             {view === 'sellerpage' && (
               <>
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
+                {role === 'wholesaler' && userId && <StorefrontSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <SignKit userId={userId} />}
                 {role !== 'wholesaler' && <p style={{ fontSize: 14 }}>The seller page belongs to wholesaler accounts.</p>}
               </>

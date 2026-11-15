@@ -596,6 +596,15 @@ export async function saveSellerPageSettings(userId: string, s: SellerPageSettin
     })
     .eq('id', userId);
   if (error) throw error;
+  // Slice 124 — keep the storefront profile's slug in sync: the
+  // public page finds the profile by slug, so a slug change here
+  // must follow or the header/trust blocks would fall back to
+  // defaults. Best-effort and silent — the row may not exist yet
+  // and the table may not exist yet (pre-migration); the old
+  // settings must still save either way.
+  try {
+    await supabase.from('storefront_profiles').update({ public_slug: slug }).eq('wholesaler_id', userId);
+  } catch { /* storefront row absent or table not yet migrated */ }
 }
 
 export interface PublicSellerPage {

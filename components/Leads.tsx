@@ -210,6 +210,11 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
           <li key={l.id || l.property_address}>
             <strong>{l.property_address}</strong> {l.city ? `— ${l.city}, ${l.state || ''} ${l.zip || ''}` : ''}
             {' '}· {l.status}
+            {l.is_partial ? <span style={{ color: '#fbbf24' }}> · ⚠️ Partial — step 1 only</span> : ''}
+            {l.property_type ? ` · ${l.property_type}` : ''}
+            {l.condition ? ` · ${l.condition}` : ''}
+            {l.occupancy ? ` · ${l.occupancy}` : ''}
+            {l.timeline ? ` · ${l.timeline}` : ''}
             {l.follow_up_date ? ` · follow-up ${l.follow_up_date}` : ''}
             {l.owner_name ? ` · owner: ${l.owner_name}` : ''}
             {l.list_source ? ` · source: ${l.list_source}` : ''}
