@@ -56,6 +56,30 @@ export interface Lead {
   condition?: string | null;
   occupancy?: string | null;
   timeline?: string | null;
+  // Slice 125: seller-firsts. tracker_token is the unguessable
+  // key for the seller's private tracking link (/track/<token>);
+  // seller_status is the seller-facing progress (separate from
+  // the wholesaler's internal status above — the seller sees
+  // only their own progress, never the CRM status). offer_* are
+  // the wholesaler's own numbers for the Offer Receipt — the
+  // seller sees exactly these, with "not provided" for any piece
+  // the wholesaler left blank; nothing is computed or invented.
+  // preferred_closing_date is the day the seller picked.
+  // inherited_home + estate_* are the fast-lane answers.
+  tracker_token?: string | null;
+  seller_status?: SellerStatus | null;
+  preferred_closing_date?: string | null;
+  offer_amount?: number | null;
+  offer_comp_low?: number | null;
+  offer_comp_high?: number | null;
+  offer_repairs?: number | null;
+  offer_resale_costs?: number | null;
+  offer_note?: string | null;
+  inherited_home?: boolean;
+  estate_role?: string | null;
+  letters_issued?: string | null;
+  court_approval?: string | null;
+  estate_notes?: string | null;
   // Slice 24 (schema v4.1): consent + do-not-contact state.
   do_not_contact?: boolean;
   consent_status?: ConsentStatus;
@@ -75,6 +99,16 @@ export type ConsentStatus = 'unknown' | 'requested_contact' | 'express_consent' 
 
 export const LEAD_STATUSES: LeadStatus[] = [
   'new', 'contacted', 'qualified', 'under_contract', 'assigned', 'closed', 'dead',
+];
+
+// Slice 125 — the seller-facing progress shown on the private
+// tracking link (/track/<token>). This is NOT the wholesaler's
+// internal CRM status above: the seller sees only these five
+// steps, in this order, and nothing else about the lead.
+export type SellerStatus = 'received' | 'reviewed' | 'offer_made' | 'closing_scheduled' | 'closed';
+
+export const SELLER_STATUSES: SellerStatus[] = [
+  'received', 'reviewed', 'offer_made', 'closing_scheduled', 'closed',
 ];
 
 // Supabase load/save. Returns null when Supabase is not configured,

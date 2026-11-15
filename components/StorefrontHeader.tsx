@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { PublicSellerPage } from '../lib/portals';
 import type { StorefrontProfile } from '../lib/storefront';
 import { DEFAULT_RESPONSE_TIME } from '../lib/storefront';
+import type { StorefrontDict, StorefrontLang } from '../lib/storefront-i18n';
 
 // Slice 124 — the wholesaler profile header & trust card at the
 // top of every /sell/<slug> page. Everything here is dynamic per
@@ -13,6 +15,15 @@ import { DEFAULT_RESPONSE_TIME } from '../lib/storefront';
 // set it; the turnaround banner shows the wholesaler's own
 // promise, and falls back to a plain no-obligation line when they
 // have not set one. The page must feel welcoming, not like a form.
+//
+// Slice 125 — the video hello plays here when the wholesaler
+// recorded one: the page mints a short-lived signed URL for that
+// wholesaler's video only (the bucket stays private, no listing).
+// If there is no video, or the signed URL cannot be minted, no
+// video section appears — never a placeholder. Platform copy is
+// translated by the language toggle; anything the wholesaler
+// wrote (headline, about, bio, response-time line, turnaround
+// promise, title company) appears exactly as written.
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -27,9 +38,13 @@ function telHref(phone: string): string {
 export default function StorefrontHeader({
   page,
   profile,
+  lang,
+  t,
 }: {
   page: PublicSellerPage;
   profile: StorefrontProfile | null;
+  lang: StorefrontLang;
+  t: StorefrontDict;
 }) {
   const company = profile?.company_name?.trim() || page.company;
   const name = profile?.display_name?.trim() || '';
@@ -45,6 +60,29 @@ export default function StorefrontHeader({
   const types = profile?.property_types || [];
   const headshot = profile?.headshot_url?.trim() || '';
   const logo = profile?.logo_url?.trim() || '';
+  const [videoSrc, setVideoSrc] = useState('');
+
+  // Slice 125 — signed playback URL for this wholesaler's video
+  // hello only. A failure leaves videoSrc empty and the section
+  // hidden; the page never shows a fake video.
+  useEffect(() => {
+    if (!profile?.video_url?.trim() || !profile.public_slug) {
+      setVideoSrc('');
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/storefront-video?slug=${encodeURIComponent(profile.public_slug)}`)
+      .then((r) => r.json().catch(() => null))
+      .then((j) => {
+        if (!cancelled && j && typeof j.url === 'string' && j.url) setVideoSrc(j.url);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [profile?.video_url, profile?.public_slug]);
+
+  const bannerTitle = turnaround
+    ? `${t.getOffer} ${turnaround === 'within 24 hours' ? 'in 24 Hours' : turnaround}`
+    : `${t.getOffer} — ${t.offerTagline}`;
 
   return (
     <div>
@@ -76,6 +114,13 @@ export default function StorefrontHeader({
           </div>
         </div>
 
+        {videoSrc && (
+          <div style={{ marginTop: 16 }}>
+            <video src={videoSrc} controls playsInline preload="metadata"
+              style={{ width: '100%', maxWidth: 420, borderRadius: 12, background: '#000' }} />
+          </div>
+        )}
+
         {(phone || email || bookingLink) && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
             {phone && (
@@ -86,7 +131,7 @@ export default function StorefrontHeader({
                 <a href={`sms:${phone.replace(/[^+\d]/g, '')}`} style={{ background: '#1e293b', color: '#e2e8f0', padding: '10px 18px', borderRadius: 8, fontWeight: 700, textDecoration: 'none' }}>
                   💬 Text us
                 </a>
-                <span style={{ fontSize: 13, color: '#4ade80' }}>Call or Text for a Same-Day Offer</span>
+                <span style={{ fontSize: 13, color: '#4ade80' }}>{t.callText}</span>
               </>
             )}
             {email && (
@@ -96,7 +141,7 @@ export default function StorefrontHeader({
             )}
             {bookingLink && (
               <a href={bookingLink} target="_blank" rel="noreferrer" style={{ background: '#1e293b', color: '#e2e8f0', padding: '10px 18px', borderRadius: 8, fontWeight: 700, textDecoration: 'none' }}>
-                📅 Book a 10-min call
+                📅 {t.bookCall}
               </a>
             )}
           </div>
@@ -106,7 +151,7 @@ export default function StorefrontHeader({
           <div style={{ marginTop: 14 }}>
             {areas.length > 0 && (
               <p style={{ fontSize: 13, margin: '0 0 6px' }}>
-                <strong>Areas we buy in: </strong>
+                <strong>{t.areasLabel}</strong>
                 {areas.map((a) => (
                   <span key={a} style={{ background: '#1e293b', padding: '4px 10px', borderRadius: 999, marginRight: 6, display: 'inline-block' }}>{a}</span>
                 ))}
@@ -114,9 +159,9 @@ export default function StorefrontHeader({
             )}
             {types.length > 0 && (
               <p style={{ fontSize: 13, margin: 0 }}>
-                <strong>We buy: </strong>
-                {types.map((t) => (
-                  <span key={t} style={{ background: '#1e293b', padding: '4px 10px', borderRadius: 999, marginRight: 6, display: 'inline-block' }}>{t}</span>
+                <strong>{t.weBuyLabel}</strong>
+                {types.map((ty) => (
+                  <span key={ty} style={{ background: '#1e293b', padding: '4px 10px', borderRadius: 999, marginRight: 6, display: 'inline-block' }}>{ty}</span>
                 ))}
               </p>
             )}
@@ -127,20 +172,17 @@ export default function StorefrontHeader({
           ⏱️ {responseText}
         </p>
         <p style={{ fontSize: 13.5, marginTop: 6 }}>
-          All purchases close securely through a licensed local Title Company / Real Estate Attorney
-          — never a wire transfer to an individual.
-          {titleCompany ? ` Closings handled by ${titleCompany}.` : ''}
+          {t.closingAssurance}
+          {titleCompany ? ` ${t.closingsHandledBy} ${titleCompany}.` : ''}
         </p>
+        {lang !== 'en' && (
+          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>{t.asWrittenNote}</p>
+        )}
       </div>
 
       <div style={{ background: '#052e16', border: '1px solid #4ade80', padding: 16, borderRadius: 12, marginBottom: 16 }}>
-        <p style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>
-          {turnaround ? `Get Your Cash Offer ${turnaround === 'within 24 hours' ? 'in 24 Hours' : turnaround}` : 'Get Your Cash Offer — fast, fair, and free'}
-        </p>
-        <p style={{ fontSize: 14, margin: '6px 0 0' }}>
-          No obligation. No repairs. No cleaning. No realtor commissions.
-          Tell us about your property below — it takes about a minute.
-        </p>
+        <p style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{bannerTitle}</p>
+        <p style={{ fontSize: 14, margin: '6px 0 0' }}>{t.bannerSub}</p>
       </div>
     </div>
   );

@@ -53,6 +53,14 @@ export interface StorefrontProfile {
   offer_closing_costs: string;
   testimonials: StorefrontTestimonial[];
   past_deals: StorefrontPastDeal[];
+  // Slice 125: video hello (storage path in the private
+  // storefront-videos bucket; played through a signed URL minted
+  // per page load — never a public listing) and the no-strangers
+  // promise (opt-in only: the pledge block appears on the page
+  // only when the wholesaler turns it on).
+  video_url: string;
+  no_strangers_enabled: boolean;
+  no_strangers_text: string;
 }
 
 // What a new profile starts with. These are starting values the
@@ -91,6 +99,9 @@ export function emptyStorefrontProfile(slug: string, company = ''): StorefrontPr
     ...DEFAULT_OFFER_TERMS,
     testimonials: [],
     past_deals: [],
+    video_url: '',
+    no_strangers_enabled: false,
+    no_strangers_text: '',
   };
 }
 
@@ -140,6 +151,9 @@ function rowToProfile(row: Record<string, unknown>): StorefrontProfile {
     offer_closing_costs: s('offer_closing_costs'),
     testimonials: cleanTestimonials(row.testimonials),
     past_deals: cleanPastDeals(row.past_deals),
+    video_url: s('video_url'),
+    no_strangers_enabled: row.no_strangers_enabled === true,
+    no_strangers_text: s('no_strangers_text'),
   };
 }
 
@@ -210,6 +224,9 @@ export async function saveMyStorefront(userId: string, p: StorefrontProfile): Pr
       .map((d) => ({ city: d.city.trim().slice(0, 80), days: d.days.trim().slice(0, 40), note: d.note.trim().slice(0, 200) }))
       .filter((d) => d.city)
       .slice(0, 3),
+    video_url: p.video_url.trim() || null,
+    no_strangers_enabled: p.no_strangers_enabled === true,
+    no_strangers_text: p.no_strangers_text.trim().slice(0, 500) || null,
   };
   const { error } = await supabase.from('storefront_profiles').upsert(payload, { onConflict: 'wholesaler_id' });
   if (error) throw error;
@@ -265,6 +282,15 @@ export interface SellerStep2 {
   timeline: string;
   asking_price: number | null;
   notes: string;
+  // Slice 125: the closing day the seller picked, and the
+  // inherited-home fast-lane answers. All optional; empty means
+  // the seller did not use them.
+  preferred_closing_date: string;
+  inherited_home: boolean;
+  estate_role: string;
+  letters_issued: string;
+  court_approval: string;
+  estate_notes: string;
 }
 
 export async function completeSellerLead(slug: string, leadId: string, d: SellerStep2): Promise<boolean> {
@@ -281,6 +307,12 @@ export async function completeSellerLead(slug: string, leadId: string, d: Seller
     p_timeline: d.timeline || null,
     p_asking_price: d.asking_price,
     p_notes: d.notes,
+    p_preferred_closing_date: d.preferred_closing_date || null,
+    p_inherited_home: d.inherited_home === true,
+    p_estate_role: d.estate_role || null,
+    p_letters_issued: d.letters_issued || null,
+    p_court_approval: d.court_approval || null,
+    p_estate_notes: d.estate_notes || null,
   });
   if (error) return false;
   return data === true;

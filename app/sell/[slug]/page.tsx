@@ -17,6 +17,8 @@ import {
   TIMELINES,
   type StorefrontProfile,
 } from '../../../lib/storefront';
+import { getStorefrontDict, STOREFRONT_LANGS, type StorefrontLang } from '../../../lib/storefront-i18n';
+import { fetchTrackToken } from '../../../lib/tracker';
 import VoiceIntake from '../../../components/VoiceIntake';
 import StorefrontHeader from '../../../components/StorefrontHeader';
 import StorefrontTrust from '../../../components/StorefrontTrust';
@@ -46,18 +48,22 @@ const EMPTY: SellerLeadForm = {
 const MAX_STEP2_PHOTOS = 5;
 
 function ToggleRow({
-  label, options, value, onPick,
+  label, options, value, onPick, labels,
 }: {
   label: string;
   options: string[];
   value: string;
   onPick: (v: string) => void;
+  // Slice 125 — display labels in the seller's language; the
+  // stored value stays the English constant (the database, the
+  // notes, and the dashboard all read the same value).
+  labels?: string[];
 }) {
   return (
     <div style={{ marginTop: 8 }}>
       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>{label}</p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {options.map((o) => (
+        {options.map((o, i) => (
           <button key={o} type="button" onClick={() => onPick(value === o ? '' : o)}
             style={{
               padding: '8px 14px', borderRadius: 999, fontSize: 13.5, cursor: 'pointer',
@@ -66,7 +72,7 @@ function ToggleRow({
               border: value === o ? '1px solid #4ade80' : '1px solid #334155',
               fontWeight: value === o ? 700 : 400,
             }}>
-            {o}
+            {labels?.[i] || o}
           </button>
         ))}
       </div>
@@ -102,6 +108,23 @@ export default function SellerPage() {
   const [closedCount, setClosedCount] = useState<number | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // Slice 125 — language toggle, closing-date picker,
+  // inherited-home fast lane, and the private tracking link.
+  const [lang, setLang] = useState<StorefrontLang>('en');
+  const [trackToken, setTrackToken] = useState('');
+  const [closingDate, setClosingDate] = useState('');
+  const [inherited, setInherited] = useState(false);
+  const [estate, setEstate] = useState({ role: '', letters: '', court: '', notes: '' });
+  const t = getStorefrontDict(lang);
+
+  // Slice 125 — after a successful submission, fetch the private
+  // tracking token so the thank-you screen can show the seller
+  // their tracking link. A failure shows no link at all — never
+  // a link that does not work.
+  useEffect(() => {
+    if (!sent || !leadId || !slug) return;
+    fetchTrackToken(leadId, slug).then((tok) => { if (tok) setTrackToken(tok); }).catch(() => undefined);
+  }, [sent, leadId, slug]);
 
   useEffect(() => {
     if (!slug) return;
@@ -129,7 +152,7 @@ export default function SellerPage() {
 
   const submitStep1 = async () => {
     if (!f.owner_name.trim() || !f.property_address.trim()) {
-      setErr('Please add your name and the property address.');
+      setErr(t.errNameAddress);
       return;
     }
     setBusy(true);
@@ -147,13 +170,13 @@ export default function SellerPage() {
       setStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      setErr('Your details could not be sent. Check the address and name, then try again.');
+      setErr(t.errStep1);
     }
   };
 
   const submitStep2 = async () => {
     if (!leadId) {
-      setErr('Your first step did not save — please go back and send it again.');
+      setErr(t.errStep1);
       return;
     }
     setBusy(true);
@@ -181,10 +204,19 @@ export default function SellerPage() {
       timeline: d2.timeline,
       asking_price: asking !== null && Number.isFinite(asking) ? asking : null,
       notes,
+      // Slice 125 — the closing day the seller picked, and the
+      // inherited-home fast-lane answers (only when the seller
+      // used the fast lane).
+      preferred_closing_date: closingDate,
+      inherited_home: inherited,
+      estate_role: inherited ? estate.role : '',
+      letters_issued: inherited ? estate.letters : '',
+      court_approval: inherited ? estate.court : '',
+      estate_notes: inherited ? estate.notes.trim() : '',
     });
     if (!ok) {
       setBusy(false);
-      setErr('Your details could not be finished — but your address and contact from step 1 are saved, and we will still reach out.');
+      setErr(t.errStep2);
       return;
     }
     // Step-2 photos ride the same sealed route as the post-submit
@@ -265,27 +297,32 @@ export default function SellerPage() {
     return (
       <div>
         <section style={{ background: '#052e16', padding: 24, borderRadius: 12 }}>
-          <h1>Thank you{f.owner_name ? `, ${f.owner_name.split(' ')[0]}` : ''}.</h1>
+          <h1>{t.thankYou}{f.owner_name ? `, ${f.owner_name.split(' ')[0]}` : ''}.</h1>
           <p style={{ fontSize: 15 }}>
-            {page.company} received your property details and will reach out shortly.
-            There’s nothing else you need to do.
+            {page.company} {t.receivedMsg}
           </p>
+          {trackToken && (
+            <p style={{ fontSize: 15, marginTop: 12 }}>
+              📍 {t.trackIntro}{' '}
+              <a href={`/track/${trackToken}`} style={{ color: '#4ade80', fontWeight: 700 }}>
+                {t.trackLink}
+              </a>
+            </p>
+          )}
           {photoNote && <p style={{ fontSize: 14 }}>{photoNote}</p>}
           {leadId && (
             <div style={{ marginTop: 16 }}>
               <p style={{ fontSize: 14 }}>
-                <strong>Optional:</strong> photos help {page.company} understand the property — the outside,
-                any rooms or repairs you want them to see. Images only, up to 6, and they go only to
-                {' '}{page.company}'s private file for this property.
+                <strong>Optional:</strong> {t.sentPhotoTitle.split('{company}').join(page.company)}
               </p>
               <input type="file" accept="image/*" multiple disabled={photoBusy}
                 onChange={(e) => { void sendPhotos(e.target.files); e.target.value = ''; }} />
-              {photoBusy && <p style={{ fontSize: 13.5 }}>Sending…</p>}
+              {photoBusy && <p style={{ fontSize: 13.5 }}>{t.sending}</p>}
               {photoNote && <p style={{ fontSize: 13.5 }}>{photoNote}</p>}
             </div>
           )}
         </section>
-        <StorefrontTrust profile={profile} company={page.company} closedCount={closedCount} />
+        <StorefrontTrust profile={profile} company={page.company} closedCount={closedCount} lang={lang} t={t} />
       </div>
     );
   }
@@ -293,34 +330,48 @@ export default function SellerPage() {
   return (
     <div>
       <style>{`.ws-sticky-call{display:none} @media (max-width:640px){.ws-sticky-call{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;gap:8px;padding:10px 12px;background:#0f172a;border-top:1px solid #334155}.ws-sticky-call a{flex:1;text-align:center;padding:12px 8px;border-radius:8px;font-weight:700;text-decoration:none}.ws-sticky-spacer{display:block;height:64px}}`}</style>
-      <StorefrontHeader page={page} profile={profile} />
+      {/* Slice 125 — language toggle: English / Español / Kreyòl Ayisyen. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {STOREFRONT_LANGS.map((l) => (
+          <button key={l.code} type="button" onClick={() => setLang(l.code)}
+            style={{
+              padding: '6px 12px', borderRadius: 999, fontSize: 13, cursor: 'pointer',
+              background: lang === l.code ? '#4ade80' : '#1e293b',
+              color: lang === l.code ? '#052e16' : '#e2e8f0',
+              border: lang === l.code ? '1px solid #4ade80' : '1px solid #334155',
+              fontWeight: lang === l.code ? 700 : 400,
+            }}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <StorefrontHeader page={page} profile={profile} lang={lang} t={t} />
 
       <VoiceIntake slug={slug} company={page.company} />
 
       <section style={{ background: '#16213a', padding: 20, borderRadius: 12 }}>
-        <h2>Tell us about your property</h2>
+        <h2>{t.tellUs}</h2>
         {step === 1 ? (
           <div>
             <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 0 }}>
-              Step 1 of 2 — just the basics, and we will reach out with a fair cash offer.
-              Your details go only to {page.company}.
+              {t.step1Note}
             </p>
             <div>
-              <input placeholder="Your full name *" value={f.owner_name}
+              <input placeholder={t.namePh} value={f.owner_name}
                 onChange={(e) => setF({ ...f, owner_name: e.target.value })} style={{ minWidth: 260 }} />
-              <input placeholder="Phone" value={f.phone}
+              <input placeholder={t.phonePh} value={f.phone}
                 onChange={(e) => setF({ ...f, phone: e.target.value })} />
-              <input placeholder="Email" value={f.email}
+              <input placeholder={t.emailPh} value={f.email}
                 onChange={(e) => setF({ ...f, email: e.target.value })} style={{ minWidth: 240 }} />
             </div>
             <div style={{ marginTop: 6 }}>
-              <input placeholder="Property address *" value={f.property_address}
+              <input placeholder={t.addressPh} value={f.property_address}
                 onChange={(e) => setF({ ...f, property_address: e.target.value })} style={{ minWidth: 320 }} />
             </div>
             <label style={{ fontSize: 13, display: 'block', marginTop: 8 }}>
               <input type="checkbox" checked={consent}
                 onChange={(e) => setConsent(e.target.checked)} />{' '}
-              It&apos;s OK for {page.company} to call or text me about my property.
+              {t.consent}
             </label>
             {/* Honeypot: invisible to people, filled by bots. Do not remove. */}
             <input type="text" name="website" value={f.website} autoComplete="off" tabIndex={-1}
@@ -329,45 +380,98 @@ export default function SellerPage() {
             {err && <p style={{ fontSize: 13.5, color: '#fbbf24' }}>{err}</p>}
             <div style={{ marginTop: 10 }}>
               <button onClick={submitStep1} disabled={busy} style={{ fontSize: 15, padding: '10px 22px' }}>
-                {busy ? 'Sending…' : 'Get My Cash Offer'}
+                {busy ? t.sending : t.getOffer}
               </button>
             </div>
             <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
               Your information goes only to {page.company} — it is never sold or shared with the
               platform. {page.company} may purchase your property directly or assign its purchase
               contract to another buyer; you’ll always know who you’re closing with before you sign.
+              {lang !== 'en' && <><br />{t.disclosureGoverns}</>}
             </p>
           </div>
         ) : (
           <div>
             <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 0 }}>
-              Step 2 of 2 — a few details help price your offer accurately. Your address and
-              contact from step 1 are already saved, so you can close this page any time and
-              we will still reach out.
+              {t.step2Note}
             </p>
             <div>
-              <input placeholder="City" value={f.city}
+              <input placeholder={t.cityPh} value={f.city}
                 onChange={(e) => setF({ ...f, city: e.target.value })} />
-              <input placeholder="State" value={f.state}
+              <input placeholder={t.statePh} value={f.state}
                 onChange={(e) => setF({ ...f, state: e.target.value })} style={{ width: 90 }} />
-              <input placeholder="ZIP" value={f.zip}
+              <input placeholder={t.zipPh} value={f.zip}
                 onChange={(e) => setF({ ...f, zip: e.target.value })} style={{ width: 110 }} />
             </div>
-            <ToggleRow label="Property type" options={PROPERTY_TYPES} value={d2.property_type}
+            <ToggleRow label={t.typeLabel} options={PROPERTY_TYPES} value={d2.property_type} labels={t.typeOptions}
               onPick={(v) => setD2({ ...d2, property_type: v })} />
-            <ToggleRow label="Property condition" options={CONDITIONS} value={d2.condition}
+            <ToggleRow label={t.conditionLabel} options={CONDITIONS} value={d2.condition} labels={t.conditionOptions}
               onPick={(v) => setD2({ ...d2, condition: v })} />
-            <ToggleRow label="Who lives there now?" options={OCCUPANCIES} value={d2.occupancy}
+            <ToggleRow label={t.occupancyLabel} options={OCCUPANCIES} value={d2.occupancy} labels={t.occupancyOptions}
               onPick={(v) => setD2({ ...d2, occupancy: v })} />
-            <ToggleRow label="How soon would you like to sell?" options={TIMELINES} value={d2.timeline}
+            <ToggleRow label={t.timelineLabel} options={TIMELINES} value={d2.timeline} labels={t.timelineOptions}
               onPick={(v) => setD2({ ...d2, timeline: v })} />
             <div style={{ marginTop: 8 }}>
-              <input placeholder="Asking price (optional)" value={d2.asking_price}
+              <input placeholder={t.askingPh} value={d2.asking_price}
                 onChange={(e) => setD2({ ...d2, asking_price: e.target.value })} style={{ minWidth: 220 }} />
+            </div>
+            {/* Slice 125 — the seller picks their ideal closing day. */}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                {t.closingDateLabel}
+              </label>
+              <input type="date" value={closingDate} min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setClosingDate(e.target.value)} style={{ minWidth: 200 }} />
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{t.closingDateHint}</p>
+            </div>
+            {/* Slice 125 — inherited-home fast lane: one tap, only the
+                estate facts, and the plain note that a sale can be
+                contingent on court approval. Informational only. */}
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => setInherited(!inherited)}
+                style={{
+                  padding: '8px 14px', borderRadius: 999, fontSize: 13.5, cursor: 'pointer',
+                  background: inherited ? '#4ade80' : '#1e293b',
+                  color: inherited ? '#052e16' : '#e2e8f0',
+                  border: inherited ? '1px solid #4ade80' : '1px solid #334155',
+                  fontWeight: inherited ? 700 : 400,
+                }}>
+                🏠 {t.inheritedToggle}
+              </button>
+              {inherited && (
+                <div style={{ marginTop: 8, background: '#0f172a', padding: 12, borderRadius: 8 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>{t.inheritedTitle}</p>
+                  <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 8px' }}>{t.estateNote}</p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <select value={estate.role} onChange={(e) => setEstate({ ...estate, role: e.target.value })}>
+                      <option value="">{t.estateRoleLabel}</option>
+                      {['Personal representative', 'Trustee', 'Other'].map((v, i) => (
+                        <option key={v} value={v}>{t.estateRoleOptions[i]}</option>
+                      ))}
+                    </select>{' '}
+                    <select value={estate.letters} onChange={(e) => setEstate({ ...estate, letters: e.target.value })}>
+                      <option value="">{t.lettersLabel}</option>
+                      {['Yes', 'No', 'Not yet', 'Not sure'].map((v, i) => (
+                        <option key={v} value={v}>{t.lettersOptions[i]}</option>
+                      ))}
+                    </select>{' '}
+                    <select value={estate.court} onChange={(e) => setEstate({ ...estate, court: e.target.value })}>
+                      <option value="">{t.courtLabel}</option>
+                      {['Yes', 'No', 'Not sure'].map((v, i) => (
+                        <option key={v} value={v}>{t.courtOptions[i]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <input placeholder={t.estateNotesPh} value={estate.notes}
+                      onChange={(e) => setEstate({ ...estate, notes: e.target.value })} style={{ minWidth: 320 }} />
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ marginTop: 12 }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>
-                Photos help your offer — snap up to {MAX_STEP2_PHOTOS} (roof, kitchen, major damage). They go only to {page.company}&apos;s private file for this property.
+                {t.photosTitle}
               </p>
               <div
                 onDragOver={(e) => { e.preventDefault(); setPhotoDrag(true); }}
@@ -380,7 +484,7 @@ export default function SellerPage() {
                 onClick={() => document.getElementById('step2-photos')?.click()}
               >
                 <p style={{ fontSize: 14, margin: 0 }}>📸 Drop photos here, or tap to choose from your phone</p>
-                <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>Images only, up to 5 MB each, up to {MAX_STEP2_PHOTOS} photos.</p>
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{t.photosHint}</p>
                 <input id="step2-photos" type="file" accept="image/*" multiple style={{ display: 'none' }}
                   onChange={(e) => { if (e.target.files) addStep2Photos(e.target.files); e.target.value = ''; }} />
               </div>
@@ -400,56 +504,52 @@ export default function SellerPage() {
             </div>
             <div style={{ marginTop: 12 }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>
-                A few quick questions (optional) — your answers help price your offer accurately.
+                {t.questionsTitle}
               </p>
               <select value={q.roof} onChange={(e) => setQ({ ...q, roof: e.target.value })}>
-                <option value="">Roof age…</option>
-                <option>Under 10 years old</option>
-                <option>10–20 years old</option>
-                <option>Over 20 years / needs work</option>
-                <option>Not sure</option>
+                <option value="">{t.roofLabel}</option>
+                {['Under 10 years old', '10–20 years old', 'Over 20 years / needs work', 'Not sure'].map((v, i) => (
+                  <option key={v} value={v}>{t.roofOptions[i]}</option>
+                ))}
               </select>{' '}
               <select value={q.hvac} onChange={(e) => setQ({ ...q, hvac: e.target.value })}>
-                <option value="">Heating &amp; cooling…</option>
-                <option>Working</option>
-                <option>Needs repair</option>
-                <option>Not working / none</option>
-                <option>Not sure</option>
+                <option value="">{t.hvacLabel}</option>
+                {['Working', 'Needs repair', 'Not working / none', 'Not sure'].map((v, i) => (
+                  <option key={v} value={v}>{t.hvacOptions[i]}</option>
+                ))}
               </select>{' '}
               <select value={q.reason} onChange={(e) => setQ({ ...q, reason: e.target.value })}>
-                <option value="">Reason for selling…</option>
-                <option>Relocating</option>
-                <option>Inherited property</option>
-                <option>Downsizing</option>
-                <option>Behind on payments</option>
-                <option>Tired of landlording</option>
-                <option>Other / prefer not to say</option>
+                <option value="">{t.reasonLabel}</option>
+                {['Relocating', 'Inherited property', 'Downsizing', 'Behind on payments', 'Tired of landlording', 'Other / prefer not to say'].map((v, i) => (
+                  <option key={v} value={v}>{t.reasonOptions[i]}</option>
+                ))}
               </select>
             </div>
             <div style={{ marginTop: 6 }}>
-              <textarea placeholder="Anything else we should know? Whatever you're comfortable sharing."
+              <textarea placeholder={t.notesPh}
                 value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })}
                 rows={3} style={{ width: '100%', maxWidth: 620 }} />
             </div>
             {err && <p style={{ fontSize: 13.5, color: '#fbbf24' }}>{err}</p>}
             <div style={{ marginTop: 10 }}>
               <button onClick={submitStep2} disabled={busy} style={{ fontSize: 15, padding: '10px 22px' }}>
-                {busy ? 'Sending…' : 'Complete my request'}
+                {busy ? t.sending : t.complete}
               </button>{' '}
               <button onClick={() => setStep(1)} disabled={busy} style={{ fontSize: 14, padding: '10px 16px' }}>
-                Back
+                {t.back}
               </button>
             </div>
             <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
               Your information goes only to {page.company} — it is never sold or shared with the
               platform. {page.company} may purchase your property directly or assign its purchase
               contract to another buyer; you’ll always know who you’re closing with before you sign.
+              {lang !== 'en' && <><br />{t.disclosureGoverns}</>}
             </p>
           </div>
         )}
       </section>
 
-      <StorefrontTrust profile={profile} company={page.company} closedCount={closedCount} />
+      <StorefrontTrust profile={profile} company={page.company} closedCount={closedCount} lang={lang} t={t} />
 
       {phone && (
         <div className="ws-sticky-call">

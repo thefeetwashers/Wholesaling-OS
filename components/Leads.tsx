@@ -12,6 +12,7 @@ import LeadTags from './LeadTags';
 import LeadPhotos from './LeadPhotos';
 import ConsentPassport from './ConsentPassport';
 import RollCheck from './RollCheck';
+import LeadOfferTracker from './LeadOfferTracker';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -55,6 +56,14 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
   // stamp on save.
   const onLeadNotesChanged = (lead: Lead, notes: string) => {
     const next = leads.map((x) => (x === lead ? { ...x, notes } : x));
+    setLeads(next); onLeads(next);
+  };
+
+  // Slice 125 — the Offer & Tracker panel saves seller status and
+  // offer numbers; refresh the row in the list immediately so the
+  // panel never shows stale numbers after a save.
+  const onLeadChanged = (lead: Lead) => {
+    const next = leads.map((x) => (x.id === lead.id ? lead : x));
     setLeads(next); onLeads(next);
   };
 
@@ -237,6 +246,10 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             )}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <RollCheck userId={userId} lead={l} onStamped={(notes) => onLeadNotesChanged(l, notes)} />
+            )}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') &&
+              (l.list_source === 'Seller landing page' || l.list_source === 'Seller page voice intake') && (
+              <LeadOfferTracker userId={userId} lead={l} onLeadChanged={onLeadChanged} />
             )}
             {' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (

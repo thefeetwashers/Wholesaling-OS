@@ -10,6 +10,8 @@ import {
   type StorefrontTestimonial,
   type StorefrontPastDeal,
 } from '../lib/storefront';
+import { DEFAULT_NO_STRANGERS } from '../lib/storefront-i18n';
+import VideoHelloRecorder from './VideoHelloRecorder';
 import { loadSellerPageSettings } from '../lib/portals';
 
 // Slice 124 — Storefront Settings in the wholesaler dashboard.
@@ -153,6 +155,33 @@ export default function StorefrontSettingsCard({ userId }: { userId: string }) {
           onChange={(e) => set('title_company', e.target.value)} style={{ minWidth: 340 }} />
         <input placeholder="Booking link (optional — Calendly, etc.)" value={p.booking_link}
           onChange={(e) => set('booking_link', e.target.value)} style={{ minWidth: 280, marginLeft: 6 }} />
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>
+          Video hello (optional) — a 30-second selfie video that plays at the top of your seller page.
+        </p>
+        <VideoHelloRecorder userId={userId} videoUrl={p.video_url}
+          onVideoChanged={(v) => set('video_url', v)} />
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>
+          The video is stored privately and plays only on your page — save your settings after recording so the page picks it up.
+        </p>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <label style={{ fontSize: 13 }}>
+          <input type="checkbox" checked={p.no_strangers_enabled}
+            onChange={(e) => set('no_strangers_enabled', e.target.checked)} />{' '}
+          Show the no-strangers promise on my page
+        </label>
+        {p.no_strangers_enabled && (
+          <div style={{ marginTop: 6 }}>
+            <textarea placeholder={DEFAULT_NO_STRANGERS}
+              value={p.no_strangers_text} onChange={(e) => set('no_strangers_text', e.target.value.slice(0, 500))}
+              rows={2} style={{ width: '100%', maxWidth: 560 }} />
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>
+              Leave it blank to use the standard wording. Edit it only to say what you will actually do — the promise shows only while this box is checked.
+            </p>
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 6 }}>
         <input placeholder="Turnaround promise — e.g. within 24 hours" value={p.turnaround_promise}
