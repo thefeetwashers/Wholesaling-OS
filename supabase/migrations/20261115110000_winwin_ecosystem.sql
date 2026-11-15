@@ -467,22 +467,6 @@ create policy "originator reads own jv listings"
   to authenticated
   using (originating_wholesaler_id = auth.uid());
 
--- A partner whose interest was accepted reads the partnered listing.
-drop policy if exists "accepted partner reads partnered listing" on public.jv_listings;
-create policy "accepted partner reads partnered listing"
-  on public.jv_listings
-  for select
-  to authenticated
-  using (
-    status = 'partnered'
-    and exists (
-      select 1 from public.jv_interests ji
-      where ji.jv_listing_id = jv_listings.id
-        and ji.wholesaler_id = auth.uid()
-        and ji.status = 'accepted'
-    )
-  );
-
 -- Originator manages their own listings (post, close, reopen, delete).
 drop policy if exists "originator manages own jv listings" on public.jv_listings;
 create policy "originator manages own jv listings"
@@ -601,6 +585,26 @@ create policy "operator reads all jv interests"
   for select
   to authenticated
   using (public.is_operator());
+
+-- A partner whose interest was accepted reads the partnered listing.
+-- NOTE: this policy lives here, after jv_interests is created, because
+-- its USING clause queries public.jv_interests. Creating it in section
+-- 4 (before jv_interests exists) fails with "relation does not exist"
+-- and rolls the whole migration back.
+drop policy if exists "accepted partner reads partnered listing" on public.jv_listings;
+create policy "accepted partner reads partnered listing"
+  on public.jv_listings
+  for select
+  to authenticated
+  using (
+    status = 'partnered'
+    and exists (
+      select 1 from public.jv_interests ji
+      where ji.jv_listing_id = jv_listings.id
+        and ji.wholesaler_id = auth.uid()
+        and ji.status = 'accepted'
+    )
+  );
 
 -- ----------------------------------------------------------------------------
 -- 5. mail_credits_ledger — Direct Mail Credits.
