@@ -8,6 +8,8 @@ import RecordsRequestDesk from './RecordsRequestDesk';
 import PublicNotices from './PublicNotices';
 import PropertyLookup from './PropertyLookup';
 import CsvLeadImporter from './CsvLeadImporter';
+import CountyPresetBar from './CountyPresetBar';
+import { DEFAULT_FLORIDA_COUNTY_PRESET, type FloridaCountyPreset } from '../lib/floridaCountyPresets';
 
 // County records (Slice 22). Two platform-verified layers, both read
 // from Supabase — nothing here is guessed:
@@ -56,6 +58,10 @@ export default function Counties({ userId }: { userId: string | null }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formMsg, setFormMsg] = useState('');
   const [formBusy, setFormBusy] = useState(false);
+  // Slice 129 — the active county preset (default St. Lucie) for
+  // the distress importer area: the clerk + appraiser links above
+  // the importer, and the county the imported rows belong to.
+  const [selectedCounty, setSelectedCounty] = useState<FloridaCountyPreset>(DEFAULT_FLORIDA_COUNTY_PRESET);
 
   const refreshMine = () => {
     if (userId) loadUserCounties(userId).then(setMine).catch(() => {});
@@ -171,8 +177,12 @@ export default function Counties({ userId }: { userId: string | null }) {
 
       {/* Slice 123 — the lookup bar and the distress-list importer
           live on this desk, next to the doors the lists come from:
-          look a parcel up on the roll, or drop a county list in. */}
+          look a parcel up on the roll, or drop a county list in.
+          Slice 129 — the county preset bar sits above the importer:
+          pick the county the list came from and the clerk +
+          appraiser links for it are right there. */}
       <PropertyLookup userId={userId} />
+      <CountyPresetBar selectedCounty={selectedCounty} onSelectCounty={setSelectedCounty} />
       <CsvLeadImporter userId={userId} />
 
       <StateRecords userId={userId} />

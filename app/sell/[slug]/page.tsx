@@ -116,6 +116,20 @@ export default function SellerPage() {
   const [inherited, setInherited] = useState(false);
   const [estate, setEstate] = useState({ role: '', letters: '', court: '', notes: '' });
   const t = getStorefrontDict(lang);
+  // Slice 127 — the ?case= probate tag from a storefront link
+  // (/sell/<slug>?case=2026CP001433). Read from the URL on mount
+  // (window.location, not useSearchParams — no Suspense boundary
+  // needed), sanitized to a case-number shape only. It only
+  // echoes the number from the link — nothing is invented — and
+  // rides both steps of the form into leads.probate_case_number.
+  const [probateCase, setProbateCase] = useState('');
+  useEffect(() => {
+    try {
+      const raw = new URLSearchParams(window.location.search).get('case') || '';
+      const cleaned = raw.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+      if (cleaned) setProbateCase(cleaned);
+    } catch { /* no URL, no tag — the form behaves as today */ }
+  }, []);
 
   // Slice 125 — after a successful submission, fetch the private
   // tracking token so the thank-you screen can show the seller
@@ -163,7 +177,7 @@ export default function SellerPage() {
       phone: f.phone.trim(),
       email: f.email.trim(),
       consent: consent && !!f.phone.trim(),
-    }, f.website);
+    }, f.website, probateCase || undefined);
     setBusy(false);
     if (newLeadId) {
       setLeadId(newLeadId);
@@ -213,6 +227,8 @@ export default function SellerPage() {
       letters_issued: inherited ? estate.letters : '',
       court_approval: inherited ? estate.court : '',
       estate_notes: inherited ? estate.notes.trim() : '',
+      // Slice 127 — the ?case= probate tag, carried from step 1.
+      probate_case_number: probateCase || '',
     });
     if (!ok) {
       setBusy(false);
@@ -346,6 +362,15 @@ export default function SellerPage() {
         ))}
       </div>
       <StorefrontHeader page={page} profile={profile} lang={lang} t={t} />
+
+      {/* Slice 127 — probate reference badge: shown only when the
+          seller arrived on a /sell/<slug>?case=<number> link. It
+          echoes the case number from the URL and nothing else. */}
+      {probateCase && (
+        <p style={{ background: '#422006', padding: '10px 14px', borderRadius: 8, fontSize: 14, marginTop: 12 }}>
+          📁 Reference File: <strong>#{probateCase}</strong> — Priority Review
+        </p>
+      )}
 
       <VoiceIntake slug={slug} company={page.company} />
 

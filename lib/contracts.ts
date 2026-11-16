@@ -578,3 +578,182 @@ export function emdCountdownText(deadlineIso: string, now: Date = new Date()): s
   const m = Math.floor((ms % 3600000) / 60000);
   return `${h}h ${m}m remaining`;
 }
+
+// ---------------------------------------------------------------------------
+// Slice 128 — Wholesale Contract Generator: A-to-B purchase agreement
+// + B-to-C assignment. Templates only, not legal advice. Every
+// document carries the attorney-review banner top AND bottom.
+// Merge tags are the field names in WholesaleContractFields.
+// Money fields are EMPTY by default in the form — no invented
+// prices, earnest money, or fees are ever baked in. The assignment
+// EMD amount, refundability, and deadline are editable form fields,
+// never a hardcoded "$5,000 non-refundable within 24 hours". The
+// MAO, when shown, is a reference ceiling only — never the price.
+// The B-to-C assignment is effective only once the A-to-B purchase
+// agreement is signed (canSignBC / ab_status in this same file).
+// Print / .txt export happens in the generator component; nothing
+// here files, sends, or signs anything.
+// ---------------------------------------------------------------------------
+
+export interface WholesaleContractFields {
+  // Wholesaler (Buyer under the A-to-B, Assignor under the B-to-C).
+  buyer_name: string;
+  buyer_entity: string;
+  buyer_address: string;
+  buyer_email: string;
+  buyer_phone: string;
+  // Seller under the A-to-B.
+  seller_name: string;
+  seller_address: string;
+  // Property.
+  property_address: string;
+  city: string;
+  county: string;
+  state: string;
+  parcel_id: string;
+  // A-to-B money + terms. All empty by default in the form.
+  purchase_price: number | null;
+  earnest_money: number | null;
+  earnest_money_refundable: boolean;
+  earnest_money_deadline: string;
+  inspection_days: number | null;
+  closing_date: string;
+  title_company: string;
+  // B-to-C money + terms. All empty by default in the form.
+  end_buyer_name: string;
+  end_buyer_entity: string;
+  assignment_fee: number | null;
+  assignment_emd_amount: number | null;
+  assignment_emd_refundable: boolean;
+  assignment_emd_deadline: string;
+  // Probate authority (kept from the platform's probate strategy).
+  is_probate: boolean;
+  probate_case_number: string;
+  // MAO reference only — a ceiling, never the price.
+  mao_reference: number | null;
+}
+
+export const PURCHASE_AGREEMENT_MERGE_TAGS = [
+  '{{buyer_name}}', '{{buyer_entity}}', '{{buyer_address}}', '{{buyer_email}}', '{{buyer_phone}}',
+  '{{seller_name}}', '{{seller_address}}',
+  '{{property_address}}', '{{city}}', '{{county}}', '{{state}}', '{{parcel_id}}',
+  '{{purchase_price}}', '{{earnest_money}}', '{{earnest_money_refundable}}', '{{earnest_money_deadline}}',
+  '{{inspection_days}}', '{{closing_date}}', '{{title_company}}',
+  '{{is_probate}}', '{{probate_case_number}}',
+] as const;
+
+export const ASSIGNMENT_CONTRACT_MERGE_TAGS = [
+  '{{buyer_name}}', '{{buyer_entity}}', '{{end_buyer_name}}', '{{end_buyer_entity}}',
+  '{{property_address}}', '{{city}}', '{{county}}', '{{state}}', '{{parcel_id}}',
+  '{{purchase_price}}', '{{assignment_fee}}',
+  '{{assignment_emd_amount}}', '{{assignment_emd_refundable}}', '{{assignment_emd_deadline}}',
+  '{{closing_date}}', '{{title_company}}', '{{mao_reference}}',
+] as const;
+
+const contractBlank = (v: string | null | undefined) => (v && v.trim() ? v : '[not given]');
+
+function probateAuthorityClause(f: WholesaleContractFields): string {
+  if (!f.is_probate) return '';
+  const caseLine = f.probate_case_number.trim()
+    ? ` Probate case: ${f.probate_case_number.trim()}.`
+    : '';
+  return `\nPROBATE AUTHORITY — This sale is contingent on the Seller having authority to sell: Letters Testamentary, Letters of Administration, or a Summary Administration order, as the court requires.${caseLine} Where the court must approve the sale, closing waits for that approval — the Buyer never asks the Seller to skip a step the court requires. If the court does not approve the sale, this agreement ends and any earnest money is returned as the court directs.`;
+}
+
+export function buildPurchaseAgreement(f: WholesaleContractFields): string {
+  const emdLine = f.earnest_money != null
+    ? `Earnest money: ${moneyOrBlank(f.earnest_money)}, ${f.earnest_money_refundable ? 'refundable' : 'non-refundable'} as stated here, due ${contractBlank(f.earnest_money_deadline)}.`
+    : 'Earnest money: [amount not given] — enter the agreed amount, whether it is refundable, and the deadline before printing.';
+  const inspectionLine = f.inspection_days != null
+    ? `Inspection period: ${f.inspection_days} day(s) from acceptance. Buyer may inspect and cancel within that period.`
+    : 'Inspection period: [not given] — enter the agreed number of days before printing.';
+  return `${ATTORNEY_REVIEW_BANNER}
+
+RESIDENTIAL PURCHASE AGREEMENT (A-to-B — Wholesaler buys from Seller)
+
+This template is software-generated for operational convenience and carries an attorney-review flag. Real estate contracts differ by state. Have licensed real estate counsel in your state review and approve this agreement before signing or submitting to title.
+
+BUYER (Wholesaler):
+  Name: ${contractBlank(f.buyer_name)}  (merge tag: {{buyer_name}})
+  Entity: ${contractBlank(f.buyer_entity)}  (merge tag: {{buyer_entity}})
+  Address: ${contractBlank(f.buyer_address)}  (merge tag: {{buyer_address}})
+  Email: ${contractBlank(f.buyer_email)}  (merge tag: {{buyer_email}})
+  Phone: ${contractBlank(f.buyer_phone)}  (merge tag: {{buyer_phone}})
+
+SELLER:
+  Name: ${contractBlank(f.seller_name)}  (merge tag: {{seller_name}})
+  Address: ${contractBlank(f.seller_address)}  (merge tag: {{seller_address}})
+
+PROPERTY:
+  Address: ${contractBlank(f.property_address)}  (merge tag: {{property_address}})
+  City: ${contractBlank(f.city)}  (merge tag: {{city}}), County: ${contractBlank(f.county)}  (merge tag: {{county}}), State: ${contractBlank(f.state)}  (merge tag: {{state}})
+  Parcel / APN: ${contractBlank(f.parcel_id)}  (merge tag: {{parcel_id}})
+
+1. PURCHASE PRICE: ${moneyOrBlank(f.purchase_price)}  (merge tag: {{purchase_price}}). The Seller sees this price only — no assignment fee, buyer, or margin appears in this agreement.
+2. ${emdLine}  (merge tags: {{earnest_money}}, {{earnest_money_refundable}}, {{earnest_money_deadline}})
+3. ${inspectionLine}  (merge tag: {{inspection_days}})
+4. CLOSING: on or before ${f.closing_date || '[date not given]'}  (merge tag: {{closing_date}}), at ${contractBlank(f.title_company)}  (merge tag: {{title_company}}). The Seller picks the closing date; the date above is the agreed target.
+5. AS-IS: the property is sold as-is. No repairs, no cleanout, no agent commissions are promised by either side unless written here.
+6. RIGHT TO ASSIGN: Buyer may assign this contract, in whole or in part, to a third party. The Buyer holds an equitable interest in the property and may market that interest, not the property itself.
+7. TITLE: Seller shall deliver marketable title, subject only to matters of record and any court approval required below.${probateAuthorityClause(f)}
+8. This agreement is the whole agreement for this property. Changes must be written and signed by both sides.
+
+SIGNATURES
+Buyer:
+  Signed: ______________________________  Date: __________
+  Name: ${contractBlank(f.buyer_name)}
+Seller:
+  Signed: ______________________________  Date: __________
+  Name: ${contractBlank(f.seller_name)}
+
+${ATTORNEY_REVIEW_BANNER}`;
+}
+
+export function buildAssignmentContract(f: WholesaleContractFields): string {
+  const total =
+    f.purchase_price != null && f.assignment_fee != null
+      ? `$${(f.purchase_price + f.assignment_fee).toLocaleString('en-US')}`
+      : '[total not given — enter both the purchase price and the assignment fee]';
+  const emdLine = f.assignment_emd_amount != null
+    ? `Earnest money deposit: ${moneyOrBlank(f.assignment_emd_amount)}, ${f.assignment_emd_refundable ? 'refundable' : 'non-refundable'} as stated here, due ${contractBlank(f.assignment_emd_deadline)}.`
+    : 'Earnest money deposit: [amount not given] — enter the agreed amount, whether it is refundable, and the deadline before printing.';
+  const maoLine = f.mao_reference != null
+    ? `MAO reference: $${Number(f.mao_reference).toLocaleString('en-US')} (merge tag: {{mao_reference}}). This is a ceiling from the wholesaler's own numbers — it is NOT the purchase price and is shown here for reference only.`
+    : '';
+  return `${ATTORNEY_REVIEW_BANNER}
+
+ASSIGNMENT OF CONTRACT (B-to-C — Wholesaler assigns to End Buyer)
+
+This template is software-generated for operational convenience and carries an attorney-review flag. Real estate contracts differ by state. Have licensed real estate counsel in your state review and approve this assignment before signing or submitting to title.
+
+EFFECTIVE ONLY WHEN SIGNED: this assignment takes effect only once the underlying A-to-B purchase agreement for the same property is signed. It assigns the Assignor's equitable interest in that contract — not the property itself.
+
+ASSIGNOR (Wholesaler — Buyer under the A-to-B):
+  Name: ${contractBlank(f.buyer_name)}  (merge tag: {{buyer_name}})
+  Entity: ${contractBlank(f.buyer_entity)}  (merge tag: {{buyer_entity}})
+
+ASSIGNEE (End Buyer):
+  Name: ${contractBlank(f.end_buyer_name)}  (merge tag: {{end_buyer_name}})
+  Entity: ${contractBlank(f.end_buyer_entity)}  (merge tag: {{end_buyer_entity}})
+
+PROPERTY (same property as the A-to-B):
+  Address: ${contractBlank(f.property_address)}  (merge tag: {{property_address}})
+  City: ${contractBlank(f.city)}  (merge tag: {{city}}), County: ${contractBlank(f.county)}  (merge tag: {{county}}), State: ${contractBlank(f.state)}  (merge tag: {{state}})
+  Parcel / APN: ${contractBlank(f.parcel_id)}  (merge tag: {{parcel_id}})
+
+1. UNDERLYING CONTRACT: the A-to-B purchase agreement for this property, at a contract price of ${moneyOrBlank(f.purchase_price)}  (merge tag: {{purchase_price}}), closing on or before ${f.closing_date || '[date not given]'}  (merge tag: {{closing_date}}) at ${contractBlank(f.title_company)}  (merge tag: {{title_company}}).
+2. ASSIGNMENT FEE: ${moneyOrBlank(f.assignment_fee)}  (merge tag: {{assignment_fee}}), payable to the Assignor at closing and shown on the settlement statement.
+3. TOTAL TO ASSIGNEE AT CLOSING: ${total} (contract price + assignment fee).
+4. ${emdLine}  (merge tags: {{assignment_emd_amount}}, {{assignment_emd_refundable}}, {{assignment_emd_deadline}})
+5. ASSIGNEE'S DUTIES: the Assignee steps into the Assignor's position under the A-to-B contract and closes on its terms, including any court approval the estate still needs.
+6. NO REPRESENTATION OF OWNERSHIP: the Assignor does not own the property. This assignment transfers only the Assignor's rights under the A-to-B contract.
+${maoLine ? `7. ${maoLine}\n\n` : ''}SIGNATURES
+Assignor:
+  Signed: ______________________________  Date: __________
+  Name: ${contractBlank(f.buyer_name)}
+Assignee:
+  Signed: ______________________________  Date: __________
+  Name: ${contractBlank(f.end_buyer_name)}
+
+${ATTORNEY_REVIEW_BANNER}`;
+}

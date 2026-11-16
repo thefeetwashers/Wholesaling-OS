@@ -5,8 +5,11 @@
 //   Mode B ?parcelId=&countyCode= — the Florida Statewide
 //   Cadastral roll (FDOR Property Tax Oversight), the same official
 //   service the State Records panel queries, narrowed to one parcel
-//   in one county (countyCode is the DOR CO_NO, 1–67 — see
-//   lib/property-lookup.ts; Charlotte is 8, not 17).
+//   in one county (countyCode is the DOR county code, 1–67 — see
+//   lib/property-lookup.ts; Charlotte is 8, not 17). The roll's
+//   own CO_NO field is the DOR code + 10 (Slice 126), and
+//   lookupFlParcel translates it — the route never sends the DOR
+//   code to the roll directly.
 // Florida only. A state joins this route only when its real service
 // URL is verified live; no other state's service is claimed here.
 // The platform stores nothing from either source: a record becomes

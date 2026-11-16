@@ -19,13 +19,18 @@ export const SHELL_VIEWS: ShellView[] = [
   { key: 'today', label: 'Today', icon: '📅', group: 'Command' },
   { key: 'assistant', label: 'AI Assistant', icon: '🤖', group: 'Command' },
   { key: 'leads', label: 'Leads', icon: '🏘️', group: 'Pipeline' },
+  { key: 'probate', label: 'Probate Leads', icon: '⚖️', group: 'Pipeline' },
   { key: 'board', label: 'Pipeline Board', icon: '📋', group: 'Pipeline' },
   { key: 'field', label: 'Field Capture', icon: '📍', group: 'Pipeline' },
   { key: 'comms', label: 'Comms Center', icon: '💬', group: 'Pipeline' },
   { key: 'sellerpage', label: 'Seller Page & Intake', icon: '🎙️', group: 'Pipeline' },
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝', group: 'Pipeline' },
+  // Slice 129 — the JV Split calculator lives in Pipeline, next to
+  // the contracts it feeds (it prints the existing JV agreement).
+  { key: 'jvcalc', label: 'JV Split', icon: '🧮', group: 'Pipeline' },
   { key: 'listings', label: 'My Listings', icon: '📣', group: 'Pipeline' },
   { key: 'buyers', label: 'Buyers', icon: '💵', group: 'Network' },
+  { key: 'cashbuyers', label: 'Cash Buyers', icon: '💰', group: 'Network' },
   { key: 'jvboard', label: 'JV Board', icon: '🤝', group: 'Network' },
   { key: 'directory', label: 'Lenders & Vendors', icon: '🧰', group: 'Network' },
   { key: 'titles', label: 'Title Companies', icon: '🏛️', group: 'Network' },
@@ -67,6 +72,10 @@ export default function Sidebar({
         <>
           <div className="ws-side-label">Platform owner</div>
           {item({ key: 'admin', label: 'Owner Admin', icon: '🛡️', group: 'Platform owner' })}
+          {/* Slice 129 — SaaS Admin (subscription rows, trial
+              countdowns, plan status) is operator-only, like Owner
+              Admin. RLS enforces it server-side too. */}
+          {item({ key: 'saasadmin', label: 'SaaS Admin', icon: '💳', group: 'Platform owner' })}
         </>
       )}
     </nav>

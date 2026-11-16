@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
-import { loadLeads, saveLead, updateLead, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, rentFlag, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
+import { loadLeads, saveLead, updateLead, updateLeadFields, deleteLead, leadsToCsv, isOutOfStateOwner, estimatedEquity, rentFlag, type Lead, type LeadStatus, LEAD_STATUSES } from '../lib/leads';
 import LeadLetter from './LeadLetter';
 import ScreenGuard from './ScreenGuard';
 import { DISTRESS_TAGS, loadAllTags, sortCallQueue, type DistressTagRow } from '../lib/distress';
+import { DISTRESS_TAGS as IMPORTER_DISTRESS_TAGS } from './CsvLeadImporter';
+import type { ContractPrefill } from './WholesaleContractGenerator';
 import { courtesyHold } from '../lib/courtesy';
 import ResearchLinks from './ResearchLinks';
 import LeadTags from './LeadTags';
@@ -13,10 +15,11 @@ import LeadPhotos from './LeadPhotos';
 import ConsentPassport from './ConsentPassport';
 import RollCheck from './RollCheck';
 import LeadOfferTracker from './LeadOfferTracker';
+import GoogleSkipTraceModal from './GoogleSkipTraceModal';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
-export default function Leads({ userId, userEmail, onLeads }: { userId: string | null; userEmail?: string | null; onLeads: (leads: Lead[]) => void }) {
+export default function Leads({ userId, userEmail, onLeads, onDraftContract }: { userId: string | null; userEmail?: string | null; onLeads: (leads: Lead[]) => void; onDraftContract?: (prefill: ContractPrefill) => void }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [form, setForm] = useState<Lead>(EMPTY);
   const [filter, setFilter] = useState<string>('all');
@@ -24,6 +27,11 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
   const [confirmId, setConfirmId] = useState<string>('');
   const [editingId, setEditingId] = useState<string>('');
   const [delMsg, setDelMsg] = useState<string>('');
+  // Slice 129 — Google Lookup modal target (distressed + inbound
+  // rows only). The save writes owner_phone/owner_email onto
+  // public.leads via updateLeadFields — never to a distressed_leads
+  // table, which does not exist.
+  const [googleTarget, setGoogleTarget] = useState<Lead | null>(null);
   // Slice 42 — distress tags + the human call queue.
   const [tagsByLead, setTagsByLead] = useState<Record<string, DistressTagRow[]>>({});
   const [queueMode, setQueueMode] = useState(false);
@@ -126,7 +134,16 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
   };
 
   const todayISO = new Date().toISOString().slice(0, 10);
-  let shown = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
+  // Slice 127 — two extra filters ride the same dropdown: Probate
+  // Linked (the ?case= tag landed on the lead) and Step-1 Partial
+  // (the seller finished step 1 but not step 2). The row already
+  // rendered "Partial — step 1 only"; that wording is kept.
+  let shown = leads;
+  if (filter === 'probate') shown = leads.filter((l) => !!l.probate_case_number);
+  else if (filter === 'partial') shown = leads.filter((l) => l.is_partial === true);
+  else if (filter === 'aged100') shown = leads.filter((l) => l.created_at != null && Date.now() - new Date(l.created_at).getTime() >= 100 * 86400000);
+  else if (filter.startsWith('distress:')) shown = leads.filter((l) => l.distress_tag === filter.slice('distress:'.length));
+  else if (filter !== 'all') shown = leads.filter((l) => l.status === filter);
   let queueHeldBack = 0;
   if (queueMode) {
     shown = shown.filter((l) => {
@@ -187,6 +204,10 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
       <div style={{ marginTop: 16 }}>
         <label>Filter: <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="all">All</option>
+          <option value="probate">Probate Linked</option>
+          <option value="partial">Step-1 Partial</option>
+          <option value="aged100">100+ days old</option>
+          {IMPORTER_DISTRESS_TAGS.map((t) => <option key={t.value} value={`distress:${t.value}`}>Distress: {t.label}</option>)}
           {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select></label>{' '}
         <button onClick={downloadCsv} disabled={leads.length === 0}>Export CSV ({leads.length})</button>
@@ -220,6 +241,8 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
             <strong>{l.property_address}</strong> {l.city ? `— ${l.city}, ${l.state || ''} ${l.zip || ''}` : ''}
             {' '}· {l.status}
             {l.is_partial ? <span style={{ color: '#fbbf24' }}> · ⚠️ Partial — step 1 only</span> : ''}
+            {l.probate_case_number ? <span style={{ color: '#4ade80' }}> · 📁 Probate #{l.probate_case_number}</span> : ''}
+            {!l.property_address?.trim() ? <span style={{ color: '#fbbf24' }}> · ⚠️ Address needed — Clerk case lookup → appraiser mailing address</span> : ''}
             {l.property_type ? ` · ${l.property_type}` : ''}
             {l.condition ? ` · ${l.condition}` : ''}
             {l.occupancy ? ` · ${l.occupancy}` : ''}
@@ -252,8 +275,29 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
               <LeadOfferTracker userId={userId} lead={l} onLeadChanged={onLeadChanged} />
             )}
             {' '}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') &&
+              (l.distress_tag || l.list_source === 'Seller landing page' || l.list_source === 'Seller page voice intake') && (
+              <button onClick={() => setGoogleTarget(l)}>🔎 Google Lookup</button>
+            )}{' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <button onClick={() => startEdit(l)}>Edit</button>
+            )}{' '}
+            {onDraftContract && (
+              <button onClick={() => onDraftContract({
+                sellerName: l.owner_name || '',
+                propertyAddress: l.property_address,
+                city: l.city || '',
+                county: l.county || '',
+                parcelId: l.parcel_id || '',
+                probateCaseNumber: l.probate_case_number || '',
+                isProbate: !!l.probate_case_number,
+                // Purchase price comes from the wholesaler's own
+                // entered offer_amount ONLY when set — never from
+                // MAO (a ceiling, not the price). There is no
+                // stored assignment fee on a lead; the wholesaler
+                // types it in the generator.
+                purchasePrice: l.offer_amount ?? null,
+              })}>Draft Contract</button>
             )}{' '}
             <LeadLetter lead={l} tags={tagsByLead[l.id || ''] || []} />{' '}
             {confirmId === (l.id || l.property_address) ? (
@@ -267,6 +311,23 @@ export default function Leads({ userId, userEmail, onLeads }: { userId: string |
           </li>
         ))}
       </ul>
+      {googleTarget && userId && (
+        <GoogleSkipTraceModal
+          target={{ kind: 'lead', leadId: googleTarget.id || '' }}
+          ownerName={googleTarget.owner_name || ''}
+          propertyAddress={googleTarget.property_address || ''}
+          cityState={googleTarget.county || ''}
+          currentPhone={googleTarget.owner_phone || null}
+          currentEmail={googleTarget.owner_email || null}
+          onSave={async (phone, email) => {
+            await updateLeadFields(userId, googleTarget.id || '', { owner_phone: phone, owner_email: email });
+            const next = leads.map((x) => (x === googleTarget ? { ...x, owner_phone: phone, owner_email: email } : x));
+            setLeads(next);
+            onLeads(next);
+          }}
+          onClose={() => setGoogleTarget(null)}
+        />
+      )}
       </ScreenGuard>
     </section>
   );

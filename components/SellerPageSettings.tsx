@@ -73,7 +73,7 @@ export default function SellerPageSettingsCard({ userId }: { userId: string }) {
       <div style={{ marginTop: 6 }}>
         <span style={{ fontSize: 13, color: '#94a3b8' }}>wholesalingos.thefeetwashers.com/sell/</span>
         <input placeholder="your-company" value={s.public_slug}
-          onChange={(e) => setS({ ...s, public_slug: e.target.value })} />
+          onChange={(e) => setS({ ...s, public_slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-') })} />
       </div>
       <div style={{ marginTop: 6 }}>
         <input placeholder="Headline — e.g. We buy houses in Fort Pierce, any condition" value={s.seller_page_headline}

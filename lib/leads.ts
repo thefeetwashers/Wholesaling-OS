@@ -32,6 +32,14 @@ export interface Lead {
   mailing_zip?: string;
   phones?: string[];
   emails?: string[];
+  // Slice 129 — owner contact saved from a Google lookup
+  // (components/GoogleSkipTraceModal.tsx): the single phone/email
+  // the wholesaler chose for this lead. The phones[]/emails[]
+  // arrays above are the lead's full contact lists; these two are
+  // the skip-traced pair. Added by migration
+  // 20261115180000_leads_owner_contact.sql; null until set.
+  owner_phone?: string | null;
+  owner_email?: string | null;
   list_source?: string;
   created_at?: string;
   motivation_score?: number;
@@ -66,6 +74,9 @@ export interface Lead {
   // the wholesaler left blank; nothing is computed or invented.
   // preferred_closing_date is the day the seller picked.
   // inherited_home + estate_* are the fast-lane answers.
+  // Slice 127: probate_case_number is the ?case= tag from a
+  // probate storefront link (/sell/<slug>?case=2026CP001433) —
+  // the court file the seller came from, if any.
   tracker_token?: string | null;
   seller_status?: SellerStatus | null;
   preferred_closing_date?: string | null;
@@ -80,6 +91,7 @@ export interface Lead {
   letters_issued?: string | null;
   court_approval?: string | null;
   estate_notes?: string | null;
+  probate_case_number?: string | null;
   // Slice 24 (schema v4.1): consent + do-not-contact state.
   do_not_contact?: boolean;
   consent_status?: ConsentStatus;

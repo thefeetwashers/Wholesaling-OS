@@ -176,6 +176,20 @@ export const FL_CADASTRAL_OUT_FIELDS = [
   'PARCEL_ID', 'OWN_NAME', 'OWN_ADDR1', 'PHY_ADDR1', 'JV', 'CO_NO', 'DOR_UC', 'ACT_YR_BLT', 'LND_VAL',
 ].join(',');
 
+// Slice 126 — the roll's CO_NO is NOT the DOR county code: it is
+// the DOR code + 10, uniformly. Verified live against the real
+// service on Nov 15, 2026: a point query at the office address
+// (4848 NW 24th Court, Lauderdale Lakes — Broward, DOR 6)
+// returned a parcel with CO_NO 16; a Fort Pierce parcel (St.
+// Lucie, DOR 56) carries CO_NO 66; CO_NO = 6 has ZERO records in
+// the roll while CO_NO = 16 has 766,749; and the counts for roll
+// codes 23 (Miami-Dade, DOR 13), 26 (Duval, DOR 16), 39
+// (Hillsborough, DOR 29), 58 (Orange, DOR 48) and 60 (Palm Beach,
+// DOR 50) all match those counties' parcel sizes. The DOR
+// registry above stays 1–67 — only the roll's field is offset —
+// so queries ADD the offset and returned records SUBTRACT it.
+export const ROLL_COUNTY_CODE_OFFSET = 10;
+
 // Verified-live county parcel services, available for future
 // per-county enrichment. NOT wired into the lookup route in this
 // slice — the route uses the statewide roll (Mode B) so every
@@ -242,7 +256,11 @@ export function mapCadastralFeature(attrs: Record<string, unknown>): PropertyLoo
   const address = s(attrs.PHY_ADDR1).trim();
   if (!address && !parcelId) return null;
   const coNo = n(attrs.CO_NO);
-  const county = coNo !== null ? countyByCode(Math.round(coNo)) : undefined;
+  // Slice 126 — the roll's CO_NO is the DOR code + 10, so a
+  // returned record's county is found by subtracting the offset
+  // (a Broward parcel arrives with CO_NO 16, not 6; reading it
+  // as a DOR code would label it Duval).
+  const county = coNo !== null ? countyByCode(Math.round(coNo) - ROLL_COUNTY_CODE_OFFSET) : undefined;
   const jv = n(attrs.JV);
   const lnd = n(attrs.LND_VAL);
   const yr = n(attrs.ACT_YR_BLT);
@@ -276,7 +294,10 @@ export async function lookupFlParcel(
   const out: PropertyLookupResult[] = [];
   for (const id of tries) {
     const escaped = id.replace(/'/g, "''");
-    const where = `PARCEL_ID = '${escaped}' AND CO_NO = ${countyCode}`;
+    // Slice 126 — the roll's CO_NO is the DOR code + 10 (see
+    // ROLL_COUNTY_CODE_OFFSET): querying the DOR code itself
+    // returns nothing for every county.
+    const where = `PARCEL_ID = '${escaped}' AND CO_NO = ${countyCode + ROLL_COUNTY_CODE_OFFSET}`;
     const qs = new URLSearchParams({
       where,
       outFields: FL_CADASTRAL_OUT_FIELDS,

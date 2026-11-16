@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { importLeads, loadLeads, type Lead } from '../lib/leads';
+import { readSpreadsheetRows, isSpreadsheetFile } from '../lib/spreadsheet';
 
 // Slice 123 — distress-list CSV importer. This is NOT the Import
 // Inbox (components/ImportInbox.tsx, Slice 30): that one imports
@@ -27,6 +28,7 @@ export type DistressTag =
   | 'probate'
   | 'code_violation'
   | 'vacant_absentee'
+  | 'fire_damage'
   | 'tax_deed';
 
 export const DISTRESS_TAGS: { value: DistressTag; label: string }[] = [
@@ -35,6 +37,7 @@ export const DISTRESS_TAGS: { value: DistressTag; label: string }[] = [
   { value: 'probate', label: 'Probate / estate' },
   { value: 'code_violation', label: 'Code violation' },
   { value: 'vacant_absentee', label: 'Vacant / absentee owner' },
+  { value: 'fire_damage', label: 'Fire damage' },
   { value: 'tax_deed', label: 'Tax deed / lands available' },
 ];
 
@@ -42,10 +45,12 @@ const TAG_VALUES = new Set<string>(DISTRESS_TAGS.map((t) => t.value));
 
 type FieldKey = 'property_address' | 'city' | 'state' | 'zip' | 'county' | 'owner_name'
   | 'mailing_address' | 'mailing_city' | 'mailing_state' | 'mailing_zip' | 'parcel_id'
-  | 'assessed_value' | 'year_built' | 'distress_tag';
+  | 'assessed_value' | 'year_built' | 'distress_tag' | 'case_number' | 'description';
 
 const FIELDS: { key: FieldKey; label: string; aliases: string[] }[] = [
-  { key: 'property_address', label: 'Property address *', aliases: ['property_address', 'property address', 'address', 'street address', 'street', 'situs address', 'property', 'situs'] },
+  { key: 'property_address', label: 'Property address', aliases: ['property_address', 'property address', 'address', 'street address', 'street', 'situs address', 'property', 'situs'] },
+  { key: 'case_number', label: 'Case number (for case lists without addresses)', aliases: ['case number', 'case_number', 'caseid', 'case id', 'case no', 'case no.'] },
+  { key: 'description', label: 'Description / parties', aliases: ['description', 'desc', 'case description', 'parties', 'plaintiff', 'case parties'] },
   { key: 'city', label: 'City', aliases: ['city'] },
   { key: 'state', label: 'State', aliases: ['state', 'st'] },
   { key: 'zip', label: 'ZIP', aliases: ['zip', 'zipcode', 'zip code', 'postal'] },
@@ -102,6 +107,144 @@ function normTag(raw: string): DistressTag | null {
   return TAG_VALUES.has(v) ? (v as DistressTag) : null;
 }
 
+// Defendant (owner) from a case description like
+// "PNC BANK NATIONAL ASSOCIATION -VS- COOPER, AMANDA" — the party
+// after -VS-. Returns '' when there is no -VS- (never guesses).
+export function defendantFromDescription(description: string): string {
+  const parts = description.split(/\s+-VS-\s*/i);
+  return parts.length > 1 ? (parts[parts.length - 1] || '').trim() : '';
+}
+
+export interface DistressBuildOutput {
+  toInsert: Lead[];
+  dupes: number;
+  noAddress: number;
+  addressNeeded: number;
+  absentee: number;
+  tagged: number;
+}
+
+// Pure row -> lead builder (exported so the address-less branch is
+// testable without a browser). Same dedupe / tag / absentee rules
+// the component always used, plus the address-optional rule:
+// a row with NO property address but WITH a case number still
+// becomes a lead — property_address stays '' (never invented),
+// the case number + parties ride in the notes, and the row is
+// flagged "address needed" with its next step. A row with neither
+// an address nor a case number cannot be identified at all and is
+// skipped. Address-less rows dedupe within the file by case number
+// (leads carry no case-number column to match against the office).
+export function buildDistressLeads(args: {
+  rows: string[][];
+  mapping: Partial<Record<FieldKey, number>>;
+  fileTag: DistressTag | '';
+  sourceLabel: string;
+  fileName: string;
+  existing: Lead[];
+}): DistressBuildOutput {
+  const { rows, mapping, fileTag, sourceLabel, fileName, existing } = args;
+  const cell = (r: string[], key: FieldKey): string => {
+    const idx = mapping[key];
+    if (idx === undefined || idx < 0) return '';
+    return (r[idx] || '').trim();
+  };
+  const seenParcel = new Set<string>();
+  const seenAddr = new Set<string>();
+  const seenCase = new Set<string>();
+  for (const l of existing) {
+    if (l.parcel_id) seenParcel.add(normAddr(l.parcel_id));
+    seenAddr.add(`${normAddr(l.property_address)}|${normAddr(l.zip || l.city || '')}`);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const stamp = `Imported ${today} from "${fileName}" — source: ${sourceLabel.trim()}`;
+  const toInsert: Lead[] = [];
+  let dupes = 0;
+  let noAddress = 0;
+  let addressNeeded = 0;
+  let absentee = 0;
+  let tagged = 0;
+  for (const r of rows) {
+    const address = cell(r, 'property_address');
+    const caseNumber = cell(r, 'case_number');
+    const description = cell(r, 'description');
+    const rowTag = normTag(cell(r, 'distress_tag'));
+    const tag = rowTag || (fileTag === '' ? null : fileTag);
+    if (tag) tagged++;
+    const money = (v: string): number | null => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return Number.isFinite(n) && n >= 0 ? n : null; };
+    if (!address) {
+      // Address-less case row (e.g. the founder's foreclosure file:
+      // caseid, Case Number, Description, Case Type, Entered Date,
+      // TotalFee — no address column at all). Keep it, flagged.
+      if (!caseNumber) { noAddress++; continue; }
+      const caseKey = normAddr(caseNumber);
+      if (seenCase.has(caseKey)) { dupes++; continue; }
+      seenCase.add(caseKey);
+      const owner = cell(r, 'owner_name') || defendantFromDescription(description);
+      addressNeeded++;
+      toInsert.push({
+        property_address: '',
+        city: cell(r, 'city') || null,
+        state: cell(r, 'state') || null,
+        zip: cell(r, 'zip') || null,
+        county: cell(r, 'county') || null,
+        owner_name: owner || null,
+        mailing_address: cell(r, 'mailing_address') || null,
+        mailing_city: cell(r, 'mailing_city') || null,
+        mailing_state: cell(r, 'mailing_state') || null,
+        mailing_zip: cell(r, 'mailing_zip') || null,
+        parcel_id: cell(r, 'parcel_id') || null,
+        assessed_value: money(cell(r, 'assessed_value')),
+        year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
+        status: 'new',
+        list_source: `Distress import: ${sourceLabel.trim()}`.slice(0, 120),
+        notes: `${stamp} · Case ${caseNumber}${description ? ` — ${description}` : ''} · Address needed — next step: Clerk case lookup → appraiser mailing address`,
+        consent_status: 'unknown',
+        distress_tag: tag,
+        is_absentee_owner: false,
+      } as unknown as Lead);
+      continue;
+    }
+    const parcel = cell(r, 'parcel_id');
+    const owner = cell(r, 'owner_name');
+    const parcelKey = parcel ? normAddr(parcel) : '';
+    const addrKey = `${normAddr(address)}|${normAddr(cell(r, 'zip') || cell(r, 'city'))}`;
+    // In-file dedupe first (same parcel, or same owner + address),
+    // then dedupe against the leads already in the office.
+    if ((parcelKey && seenParcel.has(parcelKey)) || seenAddr.has(addrKey)) { dupes++; continue; }
+    if (parcelKey) seenParcel.add(parcelKey);
+    seenAddr.add(addrKey);
+    const mailing = cell(r, 'mailing_address');
+    // Absentee: the owner's mail goes somewhere other than the
+    // property itself. Compared on the normalized street lines;
+    // a missing mailing address is not a flag.
+    const isAbsentee = !!mailing && normAddr(mailing) !== normAddr(address);
+    if (isAbsentee) absentee++;
+    const notes = tag ? `${stamp} · Distress: ${tag}` : stamp;
+    toInsert.push({
+      property_address: address,
+      city: cell(r, 'city') || null,
+      state: cell(r, 'state') || null,
+      zip: cell(r, 'zip') || null,
+      county: cell(r, 'county') || null,
+      owner_name: owner || null,
+      mailing_address: mailing || null,
+      mailing_city: cell(r, 'mailing_city') || null,
+      mailing_state: cell(r, 'mailing_state') || null,
+      mailing_zip: cell(r, 'mailing_zip') || null,
+      parcel_id: parcel || null,
+      assessed_value: money(cell(r, 'assessed_value')),
+      year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
+      status: 'new',
+      list_source: `Distress import: ${sourceLabel.trim()}`.slice(0, 120),
+      notes,
+      consent_status: 'unknown',
+      distress_tag: tag,
+      is_absentee_owner: isAbsentee,
+    } as unknown as Lead);
+  }
+  return { toInsert, dupes, noAddress, addressNeeded, absentee, tagged };
+}
+
 export default function CsvLeadImporter({ userId, onAdded }: { userId: string | null; onAdded?: () => void }) {
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState<string[]>([]);
@@ -118,9 +261,7 @@ export default function CsvLeadImporter({ userId, onAdded }: { userId: string | 
     const f = files && files[0];
     if (!f) return;
     setResult('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCsv(String(reader.result || ''));
+    const applyParsed = (parsed: string[][]) => {
       if (parsed.length < 2) { setResult('That file has no data rows under its header row — nothing to import.'); return; }
       const hdrs = parsed[0].map((h) => h.trim());
       const data = parsed.slice(1, MAX_ROWS + 1);
@@ -137,6 +278,19 @@ export default function CsvLeadImporter({ userId, onAdded }: { userId: string | 
         setResult(`This importer takes up to ${MAX_ROWS} rows at a time — the first ${MAX_ROWS} are loaded.`);
       }
     };
+    // Excel (.xlsx/.xls) reads the FIRST sheet only and feeds the
+    // SAME pipeline as CSV — header auto-mapping, dedupe, and the
+    // tag logic are identical. Never invents columns or rows.
+    if (isSpreadsheetFile(f.name)) {
+      readSpreadsheetRows(f).then(applyParsed).catch((e) => {
+        setResult(`Could not read that spreadsheet: ${e instanceof Error ? e.message : 'unknown error.'}`);
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      applyParsed(parseCsv(String(reader.result || '')));
+    };
     reader.readAsText(f);
   }
 
@@ -148,69 +302,19 @@ export default function CsvLeadImporter({ userId, onAdded }: { userId: string | 
 
   async function runImport() {
     if (!sourceLabel.trim()) { setResult('Name the list source first — every imported lead carries where it came from (for example: "St. Lucie County lis pendens, Nov 2026").'); return; }
-    if (mapping.property_address === undefined) { setResult('Map the Property address column before importing — rows without an address cannot become leads.'); return; }
+    if (mapping.property_address === undefined && mapping.case_number === undefined) { setResult('Map the Property address column, or the Case Number column for a case list without addresses — rows with neither an address nor a case number cannot become leads.'); return; }
     setBusy(true);
     setResult('');
     try {
       const existing = (await loadLeads(userId as string)) || [];
-      const seenParcel = new Set<string>();
-      const seenAddr = new Set<string>();
-      for (const l of existing) {
-        if (l.parcel_id) seenParcel.add(normAddr(l.parcel_id));
-        seenAddr.add(`${normAddr(l.property_address)}|${normAddr(l.zip || l.city || '')}`);
-      }
-      const today = new Date().toISOString().slice(0, 10);
-      const stamp = `Imported ${today} from "${fileName}" — source: ${sourceLabel.trim()}`;
-      const toInsert: Lead[] = [];
-      let dupes = 0;
-      let noAddress = 0;
-      let absentee = 0;
-      let tagged = 0;
-      for (const r of rows) {
-        const address = cell(r, 'property_address');
-        if (!address) { noAddress++; continue; }
-        const parcel = cell(r, 'parcel_id');
-        const owner = cell(r, 'owner_name');
-        const parcelKey = parcel ? normAddr(parcel) : '';
-        const addrKey = `${normAddr(address)}|${normAddr(cell(r, 'zip') || cell(r, 'city'))}`;
-        // In-file dedupe first (same parcel, or same owner + address),
-        // then dedupe against the leads already in the office.
-        if ((parcelKey && seenParcel.has(parcelKey)) || seenAddr.has(addrKey)) { dupes++; continue; }
-        if (parcelKey) seenParcel.add(parcelKey);
-        seenAddr.add(addrKey);
-        const rowTag = normTag(cell(r, 'distress_tag'));
-        const tag = rowTag || (fileTag === '' ? null : fileTag);
-        if (tag) tagged++;
-        const mailing = cell(r, 'mailing_address');
-        // Absentee: the owner's mail goes somewhere other than the
-        // property itself. Compared on the normalized street lines;
-        // a missing mailing address is not a flag.
-        const isAbsentee = !!mailing && normAddr(mailing) !== normAddr(address);
-        if (isAbsentee) absentee++;
-        const money = (v: string): number | null => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return Number.isFinite(n) && n >= 0 ? n : null; };
-        const notes = tag ? `${stamp} · Distress: ${tag}` : stamp;
-        toInsert.push({
-          property_address: address,
-          city: cell(r, 'city') || null,
-          state: cell(r, 'state') || null,
-          zip: cell(r, 'zip') || null,
-          county: cell(r, 'county') || null,
-          owner_name: owner || null,
-          mailing_address: mailing || null,
-          mailing_city: cell(r, 'mailing_city') || null,
-          mailing_state: cell(r, 'mailing_state') || null,
-          mailing_zip: cell(r, 'mailing_zip') || null,
-          parcel_id: parcel || null,
-          assessed_value: money(cell(r, 'assessed_value')),
-          year_built: (() => { const y = parseInt(cell(r, 'year_built'), 10); return Number.isFinite(y) && y > 1600 && y < 2100 ? y : null; })(),
-          status: 'new',
-          list_source: `Distress import: ${sourceLabel.trim()}`.slice(0, 120),
-          notes,
-          consent_status: 'unknown',
-          distress_tag: tag,
-          is_absentee_owner: isAbsentee,
-        } as unknown as Lead);
-      }
+      const { toInsert, dupes, noAddress, addressNeeded, absentee, tagged } = buildDistressLeads({
+        rows,
+        mapping,
+        fileTag,
+        sourceLabel,
+        fileName,
+        existing,
+      });
       let outcome = await importLeads(userId as string, toInsert, BATCH_SIZE);
       let columnsMissing = false;
       // The distress columns arrive with migration 20261115120000.
@@ -232,7 +336,8 @@ export default function CsvLeadImporter({ userId, onAdded }: { userId: string | 
         `${tagged ? `, ${tagged} tagged with a distress signal` : ''}` +
         `${absentee ? `, ${absentee} flagged absentee-owner (mailing address differs from the property)` : ''}` +
         `${dupes ? `, ${dupes} duplicate${dupes === 1 ? '' : 's'} skipped (already in your pipeline or repeated in the file)` : ''}` +
-        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address)` : ''}.` +
+        `${noAddress ? `, ${noAddress} row${noAddress === 1 ? '' : 's'} skipped (no address and no case number)` : ''}` +
+        `${addressNeeded ? `, ${addressNeeded} flagged address needed (case number + parties only — next step: clerk case lookup → appraiser mailing address)` : ''}.` +
         `${columnsMissing ? ' Note: the Slice 123 migration (distress_tag / is_absentee_owner columns) has not been applied to the database yet, so the tags are stamped in each lead’s notes for now and will land in their own columns once it is applied.' : ''}` +
         `${outcome.error ? ` Some rows were rejected by the database: ${outcome.error}` : ''}`);
       if (inserted > 0 && onAdded) onAdded();
@@ -250,15 +355,17 @@ export default function CsvLeadImporter({ userId, onAdded }: { userId: string | 
     <section style={{ background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 }}>
       <h2>Distress-list importer — lis pendens, probate, tax lists</h2>
       <p style={{ fontSize: 13.5, marginTop: 0 }}>
-        Upload a CSV you lawfully obtained from the county (lis pendens, probate, tax-delinquent,
-        tax deed, code violations). Pick the distress signal for the whole file — or map a tag column
+        Upload a CSV or Excel file you lawfully obtained from the county (lis pendens, probate, tax-delinquent,
+        tax deed, code violations). A case list with no address column still imports — each row becomes a
+        lead with its case number + parties, flagged &ldquo;address needed&rdquo; with the next step (clerk case
+        lookup → appraiser mailing address); no address is ever invented. Pick the distress signal for the whole file — or map a tag column
         and let each row carry its own. Absentee owners are flagged automatically when the mailing
         address differs from the property address. Duplicates are skipped, the list source is
         stamped on every lead, and nothing is invented: phones and emails are never added by this
         importer — they come from the county record or your own skip trace, not from a list.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files)} />
+        <input type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={(e) => onFile(e.target.files)} />
         <input style={{ flex: '1 1 260px' }} placeholder="List source — e.g. St. Lucie County lis pendens, Nov 2026" value={sourceLabel} onChange={(e) => setSourceLabel(e.target.value)} />
         <label style={{ fontSize: 13 }}>
           Distress signal for this file{' '}

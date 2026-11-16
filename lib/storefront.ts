@@ -241,7 +241,15 @@ export interface SellerStep1 {
   consent: boolean;
 }
 
-export async function submitSellerLeadStep1(slug: string, f: SellerStep1, website: string): Promise<string | null> {
+export async function submitSellerLeadStep1(
+  slug: string,
+  f: SellerStep1,
+  website: string,
+  // Slice 127 — the ?case= probate tag from the storefront link
+  // (/sell/<slug>?case=2026CP001433). Carried to the lead so the
+  // wholesaler sees which probate file the seller came from.
+  probateCaseNumber?: string,
+): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null;
   const notes = [
     'Partial submission — step 1 of 2 (address + contact only); details not yet provided.',
@@ -267,6 +275,7 @@ export async function submitSellerLeadStep1(slug: string, f: SellerStep1, websit
     p_occupancy: null,
     p_timeline: null,
     p_asking_price: null,
+    p_probate_case_number: probateCaseNumber || null,
   });
   if (error || !data) return null;
   return String(data);
@@ -291,6 +300,8 @@ export interface SellerStep2 {
   letters_issued: string;
   court_approval: string;
   estate_notes: string;
+  // Slice 127 — the ?case= probate tag, carried from step 1.
+  probate_case_number?: string;
 }
 
 export async function completeSellerLead(slug: string, leadId: string, d: SellerStep2): Promise<boolean> {
@@ -313,6 +324,7 @@ export async function completeSellerLead(slug: string, leadId: string, d: Seller
     p_letters_issued: d.letters_issued || null,
     p_court_approval: d.court_approval || null,
     p_estate_notes: d.estate_notes || null,
+    p_probate_case_number: d.probate_case_number || null,
   });
   if (error) return false;
   return data === true;

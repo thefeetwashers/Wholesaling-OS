@@ -58,6 +58,12 @@ import StaleDollars from '../components/StaleDollars';
 import MoneyScoreboard from '../components/MoneyScoreboard';
 import AdminConsole from '../components/AdminConsole';
 import PlatformHealth from '../components/PlatformHealth';
+import ProbateLeads from '../components/ProbateLeads';
+import WholesaleContractGenerator, { type ContractPrefill } from '../components/WholesaleContractGenerator';
+import CashBuyersDealBlast from '../components/CashBuyersDealBlast';
+import JVCoWholesalingCalculator from '../components/JVCoWholesalingCalculator';
+import AdminSaaSDashboard from '../components/AdminSaaSDashboard';
+import SubscriptionBanner from '../components/SubscriptionBanner';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
 import StorefrontSettingsCard from '../components/StorefrontSettings';
 import SignKit from '../components/SignKit';
@@ -78,6 +84,15 @@ export default function Home() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [view, setView] = useState('dashboard');
   const [leadsNonce, setLeadsNonce] = useState(0);
+  // Slice 128 — a Draft Contract button on a probate or inbound row
+  // carries its prefill here and opens the Contracts view with the
+  // generator filled in. Money in the prefill comes only from the
+  // wholesaler's own entered offer_amount — never from MAO.
+  const [contractPrefill, setContractPrefill] = useState<ContractPrefill | null>(null);
+  const openContractDraft = (prefill: ContractPrefill) => {
+    setContractPrefill(prefill);
+    setView('contracts');
+  };
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
   const [role, setRole] = useState<string | null>(null);
@@ -119,7 +134,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 125</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 129</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -170,9 +185,14 @@ export default function Home() {
         <div className="ws-shell">
           <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} />
           <div className="ws-view">
-            <GlobalSearch userId={userId} onNavigate={setView} />
+            <GlobalSearch userId={userId} onNavigate={setView} onDraftContract={openContractDraft} />
             {view === 'dashboard' && (
               <>
+                {/* Slice 129 — the subscription banner: trial countdown
+                    + Activate Plan, or Pro Active + Manage Billing.
+                    It hides itself when the table does not exist
+                    yet (migration 20261115170000 not applied). */}
+                {userId && <SubscriptionBanner userId={userId} />}
                 {role === 'wholesaler' && userId && <CommandCenter userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <Sprint userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DealRadar onNavigate={setView} />}
@@ -228,7 +248,7 @@ export default function Home() {
                 <ListingParser userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <ImportInbox userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
                 <WebhookPanel userId={userId} onAdded={() => setLeadsNonce((n) => n + 1)} />
-                <div id="leads"><Leads key={leadsNonce} userId={userId} userEmail={userEmail} onLeads={setLeads} /></div>
+                <div id="leads"><Leads key={leadsNonce} userId={userId} userEmail={userEmail} onLeads={setLeads} onDraftContract={openContractDraft} /></div>
                 <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 16 }}>
                   No fake leads, buyers, or deals are seeded here. Empty states are
                   honest empty states until you enter your own data. Your buyer list
@@ -242,6 +262,9 @@ export default function Home() {
                 <DealAnalyzer userId={userId} />
                 <RentalAnalyzer userId={userId} />
               </>
+            )}
+            {view === 'probate' && (
+              <div id="probate"><ProbateLeads userId={userId} onDraftContract={openContractDraft} /></div>
             )}
             {view === 'board' && (
               <div id="board"><KanbanBoard userId={userId} /></div>
@@ -257,6 +280,9 @@ export default function Home() {
             )}
             {view === 'contracts' && (
               <>
+                {userId && (
+                  <div id="contract-generator"><WholesaleContractGenerator userId={userId} prefill={contractPrefill} /></div>
+                )}
                 <div id="contracts"><Contracts userId={userId} userEmail={userEmail} /></div>
                 <Paperwork userId={userId} />
                 <Viewings userId={userId} />
@@ -267,8 +293,14 @@ export default function Home() {
             {view === 'buyers' && (
               <div id="buyers"><Buyers userId={userId} userEmail={userEmail} /></div>
             )}
+            {view === 'cashbuyers' && userId && (
+              <div id="cashbuyers"><CashBuyersDealBlast userId={userId} /></div>
+            )}
             {view === 'jvboard' && (
               <div id="jvboard"><JVDealRoom userId={userId} /></div>
+            )}
+            {view === 'jvcalc' && userId && (
+              <div id="jvcalc"><JVCoWholesalingCalculator userId={userId} /></div>
             )}
             {view === 'directory' && (
               <div id="directory"><VendorDirectory userId={userId} /></div>
@@ -295,6 +327,9 @@ export default function Home() {
                 <PlatformHealth userEmail={userEmail} />
                 {userId && <OwnerDealDesk userId={userId} />}
               </>
+            )}
+            {view === 'saasadmin' && userEmail === OWNER_EMAIL && (
+              <div id="saasadmin"><AdminSaaSDashboard /></div>
             )}
           </div>
         </div>
