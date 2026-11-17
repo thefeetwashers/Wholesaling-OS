@@ -8,8 +8,11 @@ import { loadMyFundingRequests, loadDirectFundingRequests, loadFundingRequestHis
 
 const EMPTY: DealContract = {
   property_address: '', city: '', state: '', seller_name: '', buyer_name: '',
-  contract_price: 150000, arv: 300000, repairs: 50000,
-  assignment_fee: 10000, emd_amount: 1000,
+  // Slice 136 — money fields start blank (null), never pre-filled:
+  // the old 150000 / 300000 / 50000 / 10000 / 1000 defaults showed
+  // up in the pipeline as if they were a real deal's money.
+  contract_price: null, arv: null, repairs: null,
+  assignment_fee: null, emd_amount: null,
   ab_status: 'Draft', jv_status: 'Not a JV deal', bc_status: 'Draft',
 };
 
@@ -131,6 +134,12 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
 
   const setStatus = (key: 'ab_status' | 'bc_status', v: SigStatus) => setC({ ...c, [key]: v });
 
+  // Slice 136 — money inputs stay blank until the user types an
+  // amount; clearing a field back to empty means "not provided",
+  // never $0.
+  const setMoney = (key: 'contract_price' | 'arv' | 'repairs' | 'assignment_fee' | 'emd_amount', raw: string) =>
+    setC({ ...c, [key]: raw.trim() === '' ? null : Number(raw) });
+
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Contracts — Signature Pipeline</h2>
@@ -146,11 +155,12 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
         <input placeholder="City" value={c.city || ''} onChange={(e) => setC({ ...c, city: e.target.value })} />
         <input placeholder="State" value={c.state || ''} onChange={(e) => setC({ ...c, state: e.target.value })} />
         <input placeholder="Buyer name" value={c.buyer_name} onChange={(e) => setC({ ...c, buyer_name: e.target.value })} />
-        <label>Contract price $ <input type="number" value={c.contract_price} onChange={(e) => setC({ ...c, contract_price: Number(e.target.value) })} /></label>
-        <label>ARV $ <input type="number" value={c.arv} onChange={(e) => setC({ ...c, arv: Number(e.target.value) })} /></label>
-        <label>Repairs $ <input type="number" value={c.repairs} onChange={(e) => setC({ ...c, repairs: Number(e.target.value) })} /></label>
-        <label>Assignment fee $ <input type="number" value={c.assignment_fee} onChange={(e) => setC({ ...c, assignment_fee: Number(e.target.value) })} /></label>
-        <label>EMD $ <input type="number" value={c.emd_amount} onChange={(e) => setC({ ...c, emd_amount: Number(e.target.value) })} /></label>
+        <label>Contract price $ <input type="number" placeholder="Not provided" value={c.contract_price ?? ''} onChange={(e) => setMoney('contract_price', e.target.value)} /></label>
+        <label>ARV $ <input type="number" placeholder="Not provided" value={c.arv ?? ''} onChange={(e) => setMoney('arv', e.target.value)} /></label>
+        <label>Repairs $ <input type="number" placeholder="Not provided" value={c.repairs ?? ''} onChange={(e) => setMoney('repairs', e.target.value)} /></label>
+        <label>Assignment fee $ <input type="number" placeholder="Not provided" value={c.assignment_fee ?? ''} onChange={(e) => setMoney('assignment_fee', e.target.value)} /></label>
+        <label>EMD $ <input type="number" placeholder="Not provided" value={c.emd_amount ?? ''} onChange={(e) => setMoney('emd_amount', e.target.value)} /></label>
+        <p style={{ fontSize: 12.5, color: '#94a3b8', margin: 0 }}>Money fields start blank — enter the agreed amounts. A blank field means “not provided”, never $0, and nothing here is pre-filled.</p>
         <input placeholder="JV partner (leave blank if solo deal)" value={c.jv_partner || ''} onChange={(e) => setC({ ...c, jv_partner: e.target.value, jv_status: e.target.value ? 'Draft' : 'Not a JV deal' })} />
       </div>
       <div style={{ marginTop: 12 }}>
@@ -168,7 +178,7 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
       {view === 'buyer' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{buyerView(c)}</pre>}
       {view === 'title' && <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', padding: 12, borderRadius: 8 }}>{titlePackage(c)}</pre>}
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Mode: {mode === 'synced' ? 'Deals synced to Supabase (your rows only, RLS)' : 'Local only — sign in with Supabase configured to save deals.'}{savedMsg ? ` ${savedMsg}` : ''}</p>
-      {deals.length > 0 && <ul>{deals.map((d) => <li key={d.id || ''}>{(d.documents as { property_address?: string } | undefined)?.property_address || 'Deal'} — {d.contract_type}, ${d.contract_price ?? 0}, fee ${d.assignment_fee ?? 0}, status {d.status}<br /><span style={{ fontSize: 12, color: '#94a3b8' }}>Deal ID: {d.id} — share this with your seller so they can link and sign in their portal.</span></li>)}</ul>}
+      {deals.length > 0 && <ul>{deals.map((d) => <li key={d.id || ''}>{(d.documents as { property_address?: string } | undefined)?.property_address || 'Deal'} — {d.contract_type}, {d.contract_price != null ? `$${d.contract_price}` : 'price not given'}, fee {d.assignment_fee != null ? `$${d.assignment_fee}` : 'not given'}, status {d.status}<br /><span style={{ fontSize: 12, color: '#94a3b8' }}>Deal ID: {d.id} — share this with your seller so they can link and sign in their portal.</span></li>)}</ul>}
 
       {(isOperator || fundingRequests.length > 0) && (
         <section style={{ background: '#0f172a', padding: 16, borderRadius: 10, marginTop: 16 }}>

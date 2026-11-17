@@ -24,6 +24,9 @@ interface Receipt {
 
 export default function ValueReceipt({ userId }: { userId: string }) {
   const [r, setR] = useState<Receipt | null>(null);
+  // Slice 136 — a failed leads/KPI load is an error state: the
+  // receipt must not print zeros as if they had been counted.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -40,21 +43,38 @@ export default function ValueReceipt({ userId }: { userId: string }) {
       const now = Date.now();
       const day = Math.max(1, Math.floor((now - start) / 86400000) + 1);
       const daysLeft = Math.ceil((end - now) / 86400000);
-      const [leads, kpis] = await Promise.all([
-        loadLeads(userId).catch(() => null),
-        loadKpis(userId).catch(() => null),
-      ]);
-      if (!live) return;
-      setR({
-        day,
-        daysLeft,
-        leads: (leads || []).length,
-        contracts: kpis?.contractsSignedTotal ?? 0,
-        fees: kpis?.feesClosedTotal ?? 0,
-      });
+      // Slice 136 — no silent fallbacks: a failed leads or KPI load
+      // throws here and is reported below instead of rendering the
+      // receipt with 0 leads / 0 contracts / $0 in fees as fact.
+      try {
+        const [leads, kpis] = await Promise.all([
+          loadLeads(userId),
+          loadKpis(userId),
+        ]);
+        if (!leads || !kpis) throw new Error('Receipt data unavailable');
+        if (!live) return;
+        setR({
+          day,
+          daysLeft,
+          leads: leads.length,
+          contracts: kpis.contractsSignedTotal,
+          fees: kpis.feesClosedTotal,
+        });
+      } catch {
+        if (live) setLoadFailed(true);
+      }
     })();
     return () => { live = false; };
   }, [userId]);
+
+  if (loadFailed) {
+    return (
+      <p style={{ fontSize: 13, color: '#fca5a5', marginTop: 16 }}>
+        🧾 Your receipt could not be counted just now — the leads, contracts, and fees are unknown, not zero.
+        Check your connection and reload the page to try again.
+      </p>
+    );
+  }
 
   if (!r) return null;
 

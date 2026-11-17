@@ -6,12 +6,7 @@ import {
   PORTAL_ROLES,
   loadMyProfile,
   setMyRole,
-  loadMyBuyBoxes,
-  saveBuyBox,
-  deleteBuyBox,
-  confirmBuyBox,
   loadFeed,
-  listingMatchesBox,
   loadDashboard,
   loadSellerDeals,
   loadTitleLink,
@@ -20,7 +15,6 @@ import {
   loadIncomingOffers,
   setOfferStatus,
   acceptOffer,
-  loadAllBuyBoxes,
   loadMyListings,
   setListingStatus,
   type MyListing,
@@ -34,7 +28,6 @@ import {
   setMyProofOfFunds,
   type BuyerRecord,
   type PortalRole,
-  type BuyBox,
   type FeedListing,
   type DashboardData,
   type LinkedDeal,
@@ -48,7 +41,23 @@ import ScoutPortal, { ScoutClaimBoard, MyClaimedLeads } from './ScoutPortal';
 import BuyerProofCard from './BuyerProofCard';
 import LenderDashboard from './LenderDashboard';
 import { loadMySchoolBadge } from '../lib/school';
-import { loadMyBuyBox, type BuyBox as Slice131BuyBox } from '../lib/buy-box';
+// Slice 136 — buy-box merge: the buyer portal and the demand
+// view read the LIVE table only (lib/buy-box.ts,
+// public.wholesaler_buy_boxes — one row per wholesaler). The
+// legacy multi-box list on public.buy_boxes is gone from the
+// app; there is one buy box per account, saved with
+// saveMyBuyBox, and published boxes are the only ones other
+// people can see (loadAllPublishedBuyBoxes).
+import {
+  loadMyBuyBox,
+  saveMyBuyBox,
+  loadAllPublishedBuyBoxes,
+  listingMatchesBox,
+  CONDITION_OPTIONS,
+  STRATEGY_OPTIONS,
+  CLOSING_TIMELINE_OPTIONS,
+  type BuyBox as LiveBuyBox,
+} from '../lib/buy-box';
 // Slice 132 — Matching deals. lib/match-buy-box.ts is built by
 // another Slice 132 worker; import its exact contract here, do
 // not redefine it. The file lands before the build runs.
@@ -288,9 +297,9 @@ function EarnedBuyerTiers({ userId }: { userId: string }) {
 
   return (
     <div>
-      <h4>Earned buyer tiers — counted from platform closing records</h4>
+      <h4>Earned buyer tiers — from the closing record the platform holds</h4>
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
-        Only buyers who have offered on your listings appear here. The counts are the buyer&apos;s database-counted
+        Only buyers who have offered on your listings appear here. The counts are the buyer&apos;s
         platform record from Slice 21 — accepted offers, B–C signings, and escrow outcomes — not a manual CRM
         label, a buyer&apos;s self-rating, or an outside list. Rules: Tier 1 = 3+ closed; Tier 2 = 1–2 closed;
         Tier 3 = no closings yet; Caution overrides when more escrows fell through than closed.
@@ -350,17 +359,17 @@ function MyListings({ userId }: { userId: string }) {
 }
 
 function BuyerDemand() {
-  const [boxes, setBoxes] = useState<BuyBox[] | null>(null);
-  useEffect(() => { loadAllBuyBoxes().then(setBoxes).catch(() => setBoxes([])); }, []);
+  const [boxes, setBoxes] = useState<LiveBuyBox[] | null>(null);
+  useEffect(() => { loadAllPublishedBuyBoxes().then(setBoxes).catch(() => setBoxes([])); }, []);
   if (boxes === null) return null;
   const places = new Map<string, number>();
-  for (const b of boxes) for (const p of [...b.cities, ...b.states]) places.set(p, (places.get(p) || 0) + 1);
+  for (const b of boxes) for (const p of [...b.markets, ...b.states]) places.set(p, (places.get(p) || 0) + 1);
   const topList: [string, number][] = [];
   places.forEach((n, p) => topList.push([p, n]));
   const top = topList.sort((a, b) => b[1] - a[1]).slice(0, 8);
   return (
     <div>
-      <h4>Buyer demand — active buy boxes ({boxes.length})</h4>
+      <h4>Buyer demand — published buy boxes ({boxes.length})</h4>
       {boxes.length === 0 ? (
         <p style={{ fontSize: 13 }}>No buyer buy boxes yet. Demand appears here as buyers publish them.</p>
       ) : (
@@ -369,14 +378,13 @@ function BuyerDemand() {
           <ul style={{ fontSize: 13 }}>
             {boxes.slice(0, 10).map((b) => (
               <li key={b.id}>
-                {[...b.cities, ...b.states].join(', ') || 'Anywhere'}
+                {[...b.markets, ...b.states].join(', ') || 'Anywhere'}
                 {b.property_types.length ? ` · ${b.property_types.join(', ')}` : ''}
-                {b.price_max != null ? ` · up to ${money(Number(b.price_max))}` : ''}
-                {b.min_beds != null ? ` · ${b.min_beds}+ beds` : ''}
+                {b.max_price != null ? ` · up to ${money(Number(b.max_price))}` : ''}
               </li>
             ))}
           </ul>
-          <p style={{ fontSize: 12, color: '#94a3b8' }}>Criteria only — buyer identities are never shown here.</p>
+          <p style={{ fontSize: 12, color: '#94a3b8' }}>Criteria only — buyer identities are never shown here. Only buy boxes their owners published are counted.</p>
         </>
       )}
     </div>
@@ -446,7 +454,7 @@ function BuyerSignatures({ userId }: { userId: string }) {
 // never shows a fake number. No email/SMS alerts anywhere: no
 // provider is connected, so buyers check back here for new matches.
 function MatchingDeals({ userId }: { userId: string }) {
-  const [box, setBox] = useState<Slice131BuyBox | null | undefined>(undefined);
+  const [box, setBox] = useState<LiveBuyBox | null | undefined>(undefined);
   const [deals, setDeals] = useState<MatchingDealRow[] | null>(null);
   const [hidden, setHidden] = useState(false);
 
@@ -518,75 +526,166 @@ function MatchingDeals({ userId }: { userId: string }) {
   );
 }
 
+// Slice 136 — single buy box. The live table holds ONE row per
+// wholesaler (UNIQUE(user_id)), so the buyer portal is one form,
+// not a list: the same criteria fields the live table supports
+// (markets, states, ZIPs, property types, price range, rehab
+// tolerance, publish + email-alert flags, and the Slice 133
+// criteria — max ARV %, min profit, condition / strategy
+// preferences, closing timeline). Nothing is pre-filled; every
+// field starts empty until the buyer saves it.
+// The legacy "confirm still buying" button is REMOVED, honestly:
+// the live table has no confirm column and no confirm flow, so a
+// button that wrote nowhere would be fake. Liveness now reads
+// the box's last-save date (updated_at, re-stamped on every
+// save): saving the box again refreshes it, and boxes go stale
+// 120 days after their last save.
 function BuyerPortal({ userId }: { userId: string }) {
-  const [boxes, setBoxes] = useState<BuyBox[]>([]);
+  const [box, setBox] = useState<LiveBuyBox | null>(null);
+  const [boxLoaded, setBoxLoaded] = useState(false);
   const [feed, setFeed] = useState<FeedListing[]>([]);
   const [myOffers, setMyOffers] = useState<OfferRow[]>([]);
   const [offerForm, setOfferForm] = useState<Record<string, { amount: string; message: string }>>({});
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
   const todayISO = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({ label: 'My Buy Box', states: '', counties: '', cities: '', types: '', min: '', max: '', beds: '' });
+  const [markets, setMarkets] = useState('');
+  const [states, setStates] = useState('');
+  const [zips, setZips] = useState('');
+  const [types, setTypes] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [rehab, setRehab] = useState('');
+  const [published, setPublished] = useState(false);
+  const [emailAlerts, setEmailAlerts] = useState(false);
+  const [maxArvPct, setMaxArvPct] = useState('');
+  const [minProfit, setMinProfit] = useState('');
+  const [condPrefs, setCondPrefs] = useState<string[]>([]);
+  const [stratPrefs, setStratPrefs] = useState<string[]>([]);
+  const [closingTimeline, setClosingTimeline] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const fillForm = (b: LiveBuyBox) => {
+    setMarkets((b.markets || []).join(', '));
+    setStates((b.states || []).join(', '));
+    setZips((b.zip_codes || []).join(', '));
+    setTypes((b.property_types || []).join(', '));
+    setMinPrice(b.min_price != null ? String(b.min_price) : '');
+    setMaxPrice(b.max_price != null ? String(b.max_price) : '');
+    setRehab(b.rehab_tolerance || '');
+    setPublished(b.published === true);
+    setEmailAlerts(b.email_alerts_opt_in === true);
+    setMaxArvPct(b.max_arv_pct != null ? String(b.max_arv_pct) : '');
+    setMinProfit(b.min_profit != null ? String(b.min_profit) : '');
+    setCondPrefs(b.condition_preferences || []);
+    setStratPrefs(b.strategy_preferences || []);
+    setClosingTimeline(b.closing_timeline || '');
+    setNotes(b.notes || '');
+  };
 
   const refresh = () => {
-    loadMyBuyBoxes(userId).then(setBoxes).catch((e) => setErr(e instanceof Error ? e.message : 'Load failed'));
+    loadMyBuyBox(userId)
+      .then((b) => { setBox(b); if (b) fillForm(b); setBoxLoaded(true); })
+      .catch((e) => { setErr(e instanceof Error ? e.message : 'Load failed'); setBoxLoaded(true); });
     loadFeed().then(setFeed).catch(() => {});
     loadBuyerOffers(userId).then(setMyOffers).catch(() => {});
   };
   useEffect(refresh, [userId]);
+
+  const togglePref = (list: string[], setList: (v: string[]) => void, v: string) => {
+    setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  };
+
+  const saveBox = async () => {
+    try {
+      const saved = await saveMyBuyBox(userId, {
+        markets: splitList(markets),
+        states: splitList(states).map((s) => s.toUpperCase()),
+        zip_codes: splitList(zips),
+        property_types: splitList(types),
+        min_price: minPrice.trim() ? Number(minPrice) : null,
+        max_price: maxPrice.trim() ? Number(maxPrice) : null,
+        notes,
+        published,
+        email_alerts_opt_in: emailAlerts,
+        rehab_tolerance: rehab || null,
+        max_arv_pct: maxArvPct.trim() ? Number(maxArvPct) : null,
+        min_profit: minProfit.trim() ? Number(minProfit) : null,
+        condition_preferences: condPrefs,
+        strategy_preferences: stratPrefs,
+        closing_timeline: closingTimeline || null,
+      });
+      setBox(saved);
+      setNote(`Buy box saved — last updated ${todayISO}. Save again any time to refresh it.${published ? ' It is published, so wholesalers can match you.' : ' It is not published, so only you can see it.'}`);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Save failed'); }
+  };
+
+  const lv = box ? boxLiveness(box, todayISO) : null;
 
   return (
     <div>
       <h3>Cash Buyer Portal</h3>
       {err && <p style={{ fontSize: 13, color: '#f87171' }}>{err}</p>}
       {note && <p style={{ fontSize: 13, color: '#34d399' }}>{note}</p>}
-      <p style={{ fontSize: 13 }}>Publish a buy box so wholesalers' deals can be matched to you. Comma-separated lists.</p>
+      <p style={{ fontSize: 13 }}>One buy box per account — publish it so wholesalers&apos; deals can be matched to you. Comma-separated lists. Nothing is pre-filled.</p>
       <BuyerRecordCard userId={userId} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <input placeholder="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-        <input placeholder="States (FL, GA)" value={form.states} onChange={(e) => setForm({ ...form, states: e.target.value })} />
-        <input placeholder="Counties" value={form.counties} onChange={(e) => setForm({ ...form, counties: e.target.value })} />
-        <input placeholder="Cities" value={form.cities} onChange={(e) => setForm({ ...form, cities: e.target.value })} />
-        <input placeholder="Types (SFR, Duplex)" value={form.types} onChange={(e) => setForm({ ...form, types: e.target.value })} />
-        <input placeholder="Min price" inputMode="numeric" value={form.min} onChange={(e) => setForm({ ...form, min: e.target.value })} />
-        <input placeholder="Max price" inputMode="numeric" value={form.max} onChange={(e) => setForm({ ...form, max: e.target.value })} />
-        <input placeholder="Min beds" inputMode="numeric" value={form.beds} onChange={(e) => setForm({ ...form, beds: e.target.value })} />
-        <button onClick={async () => {
-          try {
-            await saveBuyBox(userId, {
-              label: form.label.trim() || 'My Buy Box',
-              states: splitList(form.states), counties: splitList(form.counties),
-              cities: splitList(form.cities), property_types: splitList(form.types),
-              price_min: form.min ? Number(form.min) : null,
-              price_max: form.max ? Number(form.max) : null,
-              min_beds: form.beds ? Number(form.beds) : null,
-              active: true,
-            });
-            refresh();
-          } catch (e) { setErr(e instanceof Error ? e.message : 'Save failed'); }
-        }}>Save buy box</button>
-      </div>
-      {boxes.length > 0 && (
-        <ul style={{ fontSize: 13 }}>
-          {boxes.map((b) => {
-            const lv = boxLiveness(b, todayISO);
-            return (
-              <li key={b.id} style={{ marginBottom: 8 }}>
-                <strong>{b.label}</strong> — {[...b.cities, ...b.states].join(', ') || 'Anywhere'}
-                {b.price_max != null ? ` · up to ${money(Number(b.price_max))}` : ''}
-                {' '}<button onClick={async () => { if (b.id) { await deleteBuyBox(b.id); refresh(); } }}>Delete</button>
-                <br />
-                {lv.live ? (
-                  <span style={{ color: '#34d399', fontSize: 12.5 }}>✅ Confirmed {lv.confirmedOn} — live. Wholesalers&rsquo; match counts lead with confirmed-live buyers.</span>
-                ) : (
-                  <span style={{ color: '#fbbf24', fontSize: 12.5 }}>⚠️ Not confirmed since {lv.confirmedOn || '—'} — this box reads as STALE to wholesalers (boxes go stale 120 days after their last confirmation). Confirm it below if you are still buying on these terms.</span>
-                )}
-                {' '}<button onClick={async () => { if (b.id) { try { await confirmBuyBox(b.id); setNote(`Confirmed “${b.label}” as still buying — ${todayISO}.`); refresh(); } catch (e) { setErr(e instanceof Error ? e.message : 'Confirm failed'); } } }}>✓ Still buying — confirm this box</button>
-              </li>
-            );
-          })}
-        </ul>
+      {boxLoaded && box && lv && (
+        <p style={{ fontSize: 13 }}>
+          {lv.live ? (
+            <span style={{ color: '#34d399' }}>✅ Last saved {lv.confirmedOn} — live.</span>
+          ) : (
+            <span style={{ color: '#fbbf24' }}>⚠️ Last saved {lv.confirmedOn || '—'} — this box reads as STALE to wholesalers (boxes go stale 120 days after their last save). Save it again below to refresh the date.</span>
+          )}
+        </p>
       )}
+      {boxLoaded && !box && (
+        <p style={{ fontSize: 13 }}>No buy box saved yet. Fill in what you buy — it stays empty until you save it.</p>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <input placeholder="Markets — counties (Broward, St. Lucie)" value={markets} onChange={(e) => setMarkets(e.target.value)} />
+        <input placeholder="States (FL, GA)" value={states} onChange={(e) => setStates(e.target.value)} />
+        <input placeholder="ZIP codes (34950, 33313)" value={zips} onChange={(e) => setZips(e.target.value)} />
+        <input placeholder="Types (SFR, Duplex)" value={types} onChange={(e) => setTypes(e.target.value)} />
+        <input placeholder="Min price" inputMode="numeric" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
+        <input placeholder="Max price" inputMode="numeric" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
+        <input placeholder="Max ARV % (optional)" inputMode="numeric" value={maxArvPct} onChange={(e) => setMaxArvPct(e.target.value)} />
+        <input placeholder="Min profit $ (optional)" inputMode="numeric" value={minProfit} onChange={(e) => setMinProfit(e.target.value)} />
+        <select value={rehab} onChange={(e) => setRehab(e.target.value)}>
+          <option value="">Rehab tolerance: no preference</option>
+          <option value="any">Any — no preference</option>
+          <option value="light">Light rehab or better</option>
+          <option value="moderate">Moderate rehab or better</option>
+          <option value="heavy">Heavy rehab — any condition</option>
+        </select>
+        <select value={closingTimeline} onChange={(e) => setClosingTimeline(e.target.value)}>
+          <option value="">Closing timeline: no preference</option>
+          {CLOSING_TIMELINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <input placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <label style={{ fontSize: 13 }}>
+          <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Publish my buy box (wholesalers can match me)
+        </label>
+        <label style={{ fontSize: 13 }}>
+          <input type="checkbox" checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} /> Email me when a deal matches (published boxes only)
+        </label>
+      </div>
+      <div style={{ fontSize: 13, marginTop: 8 }}>
+        <div>Condition preferences:</div>
+        {CONDITION_OPTIONS.map((c) => (
+          <label key={c} style={{ marginRight: 10 }}>
+            <input type="checkbox" checked={condPrefs.includes(c)} onChange={() => togglePref(condPrefs, setCondPrefs, c)} /> {c}
+          </label>
+        ))}
+        <div style={{ marginTop: 6 }}>Strategy preferences:</div>
+        {STRATEGY_OPTIONS.map((s) => (
+          <label key={s} style={{ marginRight: 10 }}>
+            <input type="checkbox" checked={stratPrefs.includes(s)} onChange={() => togglePref(stratPrefs, setStratPrefs, s)} /> {s}
+          </label>
+        ))}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <button onClick={saveBox}>Save buy box</button>
+      </div>
       <MatchingDeals userId={userId} />
       <h4>Deal feed — active public listings</h4>
       {feed.length === 0 ? (
@@ -594,7 +693,7 @@ function BuyerPortal({ userId }: { userId: string }) {
       ) : (
         <ul style={{ fontSize: 13 }}>
           {feed.map((l) => {
-            const mine = boxes.some((b) => listingMatchesBox(l, b));
+            const mine = box ? listingMatchesBox(l, box) : false;
             const f = offerForm[l.id] || { amount: '', message: '' };
             return (
               <li key={l.id} style={{ marginBottom: 10 }}>
@@ -633,7 +732,8 @@ function BuyerPortal({ userId }: { userId: string }) {
       )}
       <BuyerSignatures userId={userId} />
       <p style={{ fontSize: 12, color: '#94a3b8' }}>
-        Match = your price range plus a plain text match of your cities/states against the property address.
+        Match = your price range plus a plain text match of your markets/states against the property address.
+        This is the same buy box the Cash Buyers directory and deal matching use — one box per account.
       </p>
     </div>
   );

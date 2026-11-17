@@ -8,8 +8,9 @@ import { checkPhone } from '../lib/phone';
 import { logSentOutreach } from '../lib/outreach';
 
 // Slice 44 — send from inside the app, through the wholesaler's OWN
-// provider accounts (Twilio for texts, Resend for email; keys live in
-// the hosting environment — see app/api/send). This panel renders
+// provider accounts (Twilio for texts, their own SES/Resend email;
+// credentials live in the wholesaler's provider settings, never in
+// a shared operator account — see app/api/send). This panel renders
 // inside the Comms Center's cleared state, and the server re-checks
 // every gate before sending: sign-in, lead ownership, do-not-contact,
 // consent on file (express or requested — never 'unknown'), and the
@@ -18,6 +19,8 @@ import { logSentOutreach } from '../lib/outreach';
 //
 // Until the owner connects the accounts, GET /api/send reports both
 // channels off and this panel says so plainly instead of pretending.
+// (Slice 136: the provider settings store does not exist yet, so the
+// panel always shows the not-connected state today.)
 
 export default function InAppSend({ userId, lead, merged, tplKey }: {
   userId: string;
@@ -31,10 +34,20 @@ export default function InAppSend({ userId, lead, merged, tplKey }: {
   const [result, setResult] = useState('');
 
   useEffect(() => {
-    fetch('/api/send')
-      .then((r) => r.json())
-      .then((j) => setCfg({ sms: !!j.sms, email: !!j.email }))
-      .catch(() => setCfg({ sms: false, email: false }));
+    // Slice 136 — /api/send resolves providers PER CALLER (BYOK),
+    // so the status check carries the session token; without it the
+    // route can only answer "not connected".
+    (async () => {
+      try {
+        const { data } = await supabase!.auth.getSession();
+        const token = data.session?.access_token;
+        const res = await fetch('/api/send', token ? { headers: { authorization: `Bearer ${token}` } } : undefined);
+        const j = await res.json();
+        setCfg({ sms: !!j.sms, email: !!j.email });
+      } catch {
+        setCfg({ sms: false, email: false });
+      }
+    })();
   }, []);
 
   if (cfg === null) return null;
@@ -43,9 +56,10 @@ export default function InAppSend({ userId, lead, merged, tplKey }: {
     return (
       <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 12 }}>
         <strong>Sending from inside the app isn't connected yet.</strong> It runs on your own accounts —
-        Twilio for texts (with A2P registration) and Resend for email — with the keys placed in the hosting
-        environment, never in the app. Until then, the channels above open your own phone and mail apps,
-        which is the same message from the same you.
+        Twilio for texts (with A2P registration) and your own email provider — connected in your
+        provider settings, never through a shared operator account and never in the app. The provider
+        settings store is not built yet, so nothing can send from inside the app today. Until then, the
+        channels above open your own phone and mail apps, which is the same message from the same you.
       </p>
     );
   }

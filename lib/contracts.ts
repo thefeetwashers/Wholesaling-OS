@@ -14,11 +14,15 @@ export interface DealContract {
   state?: string;
   seller_name: string;
   buyer_name: string;
-  contract_price: number;
-  arv: number;
-  repairs: number;
-  assignment_fee: number;
-  emd_amount: number;
+  // Slice 136 — money fields are null until the user enters them.
+  // They used to be pre-filled (150000 / 300000 / 50000 / 10000 /
+  // 1000), so the pipeline showed invented money as if it were real.
+  // A null field renders as "not given", never as $0 or a guess.
+  contract_price: number | null;
+  arv: number | null;
+  repairs: number | null;
+  assignment_fee: number | null;
+  emd_amount: number | null;
   jv_partner?: string;
   jv_split_pct?: number;
   ab_status: SigStatus;
@@ -33,15 +37,24 @@ export const CONTRACT_CLAUSES = [
   'D. EMD non-refundability: Earnest money becomes non-refundable as stated in the signed contract once contingencies are removed.',
 ];
 
+const contractMoney = (n: number | null | undefined) =>
+  n != null ? `$${Number(n).toLocaleString()}` : '[amount not given — enter the agreed amount before showing or printing this agreement]';
+
 export function sellerView(c: DealContract): string {
   // Exactly one money value: the price. Fee, buyer, and margin are never interpolated here.
-  return `Purchase Agreement — ${c.property_address}\nSeller: ${c.seller_name}\nPurchase price: $${c.contract_price.toLocaleString()}\n\n${CONTRACT_CLAUSES.join('\n')}\n\nATTORNEY REVIEW REQUIRED BEFORE USE. This is a template, not legal advice.`;
+  return `Purchase Agreement — ${c.property_address}\nSeller: ${c.seller_name}\nPurchase price: ${contractMoney(c.contract_price)}\n\n${CONTRACT_CLAUSES.join('\n')}\n\nATTORNEY REVIEW REQUIRED BEFORE USE. This is a template, not legal advice.`;
 }
 
 export function buyerView(c: DealContract): string {
-  const total = totalMarketplaceCost(c.contract_price, c.assignment_fee);
-  const mao = calculateMAO(c.arv, c.repairs, c.assignment_fee);
-  return `Assignment Agreement — ${c.property_address}\nBuyer: ${c.buyer_name}\nContract price: $${c.contract_price.toLocaleString()}\nAssignment fee: $${c.assignment_fee.toLocaleString()}\nTotal Marketplace Cost: $${total.toLocaleString()}\nMAO: $${mao.toLocaleString()}\nEMD: $${c.emd_amount.toLocaleString()} due within 24 hours of signing\n\n${CONTRACT_CLAUSES.join('\n')}\n\nATTORNEY REVIEW REQUIRED BEFORE USE. This is a template, not legal advice.`;
+  const total =
+    c.contract_price != null && c.assignment_fee != null
+      ? `$${totalMarketplaceCost(c.contract_price, c.assignment_fee).toLocaleString()}`
+      : '[total not given — enter both the contract price and the assignment fee]';
+  const mao =
+    c.arv != null && c.repairs != null && c.assignment_fee != null
+      ? `$${calculateMAO(c.arv, c.repairs, c.assignment_fee).toLocaleString()}`
+      : '[MAO not given — enter ARV, repairs, and the assignment fee]';
+  return `Assignment Agreement — ${c.property_address}\nBuyer: ${c.buyer_name}\nContract price: ${contractMoney(c.contract_price)}\nAssignment fee: ${contractMoney(c.assignment_fee)}\nTotal Marketplace Cost: ${total}\nMAO: ${mao}\nEMD: ${c.emd_amount != null ? `$${c.emd_amount.toLocaleString()} due within 24 hours of signing` : '[EMD not given — enter the agreed amount before showing or printing this agreement]'}\n\n${CONTRACT_CLAUSES.join('\n')}\n\nATTORNEY REVIEW REQUIRED BEFORE USE. This is a template, not legal advice.`;
 }
 
 export function canSignBC(c: DealContract): boolean {
@@ -51,8 +64,11 @@ export function canSignBC(c: DealContract): boolean {
 export function titlePackage(c: DealContract): string {
   const parts = ['A-B Purchase Agreement', 'B-C Assignment Agreement'];
   if (c.jv_partner) parts.push(`JV Addendum — ${c.jv_partner} at ${c.jv_split_pct ?? 50}%`);
-  const total = totalMarketplaceCost(c.contract_price, c.assignment_fee);
-  return `Title package for ${c.property_address}\nIncludes: ${parts.join(', ')}\nDistribution: contract price $${c.contract_price.toLocaleString()} to seller, fee $${c.assignment_fee.toLocaleString()} to wholesaler, total $${total.toLocaleString()}.\nSend via email handoff to the title company. This is not an API or a filing.`;
+  const total =
+    c.contract_price != null && c.assignment_fee != null
+      ? `$${totalMarketplaceCost(c.contract_price, c.assignment_fee).toLocaleString()}`
+      : '[total not given — enter both the contract price and the assignment fee]';
+  return `Title package for ${c.property_address}\nIncludes: ${parts.join(', ')}\nDistribution: contract price ${contractMoney(c.contract_price)} to seller, fee ${contractMoney(c.assignment_fee)} to wholesaler, total ${total}.\nSend via email handoff to the title company. This is not an API or a filing.`;
 }
 
 // ---------------------------------------------------------------------------

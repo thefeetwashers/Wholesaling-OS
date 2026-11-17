@@ -45,15 +45,20 @@
 //   * Respond to this deal — signed-in users only; writes
 //     deal_responses. Contact is shown only when BOTH sides have
 //     shared (owner_contact_shared AND responder_contact_shared),
-//     the JV mutual-opt-in pattern. The responder may add an
-//     optional contact line to their response; it is stored after
-//     a delimiter in the message field (the spec'd
-//     deal_responses columns carry no contact column) and is
-//     rendered ONLY when both flags are true. There is no in-app
-//     chat. NOTE (for the coordinator): with the spec'd columns
-//     only the responder's contact can be revealed after mutual
-//     opt-in — the owner's contact has no column, so the buyer is
-//     told the owner can now see their contact and will reach out.
+//     the JV mutual-opt-in pattern, and ONLY through the
+//     SECURITY DEFINER RPCs (lib/buyer-profile.ts):
+//     get_buyer_contact_for_response reveals the responder's
+//     contact to the deal owner, get_owner_contact_for_response
+//     (Slice 136) reveals the owner's contact to the responder.
+//     Slice 136 — the old delimiter hack is DELETED: contact was
+//     embedded in the message column after '\n---contact---\n'
+//     and rendered from there, which leaked it to anyone who
+//     could read the row. New responses store the message only.
+//     Old rows are stripped on read (stripLegacyContactBlock) —
+//     the embedded part is never rendered. There is no in-app
+//     chat. The owner sets their own contact on this page (name
+//     + phone from their profile, email is the account email)
+//     before sharing; the responder sets theirs in the VIP portal.
 //   * The deal owner sees an Unpublish button (and Republish when
 //     the deal is unpublished).
 
@@ -74,6 +79,14 @@ import {
   type DealResponse,
 } from '../../../lib/published-deals';
 import { findMatchingBuyers, type BuyBoxForMatching } from '../../../lib/match-buy-box';
+import {
+  loadMyBuyerProfile,
+  saveMyBuyerProfile,
+  loadBuyerContactForResponse,
+  loadOwnerContactForResponse,
+  type BuyerProfile,
+  type ContactReveal,
+} from '../../../lib/buyer-profile';
 import {
   submitOffer,
   fetchOffersForDeal,
@@ -100,17 +113,21 @@ const val = (v: string | number | null | undefined): string => {
   return String(v);
 };
 
-// The responder's optional contact rides in the message after
-// this delimiter (deal_responses has no contact column). The
-// public message renders always; the contact part renders ONLY
-// when both share flags are true.
+// Slice 136 — legacy delimiter, READ-ONLY and never rendered.
+// Old responses (Slice 132) embedded the responder's contact in
+// the message column after this delimiter. New responses store
+// the message only — contact now travels through the mutual-
+// opt-in RPCs (lib/buyer-profile.ts) and is never written into
+// the message. This stripper exists solely so old embedded
+// contacts stop leaking: the part after the delimiter is
+// discarded on read, never shown.
 const CONTACT_DELIM = '\n---contact---\n';
 
-function splitResponseMessage(stored: string | null | undefined): { message: string; contact: string } {
+function stripLegacyContactBlock(stored: string | null | undefined): string {
   const raw = stored || '';
   const i = raw.indexOf(CONTACT_DELIM);
-  if (i < 0) return { message: raw, contact: '' };
-  return { message: raw.slice(0, i), contact: raw.slice(i + CONTACT_DELIM.length).trim() };
+  if (i < 0) return raw;
+  return raw.slice(0, i);
 }
 
 interface DemographicsState {
@@ -169,9 +186,26 @@ export default function DealDetailPage() {
   const [flood, setFlood] = useState<FloodState | null>(null);
   const [boundary, setBoundary] = useState<BoundaryState | null>(null);
   const [respondMsg, setRespondMsg] = useState('');
-  const [respondContact, setRespondContact] = useState('');
   const [respondErr, setRespondErr] = useState('');
   const [respondDone, setRespondDone] = useState('');
+  // Slice 136 — mutual-opt-in contact reveals (RPC only, never
+  // from the message column). Keyed by response id for the owner
+  // view; the single ownerContact is the responder's view of
+  // their own response. A reveal is fetched only when the viewer
+  // taps "Show contact" — never on page load, never for anyone
+  // who is not entitled to it.
+  const [buyerContact, setBuyerContact] = useState<Record<string, ContactReveal>>({});
+  const [buyerContactLoading, setBuyerContactLoading] = useState<Record<string, boolean>>({});
+  const [ownerContact, setOwnerContact] = useState<ContactReveal | null>(null);
+  const [ownerContactLoading, setOwnerContactLoading] = useState(false);
+  // Slice 136 — the deal owner's own contact on file (name +
+  // phone from their profile; email is the account email). The
+  // owner sets it here before sharing — the reveal RPC reads
+  // this same profile row.
+  const [ownerProfile, setOwnerProfile] = useState<BuyerProfile | null>(null);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [ownerContactSaved, setOwnerContactSaved] = useState(false);
   // Slice 133 — buyer offers on this deal. Money fields start
   // EMPTY — no price, EMD, or date is ever pre-filled.
   const [offers, setOffers] = useState<DealOffer[]>([]);
@@ -316,6 +350,22 @@ export default function DealDetailPage() {
   }, [id]);
 
   const isOwner = !!userId && !!deal && deal.user_id === userId;
+
+  // Slice 136 — the viewer's own contact on file, so the owner
+  // can set it here before sharing and the responder's form can
+  // point at it. Loaded for any signed-in user; the /vip portal
+  // is the same profile form, for buyers and owners alike.
+  useEffect(() => {
+    if (!userId) return;
+    loadMyBuyerProfile(userId)
+      .then((p) => {
+        if (!p) return;
+        setOwnerProfile(p);
+        setOwnerName(p.contact_name || '');
+        setOwnerPhone(p.contact_phone || '');
+      })
+      .catch(() => {});
+  }, [userId]);
   // Slice 133 (deal status) — offers are open only while the deal
   // is Active ('Active' | 'Under Contract' | 'Sold' from sibling
   // migration 20261117144000). A missing status — the column not
@@ -332,15 +382,14 @@ export default function DealDetailPage() {
     setRespondErr('');
     setRespondDone('');
     try {
-      const stored =
-        respondContact.trim() === ''
-          ? respondMsg.trim()
-          : `${respondMsg.trim()}${CONTACT_DELIM}${respondContact.trim()}`;
-      const row = await respondToDeal(userId, deal.id, stored);
+      // Slice 136 — the message only. Contact is NEVER embedded
+      // in the message column: it lives on the responder's
+      // profile and is revealed through the mutual-opt-in RPC
+      // only after both sides share.
+      const row = await respondToDeal(userId, deal.id, respondMsg.trim());
       setResponses((prev) => [...prev, row]);
-      setRespondDone('Response sent. Your contact is shared with the deal owner only after you both opt in below.');
+      setRespondDone('Response sent. Your contact (from your buyer profile) is shown to the owner only after you both share it below.');
       setRespondMsg('');
-      setRespondContact('');
     } catch (e) {
       setRespondErr((e as Error)?.message || 'Your response could not be sent.');
     }
@@ -360,6 +409,50 @@ export default function DealDetailPage() {
       setMsg('Contact sharing saved. Contact is shown only when both sides have shared.');
     } catch (e) {
       setMsg((e as Error)?.message || 'Contact sharing did not save.');
+    }
+  };
+
+  // Slice 136 — reveal the RESPONDER's contact to the deal
+  // owner, through the mutual-opt-in RPC only. The RPC returns
+  // nothing unless both sides shared on this response and the
+  // caller is the operator or one of the two parties; the result
+  // (or its honest reason) is shown only to this viewer.
+  const revealBuyerContact = async (responseId: string) => {
+    if (!responseId || buyerContactLoading[responseId]) return;
+    setBuyerContactLoading((prev) => ({ ...prev, [responseId]: true }));
+    const result = await loadBuyerContactForResponse(responseId);
+    setBuyerContact((prev) => ({ ...prev, [responseId]: result }));
+    setBuyerContactLoading((prev) => ({ ...prev, [responseId]: false }));
+  };
+
+  // Slice 136 — reveal the OWNER's contact to the responder,
+  // through the mirror RPC (same gate, other direction).
+  const revealOwnerContact = async (responseId: string) => {
+    if (!responseId || ownerContactLoading) return;
+    setOwnerContactLoading(true);
+    const result = await loadOwnerContactForResponse(responseId);
+    setOwnerContact(result);
+    setOwnerContactLoading(false);
+  };
+
+  // Slice 136 — the owner saves their own contact (name + phone
+  // on their profile; email is the account email) before sharing
+  // it. contact_private is preserved from the profile as loaded.
+  const saveOwnerContact = async () => {
+    if (!userId) return;
+    setMsg('');
+    try {
+      const saved = await saveMyBuyerProfile(userId, {
+        contact_name: ownerName.trim(),
+        contact_email: ownerProfile?.contact_email || userEmail || '',
+        contact_phone: ownerPhone.trim(),
+        contact_private: ownerProfile?.contact_private ?? true,
+      });
+      setOwnerProfile(saved);
+      setOwnerContactSaved(true);
+      setMsg('Your contact is saved. Share it per response below — it is shown only after the buyer shares too.');
+    } catch (e) {
+      setMsg((e as Error)?.message || 'Your contact could not be saved.');
     }
   };
 
@@ -826,17 +919,56 @@ export default function DealDetailPage() {
             {responses.length > 0 && (
               <>
                 <h3 style={{ fontSize: 15, margin: '16px 0 6px' }}>Responses ({responses.length})</h3>
+                {/* Slice 136 — the owner's own contact, set here
+                    before sharing. The reveal RPC reads this same
+                    profile row; the buyer sees it only after both
+                    sides share on the same response. */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                  <p style={{ fontSize: 13, margin: '0 0 6px' }}>
+                    Your contact on file: <strong>{ownerProfile?.contact_name || 'not set'}</strong>
+                    {ownerProfile?.contact_phone ? ` · ${ownerProfile.contact_phone}` : ' · phone not set'}
+                    {' · '}email is your account email.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <input placeholder="Your name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={{ padding: 6, border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }} />
+                    <input placeholder="Your phone" value={ownerPhone} onChange={(e) => setOwnerPhone(e.target.value)} style={{ padding: 6, border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }} />
+                    <button onClick={saveOwnerContact} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #0f766e', background: '#fff', color: '#0f766e', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>
+                      Save my contact
+                    </button>
+                  </div>
+                  {ownerContactSaved && <p style={{ fontSize: 12, color: '#0f766e', margin: '6px 0 0' }}>Saved. Or set it in the <a href="/vip">VIP portal</a> — same profile.</p>}
+                </div>
                 <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14 }}>
                   {responses.map((r) => {
-                    const parts = splitResponseMessage(r.message);
+                    const messageOnly = stripLegacyContactBlock(r.message);
                     const shared = bothShared(r);
+                    const reveal = r.id ? buyerContact[r.id] : undefined;
                     return (
                       <li key={r.id} style={{ marginBottom: 10 }}>
-                        {parts.message || '(no message)'}
+                        {messageOnly || '(no message)'}
                         {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
                         <br />
-                        {shared && parts.contact ? (
-                          <span>Buyer contact (both sides shared): <strong>{parts.contact}</strong></span>
+                        {shared ? (
+                          reveal?.available && reveal.contact ? (
+                            <span>Buyer contact (both sides shared): <strong>
+                              {reveal.contact.contact_name ? `${reveal.contact.contact_name} · ` : ''}
+                              {reveal.contact.contact_email}
+                              {reveal.contact.contact_phone ? ` · ${reveal.contact.contact_phone}` : ''}
+                            </strong></span>
+                          ) : (
+                            <span style={{ color: '#64748b' }}>
+                              Both sides shared.
+                              {' '}
+                              {buyerContactLoading[r.id!] ? (
+                                'Loading contact…'
+                              ) : (
+                                <button onClick={() => revealBuyerContact(r.id!)} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 6, border: '1px solid #0f766e', background: '#fff', color: '#0f766e', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>
+                                  Show buyer contact
+                                </button>
+                              )}
+                              {reveal && !reveal.available && reveal.reason ? ` ${reveal.reason}` : ''}
+                            </span>
+                          )
                         ) : (
                           <span style={{ color: '#64748b' }}>
                             Contact shared: buyer {r.responder_contact_shared ? 'yes' : 'not yet'} · you{' '}
@@ -869,9 +1001,31 @@ export default function DealDetailPage() {
                   <p style={{ fontSize: 14, color: '#64748b' }}>You shared your contact — the owner sees it once they share theirs.</p>
                 )}
                 {bothShared(myResponse) && (
-                  <p style={{ fontSize: 14, color: '#0f766e' }}>
-                    Both sides shared contact — the owner can now see your contact and will reach out.
-                  </p>
+                  <>
+                    <p style={{ fontSize: 14, color: '#0f766e' }}>
+                      Both sides shared contact — the owner can now see your contact and will reach out.
+                    </p>
+                    {ownerContact?.available && ownerContact.contact ? (
+                      <p style={{ fontSize: 14 }}>
+                        Deal owner&apos;s contact: <strong>
+                          {ownerContact.contact.contact_name ? `${ownerContact.contact.contact_name} · ` : ''}
+                          {ownerContact.contact.contact_email}
+                          {ownerContact.contact.contact_phone ? ` · ${ownerContact.contact.contact_phone}` : ''}
+                        </strong>
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: 14 }}>
+                        {ownerContactLoading ? (
+                          'Loading owner contact…'
+                        ) : (
+                          <button onClick={() => revealOwnerContact(myResponse.id!)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #0f766e', background: '#fff', color: '#0f766e', fontWeight: 700, cursor: 'pointer' }}>
+                            Show deal owner&apos;s contact
+                          </button>
+                        )}
+                        {ownerContact && !ownerContact.available && ownerContact.reason ? ` ${ownerContact.reason}` : ''}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
@@ -886,14 +1040,10 @@ export default function DealDetailPage() {
                     style={{ display: 'block', width: '100%', marginTop: 3, padding: 8, border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }}
                   />
                 </label>
-                <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>
-                  Your contact (email or phone — optional; shown to the owner only after you both opt in)
-                  <input
-                    value={respondContact}
-                    onChange={(e) => setRespondContact(e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: 3, padding: 8, border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }}
-                  />
-                </label>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 8px' }}>
+                  Your contact comes from your buyer profile — set your name and phone at{' '}
+                  <a href="/vip">/vip</a>. It is shown to the deal owner only after you both share it below.
+                </p>
                 {respondErr && <p style={{ fontSize: 13, color: '#b91c1c' }}>{respondErr}</p>}
                 {respondDone && <p style={{ fontSize: 13, color: '#0f766e' }}>{respondDone}</p>}
                 <button

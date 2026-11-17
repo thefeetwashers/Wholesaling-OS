@@ -84,10 +84,18 @@ export async function loadDashboardBand(userId: string): Promise<DashboardBandDa
     supabase.from('deals').select('assignment_fee, actual_sale_price, updated_at, documents').eq('owner_id', userId).limit(1000),
     supabase.from('leads').select('status, follow_up_date').eq('owner_id', userId).limit(1000),
     supabase.from('buyers').select('id', { count: 'exact', head: true }).eq('owner_id', userId),
-    loadIncomingOffers(userId).catch(() => []),
-    loadMyListings(userId).catch(() => []),
+    // Slice 136 — no silent fallbacks: a failed offers/listings
+    // query throws (it used to be caught to []), so the band never
+    // renders that section's numbers as zeros as if counted.
+    loadIncomingOffers(userId),
+    loadMyListings(userId),
   ]);
-  if (dealsRes.error) throw dealsRes.error;
+  // Slice 136 — every query must succeed, same rule as loadKpis:
+  // a failed query throws instead of defaulting to [] / count 0.
+  // Callers show an error state when this throws; null still means
+  // only "sign-in / Supabase not configured", never "zero".
+  const firstError = dealsRes.error || leadsRes.error || buyersRes.error;
+  if (firstError) throw firstError;
   const deals = (dealsRes.data || []) as unknown as BandDeal[];
   const leads = (leadsRes.data || []) as { status: string; follow_up_date?: string | null }[];
 
@@ -98,7 +106,10 @@ export async function loadDashboardBand(userId: string): Promise<DashboardBandDa
   const buyerIds = Array.from(new Set(offers.map((o) => o.buyer_user).filter(Boolean))) as string[];
   let buyersWithClosings = 0;
   for (const b of buyerIds.slice(0, 50)) {
-    const rec = await loadBuyerRecord(b).catch(() => null);
+    // Slice 136 — no .catch(() => null): a failed buyer_record RPC
+    // throws the whole band load, so the UI shows the numbers as
+    // unknown instead of undercounting buyers with closings.
+    const rec = await loadBuyerRecord(b);
     if (rec && rec.closed_deals >= 1) buyersWithClosings += 1;
   }
 
@@ -107,11 +118,14 @@ export async function loadDashboardBand(userId: string): Promise<DashboardBandDa
   let readyToClose = 0;
   const listingIds = listings.map((l) => l.id).filter(Boolean) as string[];
   if (listingIds.length > 0) {
-    const { data } = await supabase
+    // Slice 136 — a failed escrow query throws instead of leaving
+    // readyToClose at 0 as if no file had a closing scheduled.
+    const { data, error: escrowError } = await supabase
       .from('escrow_files')
       .select('id, target_closing_date, outcome')
       .in('listing_id', listingIds)
       .limit(1000);
+    if (escrowError) throw escrowError;
     readyToClose = ((data || []) as { target_closing_date?: string | null; outcome?: string | null }[])
       .filter((f) => f.target_closing_date && (!f.outcome || f.outcome === 'open'))
       .length;

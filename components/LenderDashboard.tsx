@@ -30,6 +30,19 @@ import { FundingHistoryList } from './Contracts';
 const money = (n: number | null | undefined) =>
   n == null ? '—' : '$' + Math.round(Number(n)).toLocaleString('en-US');
 
+// Slice 136 — the database error arrives as a plain PostgREST object
+// ({ message, code, ... }), not an Error, so `e instanceof Error`
+// is false for it and every catch in this file used to fall through
+// to a generic string. Read the message off whatever was thrown so
+// the desk shows the database's own words instead of a generic line.
+function readableError(e: unknown, fallback: string): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string') {
+    return (e as { message: string }).message;
+  }
+  return fallback;
+}
+
 const LENDING_PROGRAMS: { value: FundingType; label: string }[] = [
   { value: 'transactional', label: 'Transactional' },
   { value: 'fix_and_flip', label: 'Fix-and-Flip' },
@@ -82,7 +95,9 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
   const [agreed, setAgreed] = useState(false);
 
   const refresh = () => {
-    loadMatchedFundingRequests().then(setPackets).catch((e) => setErr(e instanceof Error ? e.message : 'Could not load packets.'));
+    // Slice 136 — the real database error is shown now, not the
+    // generic "Could not load packets." (see readableError above).
+    loadMatchedFundingRequests().then(setPackets).catch((e) => setErr(readableError(e, 'Could not load packets.')));
     loadMyLenderBox(userId)
       .then((b) => {
         setBox(b);
@@ -129,7 +144,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
       setMsg('Lending box saved. It is yours only until a packet matches it — it is not published to the world.');
       refresh();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Save failed — try again.');
+      setMsg(readableError(e, 'Save failed — try again.'));
     }
   };
 
@@ -143,7 +158,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
       setMsg('Partner agreement accepted. The operator still has to verify you before packets can match your box.');
       refresh();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Acceptance failed — try again.');
+      setMsg(readableError(e, 'Acceptance failed — try again.'));
     }
   };
 
@@ -200,7 +215,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
                         setHistoryVersion((v) => v + 1);
                         refresh();
                       } catch (err2) {
-                        setStatusMsg(err2 instanceof Error ? err2.message : 'Status update failed.');
+                        setStatusMsg(readableError(err2, 'Status update failed.'));
                       }
                     }}
                   >
@@ -295,7 +310,7 @@ export default function LenderDashboard({ userId, userEmail }: { userId: string;
                         setMsg(b.is_verified_partner ? 'Partner verification removed.' : 'Lender verified — matched ISO packets can now reach this lender.');
                         refresh();
                       } catch (e) {
-                        setMsg(e instanceof Error ? e.message : 'Verification update failed.');
+                        setMsg(readableError(e, 'Verification update failed.'));
                       }
                     }}
                   >

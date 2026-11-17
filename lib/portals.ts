@@ -37,62 +37,14 @@ export async function setMyRole(userId: string, role: PortalRole): Promise<void>
   if (error) throw error;
 }
 
-export interface BuyBox {
-  id?: string;
-  user_id?: string;
-  label: string;
-  states: string[];
-  counties: string[];
-  cities: string[];
-  property_types: string[];
-  price_min?: number | null;
-  price_max?: number | null;
-  min_beds?: number | null;
-  active: boolean;
-  // Slice 116 — liveness: the table has always carried these; the
-  // type now declares them. updated_at is the box's "confirmed on"
-  // (see confirmBuyBox) — created_at until the buyer first confirms.
-  created_at?: string;
-  updated_at?: string;
-}
-
-export async function loadMyBuyBoxes(userId: string): Promise<BuyBox[]> {
-  if (!supabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from('buy_boxes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as BuyBox[];
-}
-
-export async function saveBuyBox(userId: string, box: BuyBox): Promise<void> {
-  if (!supabaseConfigured || !supabase) return;
-  const { error } = await supabase.from('buy_boxes').insert({ ...box, user_id: userId });
-  if (error) throw error;
-}
-
-export async function deleteBuyBox(id: string): Promise<void> {
-  if (!supabaseConfigured || !supabase) return;
-  const { error } = await supabase.from('buy_boxes').delete().eq('id', id);
-  if (error) throw error;
-}
-
-// Slice 116 — "Still buying": the buyer re-stamps their box's
-// updated_at, which is its confirmed-on date everywhere liveness
-// is judged (lib/match.ts). The criteria are not touched — the
-// confirmation says only "this box still speaks for me, today".
-// Own-box only in effect: the v3 policy lets buyers update solely
-// their own rows.
-export async function confirmBuyBox(id: string): Promise<void> {
-  if (!supabaseConfigured || !supabase) return;
-  const { error } = await supabase
-    .from('buy_boxes')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) throw error;
-}
+// Slice 136 — buy-box merge: the legacy public.buy_boxes table
+// is retired from the app. Its BuyBox interface and functions
+// (loadMyBuyBoxes, saveBuyBox, deleteBuyBox, confirmBuyBox,
+// listingMatchesBox, loadAllBuyBoxes) lived here and are deleted;
+// the live shape is lib/buy-box.ts on
+// public.wholesaler_buy_boxes (one row per wholesaler,
+// UNIQUE(user_id)). The table itself is NOT dropped — that needs
+// a migration decision, so it stays in the database, unread.
 
 export interface FeedDeal {
   contract_price?: number | null;
@@ -123,26 +75,6 @@ export async function loadFeed(): Promise<FeedListing[]> {
     .limit(50);
   if (error) throw error;
   return (data || []) as unknown as FeedListing[];
-}
-
-// A listing matches a buy box when its total cost sits inside the box price
-// range (when set) and its property address text contains one of the box's
-// cities/states (when set). Address is free text on the deal, so this is a
-// plain text match — labeled as such in the UI.
-export function listingMatchesBox(listing: FeedListing, box: BuyBox): boolean {
-  if (!box.active) return false;
-  const cost = Number(listing.total_marketplace_cost);
-  if (box.price_min != null && cost < Number(box.price_min)) return false;
-  if (box.price_max != null && cost > Number(box.price_max)) return false;
-  const places = [...(box.cities || []), ...(box.states || [])]
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (places.length) {
-    const docs = listing.deals?.documents;
-    const hay = [docs?.property_address || '', docs?.city || '', docs?.state || ''].join(' ').toLowerCase();
-    if (!places.some((p) => hay.includes(p))) return false;
-  }
-  return true;
 }
 
 export interface DashboardData {
@@ -411,21 +343,6 @@ export async function acceptOffer(offer: OfferRow): Promise<void> {
   await setOfferStatus(offer.id, 'accepted');
 }
 
-// All buy boxes are readable by signed-in users (schema v3 policy) — the
-// wholesaler demand view aggregates criteria only; buyer identities are
-// never displayed.
-export async function loadAllBuyBoxes(): Promise<BuyBox[]> {
-  if (!supabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from('buy_boxes')
-    .select('*')
-    .eq('active', true)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (error) throw error;
-  return (data || []) as BuyBox[];
-}
-
 // ---- Slice 11: claiming + in-portal signing ----
 
 // Claim-by-ID: the wholesaler reads the deal/company ID from their own
@@ -691,7 +608,11 @@ export interface BuyerRecord {
 export async function loadBuyerRecord(buyerUser: string): Promise<BuyerRecord | null> {
   if (!supabaseConfigured || !supabase) return null;
   const { data, error } = await supabase.rpc('buyer_record', { p_buyer: buyerUser });
-  if (error || !data || (data as unknown[]).length === 0) return null;
+  // Slice 136 — an RPC error throws instead of returning null: null
+  // means "no record row for this buyer" only. Callers that used to
+  // treat a failed RPC as a zero record rendered phantom zeros.
+  if (error) throw error;
+  if (!data || (data as unknown[]).length === 0) return null;
   return (data as BuyerRecord[])[0];
 }
 

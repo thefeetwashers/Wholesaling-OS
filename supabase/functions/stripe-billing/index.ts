@@ -60,9 +60,12 @@
 //   {action:'webhook'} — POSTed by Stripe at /webhook (no JWT;
 //     deploy with --no-verify-jwt). Verifies the Stripe signature
 //     with STRIPE_WEBHOOK_SECRET when set; maps subscription
-//     statuses onto plan_status; upserts saas_subscriptions by
-//     stripe_subscription_id. A webhook with an unverifiable
-//     signature is rejected (400) and changes nothing.
+//     statuses onto plan_status; updates the wholesaler's
+//     saas_subscriptions row by user_id (client_reference_id on
+//     checkout, metadata.supabase_user_id on subscription events).
+//     An event with no determinable user id is logged and skipped
+//     (Slice 136) — it never writes a user-less row. A webhook with
+//     an unverifiable signature is rejected (400) and changes nothing.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -94,7 +97,13 @@ function notConfigured(detail: string) {
   });
 }
 
-function mapSubscriptionStatus(status: string): string {
+// Maps a Stripe subscription status onto the saas_subscriptions
+// plan_status CHECK (trialing/active/past_due/canceled). Returns
+// null for any status the CHECK does not allow (unpaid,
+// incomplete, incomplete_expired, paused, unknown) — callers log
+// and leave plan_status untouched instead of silently relabeling
+// it. Aligned with the /api/stripe/webhook route (Slice 136).
+function mapSubscriptionStatus(status: string): string | null {
   switch (status) {
     case "trialing":
       return "trialing";
@@ -103,10 +112,9 @@ function mapSubscriptionStatus(status: string): string {
     case "past_due":
       return "past_due";
     case "canceled":
-    case "unpaid":
       return "canceled";
     default:
-      return "trialing";
+      return null;
   }
 }
 
@@ -154,9 +162,19 @@ serve(async (req: Request) => {
       }
       const data = event.data.object as Record<string, unknown>;
       // The session / subscription carries the wholesaler's
-      // Supabase user id in metadata (set at checkout creation),
-      // so the webhook updates THAT wholesaler's row — it never
-      // creates a user-less row.
+      // Supabase user id — client_reference_id on the Checkout
+      // Session, metadata.supabase_user_id on the subscription
+      // (both set at checkout creation). When NEITHER is present
+      // the user cannot be determined, so the event is LOGGED and
+      // SKIPPED: saas_subscriptions.user_id is NOT NULL, and no
+      // write happens without a user id — a user-less row can
+      // never be created. (Slice 136: the previous code upserted
+      // the patch without user_id in that case, which the NOT
+      // NULL constraint would reject.)
+      //
+      // Slice 136 label: this webhook branch is implemented but
+      // NOT live-tested — there is no Stripe account, product, or
+      // price ID, so no real event has ever reached it.
       const sessionUserId =
         typeof (data as { client_reference_id?: unknown }).client_reference_id === "string"
           ? (data as { client_reference_id: string }).client_reference_id
@@ -165,21 +183,40 @@ serve(async (req: Request) => {
         const subscriptionId = typeof data.subscription === "string" ? data.subscription : null;
         const customerId = typeof data.customer === "string" ? data.customer : null;
         if (subscriptionId) {
+          // Slice 136 — no user id, no write. The old else-branch
+          // upserted this patch without user_id; user_id is NOT
+          // NULL, so that write could never land — and a user-less
+          // row must never exist. Log and return: Stripe treats
+          // the 200 as received, so it will not retry a dead end.
+          if (!sessionUserId) {
+            console.log(
+              "[stripe-billing webhook] checkout.session.completed with no client_reference_id — skipped, no user-less row written.",
+              { subscriptionId, customerId },
+            );
+            return json({ success: true, received: true, skipped: "no_supabase_user_id" });
+          }
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          const patch = {
+          const mappedStatus = mapSubscriptionStatus(sub.status);
+          const patch: Record<string, unknown> = {
             stripe_subscription_id: subscriptionId,
             stripe_customer_id: customerId,
-            plan_status: mapSubscriptionStatus(sub.status),
-            trial_ends_at:
-              sub.trial_end != null ? new Date(sub.trial_end * 1000).toISOString() : null,
           };
-          if (sessionUserId) {
-            await admin.from("saas_subscriptions").update(patch).eq("user_id", sessionUserId);
+          if (mappedStatus !== null) {
+            patch.plan_status = mappedStatus;
           } else {
-            await admin.from("saas_subscriptions").upsert(patch, {
-              onConflict: "stripe_subscription_id",
-            });
+            // Slice 136 — unmapped Stripe status: log and leave
+            // plan_status untouched, never silently relabel it.
+            console.log(
+              "[stripe-billing webhook] subscription status not mapped to a plan_status — leaving it untouched.",
+              { subscriptionId, status: sub.status },
+            );
           }
+          // trial_ends_at is NOT NULL: only set it when Stripe
+          // reports a trial end — never write null into it.
+          if (sub.trial_end != null) {
+            patch.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+          }
+          await admin.from("saas_subscriptions").update(patch).eq("user_id", sessionUserId);
         }
       } else if (
         event.type === "customer.subscription.created" ||
@@ -192,23 +229,53 @@ serve(async (req: Request) => {
           sub.metadata && typeof sub.metadata.supabase_user_id === "string"
             ? sub.metadata.supabase_user_id
             : null;
-        const patch = {
+        // Slice 136 — no user id, no write (same rule as the
+        // checkout branch above): log and return, never upsert
+        // without user_id.
+        if (!metaUserId) {
+          console.log(
+            "[stripe-billing webhook] subscription event with no metadata.supabase_user_id — skipped, no user-less row written.",
+            { subscriptionId: sub.id, status: sub.status },
+          );
+          return json({ success: true, received: true, skipped: "no_supabase_user_id" });
+        }
+        const mappedStatus = mapSubscriptionStatus(sub.status);
+        const patch: Record<string, unknown> = {
           stripe_subscription_id: sub.id,
           stripe_customer_id: customerId,
-          plan_status: mapSubscriptionStatus(sub.status),
-          trial_ends_at:
-            sub.trial_end != null ? new Date(sub.trial_end * 1000).toISOString() : null,
         };
-        if (metaUserId) {
-          await admin.from("saas_subscriptions").update(patch).eq("user_id", metaUserId);
+        if (mappedStatus !== null) {
+          patch.plan_status = mappedStatus;
         } else {
-          await admin.from("saas_subscriptions").upsert(patch, {
-            onConflict: "stripe_subscription_id",
-          });
+          // Slice 136 — unmapped Stripe status: log and leave
+          // plan_status untouched, never silently relabel it.
+          console.log(
+            "[stripe-billing webhook] subscription status not mapped to a plan_status — leaving it untouched.",
+            { subscriptionId: sub.id, status: sub.status },
+          );
         }
+        // trial_ends_at is NOT NULL: only set it when Stripe
+        // reports a trial end — never write null into it.
+        if (sub.trial_end != null) {
+          patch.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+        }
+        await admin.from("saas_subscriptions").update(patch).eq("user_id", metaUserId);
       } else if (event.type === "invoice.payment_failed") {
-        const invoice = data as unknown as Stripe.Invoice;
-        const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : null;
+        // Read the subscription id off the raw event object, not the
+        // typed Invoice: the installed stripe-node Invoice type has
+        // no `subscription` property, and newer Stripe API versions
+        // moved it to parent.subscription_details.subscription —
+        // both shapes are handled (same fix as the Next.js webhook
+        // route, Slice 136 integration).
+        const rawInvoice = data as Record<string, unknown>;
+        const parent = rawInvoice.parent as Record<string, unknown> | undefined;
+        const subDetails = parent?.subscription_details as Record<string, unknown> | undefined;
+        const subscriptionId =
+          typeof rawInvoice.subscription === "string"
+            ? rawInvoice.subscription
+            : typeof subDetails?.subscription === "string"
+              ? subDetails.subscription
+              : null;
         if (subscriptionId) {
           await admin
             .from("saas_subscriptions")

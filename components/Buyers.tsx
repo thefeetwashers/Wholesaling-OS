@@ -39,7 +39,7 @@ export default function Buyers({ userId, userEmail }: { userId: string | null; u
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         Your private buyer list only. It is never shared with other users and never shown to the owner as raw rows.
         The demand count below is buyers YOU entered, by state — not live corporate orders. The tier saved here is
-        your private working label; earned tiers in Your Portal come only from platform closing records.
+        your private working label; tiers in Your Portal come from the closing record the platform holds for that buyer.
       </p>
       <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
         <input placeholder="Buyer name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

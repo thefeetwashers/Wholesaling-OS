@@ -18,21 +18,32 @@ const ZERO_RECORD: BuyerRecord = { accepted_deals: 0, bc_signed: 0, closed_deals
 export default function BuyerProofCard({ userId, userEmail }: { userId: string; userEmail?: string }) {
   const [record, setRecord] = useState<BuyerRecord | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [recErr, setRecErr] = useState(false);
   const [pof, setPof] = useState<{ status: string; note: string } | null>(null);
 
   useEffect(() => {
     let live = true;
     // A buyer with no platform events yet has a true record of
     // zeros — the RPC may return no row for them, which this card
-    // renders as the zero record it is, never as a blank.
+    // renders as the zero record it is, never as a blank. An RPC
+    // ERROR is different: the record is unknown, not zero, so the
+    // card must not print zeros as if they were counted (Slice 136).
     loadBuyerRecord(userId)
       .then((r) => { if (live) { setRecord(r ?? ZERO_RECORD); setLoaded(true); } })
-      .catch(() => { if (live) { setRecord(ZERO_RECORD); setLoaded(true); } });
+      .catch(() => { if (live) { setRecErr(true); setLoaded(true); } });
     loadMyProofOfFunds(userId).then((p) => { if (live) setPof(p); }).catch(() => { if (live) setPof({ status: 'none', note: '' }); });
     return () => { live = false; };
   }, [userId]);
 
-  if (!loaded || !record || !pof) return null;
+  if (!loaded || !pof) return null;
+  if (recErr || !record) {
+    return (
+      <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginBottom: 24 }}>
+        <h2>🏅 Your proof card</h2>
+        <p style={{ fontSize: 13.5, color: '#cbd5e1' }}>Your buyer record could not be loaded just now — the figures are unknown, not zero. Please reload and try again before printing or sharing this card.</p>
+      </section>
+    );
+  }
 
   const tier = buyerTier(record);
   const completion = completionRatePct(record);
@@ -54,8 +65,8 @@ export default function BuyerProofCard({ userId, userEmail }: { userId: string; 
         <p><strong>${escHtml(tier.label)}</strong></p>
         <table style="border-collapse: collapse; font-size: 15px">${rows}</table>
         <p>Proof of funds: <strong>${escHtml(pofLine)}</strong> (self-reported by the buyer${pof.note ? ` — ${escHtml(pof.note)}` : ''})</p>
-        <p style="font-size: 13px">The record above is counted by the platform from closing records — accepted offers,
-        signed B–C contracts, and escrow outcomes. It is not claimed by the buyer and cannot be bought.
+        <p style="font-size: 13px">The record above comes from the closing record the platform holds for this buyer — accepted offers,
+        signed B–C contracts, and escrow outcomes. The buyer does not set their own tier.
         Proof of funds is the buyer's own statement and is labeled self-reported. Verify current figures
         in the buyer's WholesalingOS portal.</p>
       </div>`);
@@ -74,9 +85,9 @@ export default function BuyerProofCard({ userId, userEmail }: { userId: string; 
         Proof of funds: <strong>{pofLine}</strong> — self-reported{pof.note ? ` · ${pof.note}` : ''}
       </p>
       <p style={{ fontSize: 12.5, color: '#94a3b8' }}>
-        Counted by the platform from closing records — not claimed, not bought. Print the card to hand
+        From the closing record the platform holds — the buyer does not set their own tier. Print the card to hand
         to a wholesaler or lender; the figures on paper match this screen because both come from the
-        same counted record.
+        same record.
       </p>
       <button type="button" onClick={print} style={{ cursor: 'pointer' }}>Print my proof card</button>
     </section>

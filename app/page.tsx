@@ -187,7 +187,7 @@ function MarketplaceLanding() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
         <div style={MKT_PANEL}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🏆 Earned record</div>
-          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>A buyer&apos;s standing comes from closings this platform counted — accepted offers, signed assignments, escrow outcomes. It cannot be bought, and a buyer cannot write it for themselves.</p>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>A buyer&apos;s standing comes from the closing record the platform holds — accepted offers, signed assignments, escrow outcomes. The tier rules read those counts only; buyers do not set their own tier.</p>
         </div>
         <div style={MKT_PANEL}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🚩 Report a problem</div>
@@ -219,7 +219,7 @@ function MarketplaceLanding() {
             <tr>
               <td style={cell}><strong style={{ color: '#fff' }}>Proof a buyer closes</strong></td>
               <td style={cell}>Their word for it</td>
-              <td style={cell}>An earned tier counted from this platform&apos;s closings</td>
+              <td style={cell}>A tier drawn from the closing record the platform holds for that buyer</td>
             </tr>
             <tr>
               <td style={cell}><strong style={{ color: '#fff' }}>Whose eyes see it</strong></td>
@@ -256,7 +256,7 @@ function MarketplaceLanding() {
         </div>
         <div style={MKT_PANEL}>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>How do I know a buyer is real?</div>
-          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>You do not take their word for it: their tier is earned from closings this platform counted, and their proof of funds is labelled self-reported until you see the letter.</p>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>You do not take their word for it: their tier comes from the closing record the platform holds for them, and their proof of funds is labelled self-reported until you see the letter.</p>
         </div>
         <div style={MKT_PANEL}>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>How do I report a problem?</div>
@@ -391,7 +391,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 135</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 136</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,
@@ -416,7 +416,7 @@ export default function Home() {
           <h1>Your whole wholesaling business. One office.</h1>
           <p>
             WholesalingOS runs your pipeline from the first lead to the funded closing —
-            leads, deal analysis, contracts, signing, escrow, and payouts — with private
+            leads, deal analysis, contracts, signature-status tracking, escrow, and payouts — with private
             portals for your cash buyers, your sellers, and your title company.
           </p>
           <div className="ws-chips">

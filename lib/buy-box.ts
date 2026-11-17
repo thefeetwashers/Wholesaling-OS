@@ -80,6 +80,58 @@ export async function loadMyBuyBox(userId: string): Promise<BuyBox | null> {
   return (data || null) as BuyBox | null;
 }
 
+// Slice 136 — buy-box merge: the legacy public.buy_boxes table
+// (lib/portals.ts) is retired from the app. Every buy-box read now
+// goes through this table, public.wholesaler_buy_boxes — one row
+// per wholesaler, UNIQUE(user_id). Published boxes only are
+// readable in aggregate: a box counts as platform demand only
+// once its owner turns publishing on. Unpublished boxes are
+// visible to their owner alone (their own portal, their own
+// matching), never to anyone else.
+export async function loadAllPublishedBuyBoxes(): Promise<BuyBox[]> {
+  if (!supabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase
+    .from('wholesaler_buy_boxes')
+    .select(BUY_BOX_SELECT)
+    .eq('published', true)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data || []) as BuyBox[];
+}
+
+// A marketplace listing matches a buy box when its total cost
+// sits inside the box price range (when set) and its property
+// address text contains one of the box's markets/states (when
+// set). Address is free text on the deal, so this is a plain
+// text match — labeled as such in the UI. Moved from
+// lib/portals.ts (Slice 136) and adapted to the live BuyBox
+// shape: markets are county names, states are 2-letter codes;
+// the legacy label / cities / counties / min_beds fields do not
+// exist on this table. Published is NOT checked here — the
+// caller's own box matches their own feed whether or not they
+// have published it; callers aggregating other people's boxes
+// must pass published boxes (loadAllPublishedBuyBoxes above).
+export interface FeedListingForMatch {
+  total_marketplace_cost: number;
+  deals?: { documents?: { property_address?: string; city?: string; state?: string } | null } | null;
+}
+
+export function listingMatchesBox(listing: FeedListingForMatch, box: BuyBox): boolean {
+  const cost = Number(listing.total_marketplace_cost);
+  if (box.min_price != null && cost < Number(box.min_price)) return false;
+  if (box.max_price != null && cost > Number(box.max_price)) return false;
+  const places = [...(box.markets || []), ...(box.states || [])]
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (places.length) {
+    const docs = listing.deals?.documents;
+    const hay = [docs?.property_address || '', docs?.city || '', docs?.state || ''].join(' ').toLowerCase();
+    if (!places.some((p) => hay.includes(p))) return false;
+  }
+  return true;
+}
+
 // Upsert on user_id (one buy box per wholesaler). Verified write:
 // the saved row is selected back, and a missing row is an honest
 // error — the save is never silently pretended to have worked.

@@ -185,3 +185,49 @@ export async function loadBuyerContactForResponse(responseId: string): Promise<C
     };
   }
 }
+
+// Slice 136 — the mirror direction: the deal OWNER's contact,
+// for the responder. get_owner_contact_for_response (migration
+// 20261117151000) returns the owner's profile contact (the owner
+// sets their own contact_name / contact_phone with
+// saveMyBuyerProfile above; the email is their account email)
+// ONLY when the same deal_responses row has BOTH
+// owner_contact_shared AND responder_contact_shared true, AND
+// the caller is the operator or one of the two parties. Same
+// honest-unavailable shape as the responder direction: it never
+// throws into a page and never falls back to a plain read of
+// profiles (owner-only RLS means another user cannot read the
+// owner's contact row anyway).
+export async function loadOwnerContactForResponse(responseId: string): Promise<ContactReveal> {
+  if (!supabaseConfigured || !supabase || !responseId) {
+    return { available: false, contact: null, reason: 'No deal response was given, so no contact can be shown.' };
+  }
+  try {
+    const { data, error } = await supabase.rpc('get_owner_contact_for_response', {
+      p_response_id: responseId,
+    });
+    if (error) {
+      return {
+        available: false,
+        contact: null,
+        reason:
+          'Contact sharing for deal responses is not built yet — the buyer and the wholesaler have not both shared on this deal, or the reveal is not wired up. No contact is shown.',
+      };
+    }
+    const row = (Array.isArray(data) ? data[0] : data) as SharedBuyerContact | null | undefined;
+    if (!row || !row.contact_email) {
+      return {
+        available: false,
+        contact: null,
+        reason: 'No contact shared yet — both sides must share their contact on this deal before either is shown.',
+      };
+    }
+    return { available: true, contact: row, reason: '' };
+  } catch {
+    return {
+      available: false,
+      contact: null,
+      reason: 'Contact sharing for deal responses is not available right now. No contact is shown.',
+    };
+  }
+}

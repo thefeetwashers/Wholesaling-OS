@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadLeads, type Lead } from '../lib/leads';
-import { loadAllBuyBoxes, type BuyBox } from '../lib/portals';
+import { loadAllPublishedBuyBoxes, type BuyBox } from '../lib/buy-box';
 import { ageLabel, countLeadMatches } from '../lib/match';
 import ProofCaption from './ProofCaption';
 
@@ -20,7 +20,7 @@ export default function SpeedToLead({ userId, onNavigate }: { userId: string; on
 
   useEffect(() => {
     let live = true;
-    Promise.all([loadLeads(userId), loadAllBuyBoxes().catch(() => [] as BuyBox[])])
+    Promise.all([loadLeads(userId), loadAllPublishedBuyBoxes().catch(() => [] as BuyBox[])])
       .then(([ls, bx]) => {
         if (!live) return;
         const sorted = [...(ls || [])].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
@@ -40,7 +40,7 @@ export default function SpeedToLead({ userId, onNavigate }: { userId: string; on
       <ProofCaption>Ages and sources are the lead records’ own fields; match counts come from the buy boxes on file, matched when this page loaded.</ProofCaption>
       <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>
         Fresh leads close. Each lead below shows its real age and how many buyers match it by their own
-        buy boxes (plain text match on city / state / county — a box with no place set counts as a general buyer).
+        buy boxes (plain text match on city / state / county / ZIP — a box with no place set counts as a general buyer).
       </p>
       <ul style={{ fontSize: 13.5, paddingLeft: 18 }}>
         {leads.map((l) => {

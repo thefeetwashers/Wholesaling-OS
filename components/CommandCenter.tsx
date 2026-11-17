@@ -55,10 +55,13 @@ export function briefingLine(band: DashboardBandData, deadlines: DeadlineItem[])
 
 export default function CommandCenter({ userId, onNavigate }: { userId: string; onNavigate: (view: string) => void }) {
   const [band, setBand] = useState<DashboardBandData | null>(null);
+  // Slice 136 — loading / ready / error / unavailable stay distinct:
+  // a failed band load used to return null for the whole panel, and a
+  // null band (sign-in not configured) read as "loading" forever.
+  const [bandState, setBandState] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
   const [streak, setStreak] = useState<number | null>(null);
   const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
   const [company, setCompany] = useState('');
-  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -68,12 +71,10 @@ export default function CommandCenter({ userId, onNavigate }: { userId: string; 
       loadDeadlines(userId).catch(() => [] as DeadlineItem[]),
       loadSellerPageSettings(userId).then((s) => (s ? s.company : '')).catch(() => ''),
     ])
-      .then(([b, d, c]) => { if (live) { setBand(b); setDeadlines(d); setCompany(c || ''); } })
-      .catch(() => { if (live) setFailed(true); });
+      .then(([b, d, c]) => { if (live) { setBand(b); setBandState(b ? 'ready' : 'unavailable'); setDeadlines(d); setCompany(c || ''); } })
+      .catch(() => { if (live) setBandState('error'); });
     return () => { live = false; };
   }, [userId]);
-
-  if (failed) return null;
 
   const now = new Date();
   const dateLine = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -108,7 +109,11 @@ export default function CommandCenter({ userId, onNavigate }: { userId: string; 
         {greetingFor(now)}{company ? `, ${company}` : ''}.
       </h2>
       <p style={{ fontSize: 15, color: '#cbd5e1', margin: '0 0 18px', maxWidth: 860 }}>
-        {band ? briefingLine(band, deadlines) : 'Loading your numbers…'}
+        {bandState === 'error'
+          ? 'Your numbers could not be loaded — the counts on this board are unknown right now, not zero. Check your connection and reload the page to try again.'
+          : bandState === 'unavailable'
+            ? 'Your numbers are unavailable — sign-in is not configured on this deployment, so nothing is counted here.'
+            : band ? briefingLine(band, deadlines) : 'Loading your numbers…'}
       </p>
       <ProofCaption>Briefing composed from the same counted records as Your numbers below, loaded when this page opened.</ProofCaption>
       {streak !== null && (

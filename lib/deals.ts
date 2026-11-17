@@ -25,11 +25,14 @@ export function dealFromContract(userId: string, c: DealContract): DealRow {
   return {
     owner_id: userId,
     contract_type: c.buyer_name.trim() ? 'assignment' : 'purchase',
-    contract_price: c.contract_price,
-    arv: c.arv,
-    repairs: c.repairs,
-    assignment_fee: c.assignment_fee,
-    emd_amount: c.emd_amount,
+    // Slice 136 — money fields are null until entered; a null stays
+    // unset on the row instead of being saved as 0 or a pre-filled
+    // amount.
+    contract_price: c.contract_price ?? undefined,
+    arv: c.arv ?? undefined,
+    repairs: c.repairs ?? undefined,
+    assignment_fee: c.assignment_fee ?? undefined,
+    emd_amount: c.emd_amount ?? undefined,
     status: c.ab_status === 'Signed' ? 'signed' : 'draft',
     documents: {
       property_address: c.property_address,

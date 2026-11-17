@@ -39,6 +39,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/distressed-finder`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.8 },
     { url: `${BASE}/agents`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE}/parcel-enricher`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.7 },
+    // Slice 132 — public routes that shipped with the marketplace but
+    // were never added to the sitemap. /vip is signed-in only, but it
+    // is a real public route, so it is listed, not hidden.
+    { url: `${BASE}/join`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${BASE}/managed-dispo`, lastModified: new Date('2026-11-17'), changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE}/vip`, lastModified: new Date('2026-11-17'), changeFrequency: 'monthly', priority: 0.6 },
+    // Slice 136 — the public roadmap page.
+    { url: `${BASE}/roadmap`, lastModified: new Date('2026-11-17'), changeFrequency: 'monthly', priority: 0.6 },
     { url: `${BASE}/privacy`, lastModified: new Date('2026-10-31'), changeFrequency: 'yearly', priority: 0.4 },
     { url: `${BASE}/terms`, lastModified: new Date('2026-10-31'), changeFrequency: 'yearly', priority: 0.4 },
   ];

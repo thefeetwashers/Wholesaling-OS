@@ -1,20 +1,26 @@
 import type { Lead } from './leads';
-import type { BuyBox } from './portals';
+import type { BuyBox } from './buy-box';
 
 // Slice 70 — lead ↔ buy-box matching for the Speed-to-Lead center.
+// Slice 136 — rewired from the legacy public.buy_boxes table to
+// the live public.wholesaler_buy_boxes shape (lib/buy-box.ts):
+// markets are county names, states are 2-letter codes, ZIPs are
+// in zip_codes; there is no label / cities / counties / min_beds
+// / active column on the live table. A box reaches this matcher
+// only through loadAllPublishedBuyBoxes, so the published filter
+// is the read, not a check here.
 // Same honesty rule as listingMatchesBox: a lead has no reliable price
 // field, so matching is a PLAIN TEXT match on place (the box's
-// cities / states / counties against the lead's city / state / county)
-// and it is labeled as such wherever shown. A box with no place
+// markets / states / ZIPs against the lead's city / state / county
+// / ZIP) and it is labeled as such wherever shown. A box with no place
 // criteria counts as a general buyer and matches every lead.
 
 export function leadMatchesBox(lead: Lead, box: BuyBox): boolean {
-  if (!box.active) return false;
-  const places = [...(box.cities || []), ...(box.states || []), ...(box.counties || [])]
+  const places = [...(box.markets || []), ...(box.states || []), ...(box.zip_codes || [])]
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   if (!places.length) return true;
-  const hay = [lead.city || '', lead.state || '', lead.county || ''].join(' ').toLowerCase();
+  const hay = [lead.city || '', lead.state || '', lead.county || '', lead.zip || ''].join(' ').toLowerCase();
   return places.some((p) => hay.includes(p));
 }
 
@@ -25,10 +31,12 @@ export interface LeadMatchCount {
   liveBoxes: number; // Slice 116: matching boxes confirmed live
 }
 
-// Slice 116 — buy-box liveness. A box speaks for its buyer until
-// it is confirmed again: the confirmed-on date is the box's
-// updated_at (created_at until first confirmation), and a box not
-// confirmed within 120 days is STALE. Stale boxes still match —
+// Slice 116 — buy-box liveness. Slice 136: the live table has
+// no separate "confirm" step — the confirmed-on date is the
+// box's updated_at (created_at until the first save), and saving
+// the box again re-stamps it via the set_updated_at trigger, so
+// "confirm still buying" is now "save the box again". A box not
+// saved within 120 days is STALE. Stale boxes still match —
 // criteria are criteria — but every count that quotes buyers now
 // leads with the confirmed-live number, and stale boxes are
 // flagged wherever they are listed, because a match count that

@@ -13,7 +13,7 @@ import {
   type KpiData,
 } from '../lib/money';
 import { loadDeals, type DealRow } from '../lib/deals';
-import { loadAllBuyBoxes } from '../lib/portals';
+import { loadAllPublishedBuyBoxes } from '../lib/buy-box';
 
 // Slice 14 — Money & scoreboard: disbursements with authorization
 // letters, a KPI scorecard computed live from the user's own rows, and
@@ -27,6 +27,10 @@ export default function MoneyScoreboard({ userId }: { userId: string | null }) {
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [disbs, setDisbs] = useState<Disbursement[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
+  // Slice 136 — loading / ready / error / unavailable stay distinct
+  // for the KPI region only: a failed load used to leave the
+  // scorecard on "Loading…" forever with no numbers shown.
+  const [kpiState, setKpiState] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
   const [msg, setMsg] = useState('');
   const [letterFor, setLetterFor] = useState<string | null>(null);
   const [landBoxes, setLandBoxes] = useState(0);
@@ -40,12 +44,17 @@ export default function MoneyScoreboard({ userId }: { userId: string | null }) {
   const refresh = () => {
     if (!userId) return;
     loadDisbursements(userId).then(setDisbs).catch(() => {});
-    loadKpis(userId).then(setKpi).catch(() => {});
+    // Slice 136 — a failed KPI load is an error state, not a silent
+    // empty scorecard: the numbers are unknown, never zero.
+    setKpiState('loading');
+    loadKpis(userId)
+      .then((k) => { setKpi(k); setKpiState(k ? 'ready' : 'unavailable'); })
+      .catch(() => { setKpi(null); setKpiState('error'); });
   };
   useEffect(() => {
     if (!userId) return;
     loadDeals(userId).then((rows) => { if (rows) setDeals(rows); }).catch(() => {});
-    loadAllBuyBoxes()
+    loadAllPublishedBuyBoxes()
       .then((boxes) => setLandBoxes(boxes.filter((b) => b.property_types.some((t) => t.toLowerCase().includes('land'))).length))
       .catch(() => {});
     refresh();
@@ -79,9 +88,18 @@ export default function MoneyScoreboard({ userId }: { userId: string | null }) {
       {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
 
       <h3>KPI scorecard — your numbers, this week vs last</h3>
-      {kpi === null ? (
+      {kpiState === 'loading' ? (
         <p style={{ fontSize: 13 }}>Loading your scorecard…</p>
-      ) : (
+      ) : kpiState === 'error' ? (
+        <p style={{ fontSize: 13, color: '#fca5a5' }}>
+          Your scorecard could not be loaded — the numbers are unknown right now, not zero.
+          Check your connection and reload the page to try again.
+        </p>
+      ) : kpiState === 'unavailable' ? (
+        <p style={{ fontSize: 13 }}>
+          Your scorecard is unavailable — sign-in is not configured on this deployment, so nothing is counted here.
+        </p>
+      ) : kpi ? (
         <div style={{ fontSize: 13 }}>
           <p>
             Leads added: <strong>{kpi.leadsThisWeek}</strong> this week · {kpi.leadsLastWeek} last week<br />
@@ -92,7 +110,7 @@ export default function MoneyScoreboard({ userId }: { userId: string | null }) {
             Assignment fees on closed deals (actuals recorded): <strong>{money(kpi.feesClosedTotal)}</strong>
           </p>
         </div>
-      )}
+      ) : null}
 
       {plans && (
         <>
@@ -163,7 +181,7 @@ export default function MoneyScoreboard({ userId }: { userId: string | null }) {
       <h3>Playbook — vacant land to builders</h3>
       <div style={{ fontSize: 13 }}>
         <p>
-          Active buyer demand for land right now: <strong>{landBoxes} buy box{landBoxes === 1 ? '' : 'es'}</strong> asking for land.
+          Published buyer demand for land right now: <strong>{landBoxes} buy box{landBoxes === 1 ? '' : 'es'}</strong> asking for land.
         </p>
         <ol>
           <li>Source: tax-delinquent and code-violation lists plus Driving for Dollars pins on empty lots.</li>

@@ -176,6 +176,20 @@ function requireSupabase() {
   return supabase;
 }
 
+// Slice 136 — PostgREST errors are plain objects ({ message, code,
+// details, hint }), NOT Error instances. Throwing one raw means every
+// `e instanceof Error` catch in the UI falls through to a generic
+// string and the database's own words are lost — which is exactly
+// how the lender desk ended up showing "Could not load packets."
+// for every failure. Wrap it so the caller always gets a real Error
+// carrying the database's message (e.g. "permission denied for
+// table funding_requests" [42501], or a missing column [42703]).
+function postgrestError(error: { message?: string; code?: string | null }): Error {
+  const message = error?.message || 'The database refused this request.';
+  const code = error?.code ? ` [${error.code}]` : '';
+  return new Error(`${message}${code}`);
+}
+
 const FUNDING_SELECT =
   'id, requester_id, deal_id, financing_type, borrowing_entity_name, entity_state, business_purpose_certified, no_upfront_fee_acknowledged, property_address, property_state, purchase_price, loan_amount_requested, estimated_arv, rehab_budget, monthly_rent, target_closing_date, title_company_name, title_officer_email, routing_track, assigned_lender_id, status, fee_percentage, fee_amount, fee_paid, fee_paid_at, fee_paid_amount, interest_rate, loan_term_months, created_at, updated_at';
 
@@ -205,7 +219,9 @@ export async function loadMatchedFundingRequests(): Promise<FundingRequest[]> {
     .from('funding_requests')
     .select(FUNDING_SELECT)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  // Slice 136 — throw a real Error carrying the database's own
+  // message, not the raw PostgREST object (see postgrestError).
+  if (error) throw postgrestError(error);
   return (data || []) as FundingRequest[];
 }
 

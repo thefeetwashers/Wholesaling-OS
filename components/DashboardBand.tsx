@@ -15,20 +15,43 @@ const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 export default function DashboardBand({ userId }: { userId: string }) {
   const [band, setBand] = useState<DashboardBandData | null>(null);
   const [failed, setFailed] = useState(false);
+  // Slice 136 — loading / error / unavailable stay distinct: a null
+  // band after loading means "sign-in not configured", not "loading".
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let live = true;
     loadDashboardBand(userId)
-      .then((b) => { if (live) setBand(b); })
-      .catch(() => { if (live) setFailed(true); });
+      .then((b) => { if (live) { setBand(b); setLoaded(true); } })
+      .catch(() => { if (live) { setFailed(true); setLoaded(true); } });
     return () => { live = false; };
   }, [userId]);
 
-  if (failed) return null;
-  if (!band) {
+  if (failed) {
     return (
       <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginBottom: 16 }}>
-        <p style={{ fontSize: 13.5, color: '#94a3b8', margin: 0 }}>Loading your numbers…</p>
+        <h2 style={{ marginTop: 0 }}>Your numbers</h2>
+        <p style={{ fontSize: 13.5, color: '#fca5a5', margin: 0 }}>
+          Your numbers could not be loaded — the counts are unknown right now, not zero.
+          Check your connection and reload the page to try again.
+        </p>
+      </section>
+    );
+  }
+  if (!band) {
+    if (!loaded) {
+      return (
+        <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginBottom: 16 }}>
+          <p style={{ fontSize: 13.5, color: '#94a3b8', margin: 0 }}>Loading your numbers…</p>
+        </section>
+      );
+    }
+    return (
+      <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Your numbers</h2>
+        <p style={{ fontSize: 13.5, color: '#94a3b8', margin: 0 }}>
+          Your numbers are unavailable — sign-in is not configured on this deployment, so nothing is counted here.
+        </p>
       </section>
     );
   }

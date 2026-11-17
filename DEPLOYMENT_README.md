@@ -7,7 +7,7 @@
 
 This file is the deployment guide for a developer picking up the repo. It
 lists the system as it actually is — file names, migration names, routes, and
-environment variables were all verified against the tree on Nov 16, 2026.
+environment variables were all verified against the tree on Nov 17, 2026.
 Nothing in here is aspirational: a feature marked "not live" is not live.
 
 ## 1. Stack (as it actually is)
@@ -455,10 +455,12 @@ Already applied (Nov 15–16, 2026 — do not re-run unless the database was res
 | `20261115170000_saas_subscriptions.sql` | Slice 129 |
 | `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (Slices 130–133 — apply after the deploy):
+New in this push (Slices 130–135 — apply after the deploy, except where noted applied):
 
 | File | Contents |
 | --- | --- |
+| `20261117123500_grant_authenticated_app_tables.sql` | Grants fix (Nov 17) — GRANTs to `authenticated` + `service_role` on the Slices 118–130 app tables, incl. `funding_requests` + `lender_boxes`; applied + verified live Nov 17, 2026, 12:40–12:42 EST |
+| `20261117150000_slice135_realtor_pocket_listings.sql` | Slice 135 — `realtor_pocket_listings` table + `submit_realtor_pocket_listing` function; applied + verified live Nov 17, 2026 |
 | `20261117090000_slice130_operator_visibility.sql` | `scout_leads.w9_received` + `w9_received_at` + W-9-before-paid CHECK; `funding_requests.interest_rate` + `loan_term_months`; `problem_reports` table + RLS |
 | `20261117124100_buyer_networks_buy_box.sql` | `wholesaler_buy_boxes` table (one buy box per wholesaler) + owner/operator RLS + GRANTs to `authenticated` and `service_role` in the same file |
 | `20261117130000_slice132_marketplace_tables.sql` | `published_deals` + `deal_responses` + `managed_dispo_requests` tables + RLS + GRANTs (incl. anon SELECT on published deals only) in the same file |
@@ -470,6 +472,7 @@ New in this push (Slices 130–133 — apply after the deploy):
 | `20261117143000_slice133_saved_searches.sql` | `buyer_saved_searches` table (owner CRUD + operator read, no anon) + GRANTs in the same file |
 | `20261117144000_slice133_deal_status.sql` | `published_deals.status` (Active/Under Contract/Sold, default Active) + owner SELECT policy for own rows + DB trigger rejecting offer INSERTs on non-Active deals |
 | `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
+| `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; apply after the Slice 136 deploy |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -634,66 +637,61 @@ Honestly unset (features that stay off until they are set):
 Never write a real key or secret into this README, into chat, or into the
 repo. Do not commit `.env`.
 
-## 8. Go-live checklist (this push: Slices 126 + 127 + 128 + 129)
+## 8. Go-live checklist (current state: Slice 135 live; Slice 136 audit fixes local only)
 
-1. Push via the GitHub approval card → Vercel auto-deploys in 2–3 minutes.
-   The first live check after a push usually catches the old build —
-   re-check before concluding failure. Confirm the build tag reads
-   **Slice 129** on both `wholesalingos.thefeetwashers.com` and
-   `wholesalingos.vercel.app`.
-2. Apply migrations `20261115150000`, `20261115160000`, `20261115170000`,
-   and `20261115180000` in Supabase via commit-pinned raw URLs (§3).
-   Confirm `probate_leads`, `probate_lead_activity`, `cash_buyers`,
-   `saas_subscriptions`, `leads.probate_case_number`, and
-   `leads.owner_phone` / `leads.owner_email` exist.
-3. Run the pre-flight script (after `.env.local` holds the real Supabase
-   URL + anon key): `node --env-file=.env.local
-   scripts/verify-wholesalingos.mjs`. It checks the real files, the real
-   tables (a 401/403 means "reachable (anon blocked)" — it does NOT prove
-   RLS), and the 3 Edge Functions via OPTIONS (they are expected to
-   report missing until the owner deploys them).
-3. Mode B parcel lookup (Slice 126 proof): parcel `494125000190`, Broward
-   (countyCode 6) must return the Lauderdale Lakes parcel with county
-   Broward — not Duval, not `[]`.
-4. Probate import: upload the docket CSV (or its `.xlsx`) and confirm the
-   counts reproduce exactly — **27 cases, 26 OPEN, 1 CLOSED
-   (`2026CP001398`), 7 Pro Se, 0 without a decision-maker**, with the 5
-   seed cases exact (001433 SCHOEPP, 001412 SMALLEY + HCA FLORIDA ST LUCIE
-   HOSPITAL claim, 001408 SCARFONE, 001406 KURLANTZICK, 001397 ZEHNER).
-5. Storefront: open `https://wholesalingos.thefeetwashers.com/sell/thefeetwashers`
-   in incognito, submit via `?case=2026CP001433`, and confirm the lead in
-   the Leads dashboard carries `probate_case_number = 2026CP001433` and
-   the probate row shows "Seller submitted".
-6. Skip-trace: with no provider connected, invoke the function and confirm it returns
-   `not_configured` and writes nothing. Do not deploy it, set any key, or build a
-   per-wholesaler settings store until the founder picks providers (§5, BYOK).
-7. Contracts: Draft Contract from a probate row and from an inbound lead;
-   confirm the prefill carries the seller/property/case (price only from
-   `offer_amount` when set, never from MAO) and the form will not print
-   until the price/fee is entered.
-8. Cash Buyers: add one real buyer, build one blast from real numbers,
-   copy it (never auto-sent).
-9. Confirm the distress importer accepts the 160-row foreclosure file
-   with all rows flagged "address needed".
-10. Google Lookup: from a probate row, open the lookup and confirm the
-    Google link opens the targeted search and the modal shows the honest
-    `not_configured` message (the function is not deployed and no
-    provider is connected) — and that saving a manually entered phone
-    writes it to the decision-maker without marking Contacted.
-11. County presets: switch the preset to Broward, confirm the clerk +
-    appraiser links open the right official pages, and import a
-    Broward-style header ("Party Name", "Role", "Case #", "Case
-    Status") — it must parse. The checkbox lists are unverified; confirm
-    them on the clerk site before relying on them.
-12. JV Split: open the calculator, confirm all money fields start empty
-    and Partner A loads from your own storefront profile (blank with a
-    note when no profile is saved), and preview the agreement — it must
-    be the existing JV template (0% platform fee, 24-month
-    non-circumvention).
-13. SaaS Admin (operator only): confirm the dashboard shows the honest
-    empty state (no wholesalers yet) and the subscription banner shows
-    the trial countdown; do NOT deploy the stripe-billing function or
-    set Stripe secrets until the founder decides the billing model (§10).
+1. Slice 135 is LIVE on both `wholesalingos.thefeetwashers.com` and
+   `wholesalingos.vercel.app` (commit `f10bab5`, deploy confirmed Nov 17,
+   2026). Confirm the build tag reads **Slice 135** on both domains.
+   Slice 136 audit fixes (homepage wording, sitemap, `/roadmap`, lender-desk
+   error reporting) are local only — not pushed, not deployed.
+2. Migrations applied live: Slice 133's six (`20261117140000`–
+   `20261117145000`) and Slice 135's (`20261117150000`), verified Nov 17,
+   2026. Still pending: the **legacy-schema dump (not yet received)** — do
+   not invent its contents or apply anything for it until it arrives.
+3. Stripe: **NOT connected** — no Stripe account, no product or price ID,
+   no secrets set, and the `stripe-billing` function is NOT deployed.
+   Do not claim billing is live. The $150/mo platform price itself is
+   locked (see §9); the billing-model decision (each wholesaler's own
+   Stripe account vs the platform subscription) is still open (§10).
+4. No email/SMS provider connected — no Resend key, no Twilio keys; the
+   `match-and-email` function is NOT deployed (`not_configured`); the app
+   never auto-sends. Per-wholesaler connected sending waits on Slice 134
+   (BYOK provider store + dispatcher) and the founder picking providers.
+5. No proof of funds verified yet — no buyer POF document has been
+   verified by the operator, so the `verified_buyer_pof` view is empty
+   until the first real verification happens.
+6. Lender packets: the lender desk's packet load failed live and the old
+   code swallowed the database's error behind the generic "Could not load
+   packets." Slice 136 surfaces the real error in code (see
+   `lib/funding.ts` `postgrestError` + `components/LenderDashboard.tsx`
+   `readableError`). **Live check still needed after the Slice 136
+   deploy:** sign in as a lender, open the desk, and read the surfaced
+   message before guessing a fix. Two often-suspected causes are already
+   ruled out by the Nov 17 record: the grants migration `20261117123500`
+   was applied + verified live 12:40–12:42 EST, and the Slice 130 columns
+   migration `20261117090000` was applied + verified live 05:04–05:07 EST —
+   and the packets failure was observed ~14:03 EST, after both were live.
+   Confirm in the Supabase SQL editor with:
+   `select has_table_privilege('authenticated', 'public.funding_requests', 'SELECT');`
+   and `select column_name from information_schema.columns where table_name = 'funding_requests';`
+7. First-live-proofs still outstanding (Slices 133 + 135 — none faked):
+   first real offer → accept → assignment draft; first POF upload →
+   operator verify → badge; first counted deal view; first saved search;
+   first buy-box criteria save + match; first invite-link registration;
+   first cross-post copy; first status change; first Distressed Finder
+   query + save-to-leads; first JV submit; first agent pocket submission +
+   approve & promote; first parcel enrich run on a real county record;
+   first CSV exports.
+8. Already proven live (no need to re-run unless the database was reset):
+   Mode B parcel lookup (parcel `494125000190`, Broward, returns the
+   Lauderdale Lakes parcel, not Duval, not `[]`); probate import counts
+   (**27 cases, 26 OPEN, 1 CLOSED (`2026CP001398`), 7 Pro Se, 0 without a
+   decision-maker**); storefront `?case=2026CP001433` tag landing on
+   `leads.probate_case_number`; contracts print gate (no print until
+   price/fee entered); cash-buyer blast copy (never auto-sent); the
+   distress importer accepting the 160-row foreclosure file with all rows
+   flagged "address needed"; Google Lookup showing the honest
+   `not_configured` message with no provider connected.
 
 ## 9. Operating rules
 

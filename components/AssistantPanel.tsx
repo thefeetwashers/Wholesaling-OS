@@ -39,17 +39,27 @@ export default function AssistantPanel({ userId }: { userId: string | null }) {
   if (!userId) return null;
 
   async function buildContext(): Promise<string> {
+    // Slice 136 — a failed KPI/leads load is reported in the context
+    // as unknown, never omitted: omitting the KPI line let the
+    // assistant answer as if there were no numbers, and a failed
+    // leads load used to read as "0 leads".
+    let leadsFailed = false;
+    let kpisFailed = false;
     const [leads, kpis, queue] = await Promise.all([
-      loadLeads(userId as string).catch(() => null),
-      loadKpis(userId as string).catch(() => null),
+      loadLeads(userId as string).catch(() => { leadsFailed = true; return null; }),
+      loadKpis(userId as string).catch(() => { kpisFailed = true; return null; }),
       loadFollowUpQueue(userId as string).catch(() => []),
     ]);
     const list = leads || [];
     const byStatus: Record<string, number> = {};
     for (const l of list) byStatus[l.status] = (byStatus[l.status] || 0) + 1;
     const lines: string[] = [];
-    lines.push(`Leads: ${list.length} total. By status: ${Object.keys(byStatus).map((s) => `${s} ${byStatus[s]}`).join(', ') || 'none'}.`);
-    if (kpis) {
+    lines.push(leadsFailed
+      ? 'Leads: could not be loaded — the lead counts are unknown. Do not state any lead numbers.'
+      : `Leads: ${list.length} total. By status: ${Object.keys(byStatus).map((s) => `${s} ${byStatus[s]}`).join(', ') || 'none'}.`);
+    if (kpisFailed) {
+      lines.push('KPIs: could not be loaded — this week\u2019s leads, calls, offers, contracts, fees, and listings are unknown. Do not state any KPI numbers.');
+    } else if (kpis) {
       lines.push(
         `This week: ${kpis.leadsThisWeek} new leads, ${kpis.callsThisWeek} calls logged. Offers awaiting a seller answer: ${kpis.offersAwaiting}. ` +
         `Offers accepted (all time): ${kpis.offersAcceptedTotal}. Contracts signed (all time): ${kpis.contractsSignedTotal}. ` +

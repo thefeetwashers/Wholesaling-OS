@@ -3,7 +3,7 @@ import { supabase, supabaseConfigured } from './supabase';
 // Slice 122 — WholesalingOS School 7-Day Deal Launch Bootcamp.
 // The curriculum is drawn ONLY from material the platform already
 // teaches: the lessons wall on the homepage, the /learn lessons,
-// the Pull-the-List playbooks, the 12 call & letter scripts, the
+// the Pull-the-List playbooks, the 17 call, letter, and video scripts, the
 // calculators, the escrow desk, and the funding flow. No new legal
 // or financial claims, no invented statistics. Each lesson ends at
 // the same door — the 90-day free trial. Progress lives in
@@ -144,7 +144,7 @@ export const BOOTCAMP: BootcampDay[] = [
     slug: 'day-4-compliant-outreach-and-consent-rules',
     icon: '📞',
     title: 'Compliant Outreach & Consent Rules',
-    dek: 'How to use the 12 call & letter scripts lawfully — without robocall or TCPA fines.',
+    dek: 'How to use the 17 call, letter, and video scripts lawfully — without robocall or TCPA fines.',
     minutes: 6,
     steps: [
       {
@@ -157,7 +157,7 @@ export const BOOTCAMP: BootcampDay[] = [
       {
         h: 'The scripts are yours to use, in your own voice',
         body: [
-          'The office carries 12 call and letter scripts with the merge fields filled from the lead in front of you — intro, code violation, probate, tired landlord, FSBO, follow-up drips, realtor outreach, the direct-mail letter, and a human call script you make yourself, on your own phone.',
+          'The office carries 17 call, letter, and video scripts with the merge fields filled from the lead in front of you — intro, code violation, probate, tired landlord, FSBO, follow-up drips, realtor outreach (including recent cash sales and expired listings), foreclosure and probate calls, the direct-mail letter, the buyer deal blast, the investor video walkthrough, and a human call script you make yourself, on your own phone.',
           'Call in your own voice. AI-generated voices are "artificial" under the TCPA (FCC, February 2024) and need the other party’s prior express consent. Florida is two-party consent for recording (Florida Statutes §934.03).',
         ],
       },

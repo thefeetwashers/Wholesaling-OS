@@ -110,7 +110,14 @@ export async function loadKpis(userId: string): Promise<KpiData | null> {
     supabase.from('deals').select('assignment_fee, actual_sale_price, documents').eq('owner_id', userId).limit(1000),
     supabase.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('owner_id', userId).eq('listing_status', 'active'),
   ]);
-  if (leadsRes.error) throw leadsRes.error;
+  // Slice 136 — every query must succeed. A failed query throws
+  // instead of silently defaulting to [], which rendered that
+  // section's numbers as zeros as if they had been counted. Callers
+  // show an error state when this throws; null still means only
+  // "sign-in / Supabase not configured", never "zero".
+  const firstError =
+    leadsRes.error || callsRes.error || offersRes.error || dealsRes.error || listingsRes.error;
+  if (firstError) throw firstError;
   const leads = (leadsRes.data || []) as { created_at?: string; status: string; follow_up_date?: string }[];
   const calls = (callsRes.data || []) as { called_at?: string; outcome: string }[];
   const offers = (offersRes.data || []) as { created_at?: string; status: string }[];
