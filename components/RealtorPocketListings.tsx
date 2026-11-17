@@ -32,6 +32,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
+import { openCopilot } from '../lib/ai-copilot';
 
 export interface RealtorPocketListing {
   id: string;
@@ -54,6 +55,17 @@ export interface RealtorPocketListing {
 
 const money = (n: number | null | undefined): string =>
   n == null ? 'not provided' : `$${Math.round(n).toLocaleString()}`;
+
+// Slice 137 — "Analyze with AI" per row. The context summary
+// carries city/state, the agent's real net asking price, the real
+// commission % (or "not stated"), and the notes — NEVER the street
+// address, NEVER agent contact, NEVER a phone number.
+function pocketSummary(r: RealtorPocketListing): string {
+  return `Realtor Pocket Listing, ${r.city}, ${r.state_code} — agent net asking $${Math.round(r.asking_price).toLocaleString()}, commission ${r.commission_percent == null ? 'not stated' : `${r.commission_percent}%`}, notes: ${r.property_notes || 'None'}`;
+}
+
+const POCKET_AUTO_QUESTION =
+  'Analyze this pocket listing, calculate my max offer, and write a quick SMS to the listing agent.';
 
 function isMissingTable(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -242,6 +254,7 @@ export default function RealtorPocketListings({ userId, operatorEmail }: { userI
                 <th style={{ padding: '8px 10px' }}>Notes</th>
                 <th style={{ padding: '8px 10px' }}>Status</th>
                 <th style={{ padding: '8px 10px' }}>Approve &amp; promote</th>
+                <th style={{ padding: '8px 10px' }}>Analyze with AI</th>
               </tr>
             </thead>
             <tbody>
@@ -310,6 +323,15 @@ export default function RealtorPocketListings({ userId, operatorEmail }: { userI
                           </button>
                         </>
                       )}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCopilot(pocketSummary(r), POCKET_AUTO_QUESTION)}
+                        style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+                      >
+                        🤖 Analyze
+                      </button>
                     </td>
                   </tr>
                 );

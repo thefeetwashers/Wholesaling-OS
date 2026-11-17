@@ -1,5 +1,6 @@
 import React from 'react';
 import './globals.css';
+import AiCopilot from '../components/AiCopilot';
 
 // Slice 94 — SEO foundation. Every claim in this metadata is a
 // fact the platform's own machinery backs (see /verify). The
@@ -83,6 +84,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="ws-topbar-price">90 days free, then $150/mo — no other platform fee</span>
         </header>
         <main className="ws-main">{children}</main>
+        {/* Slice 137, Part B — AI Deal Copilot widget (BYOK). Mounted
+            on every page; it opens only via the 'ws:open-copilot'
+            event from lib/ai-copilot.ts. */}
+        <AiCopilot />
         <footer className="ws-footer">
           WholesalingOS is operated by THE FEET WASHERS, INC. Contracts in this app carry attorney-review labels.
           This app does not scrape, auto-dial, or auto-send messages.

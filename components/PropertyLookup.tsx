@@ -15,6 +15,7 @@ import PropertyMap from './PropertyMap';
 import type { CorporateBuyerRow } from '../lib/corporate-buyers';
 import { loadMyStorefront } from '../lib/storefront';
 import { buildBuyerInviteLink } from '../lib/invite-link';
+import { openCopilot } from '../lib/ai-copilot';
 
 // Slice 123 — Property lookup bar. Two modes, both through the
 // server route /api/property-lookup (the Census geocoder sends no
@@ -619,6 +620,32 @@ function ResultEnrichment({
     | null;
   const floodData = flood as { mode?: string; zone?: string | null; zoneSubtype?: string | null; inSfha?: boolean | null; error?: string } | null;
 
+  // Slice 137 — "Analyze with AI" on the lookup result. The
+  // summary is built ONLY from fields this lookup actually
+  // returned — city/state/ZIP, county, and the FEMA flood zone
+  // checked live at the point (ResultEnrichment is where that
+  // zone value lives). NEVER a street address, NEVER a parcel
+  // owner name. A missing field is left out, never invented;
+  // when the flood zone is unknown the flood clause is omitted
+  // and the auto-question asks what to check instead. The
+  // DealAnalyzer renders this same PropertyLookup, so the button
+  // appears there too.
+  const analyzeLookup = () => {
+    const place = [rec.city, rec.state].filter(Boolean).join(', ');
+    const head = `${place}${rec.zip ? ` ${rec.zip}` : ''}`.trim();
+    const parts: string[] = [];
+    if (head) parts.push(head);
+    if (rec.county) parts.push(`County: ${rec.county}`);
+    const zone = floodData?.mode === 'ok' ? floodData.zone : null;
+    if (zone) parts.push(`FEMA Flood Zone: ${zone}`);
+    openCopilot(
+      parts.join(' — '),
+      zone
+        ? `How does FEMA Flood Zone ${zone} affect insurance and my cash buyer offer on this house?`
+        : 'Underwrite this deal — what should I check on insurance and my cash buyer offer?'
+    );
+  };
+
   const mapCenter =
     rec.source === 'census' && rec.lat != null && rec.lng != null
       ? { lat: rec.lat, lng: rec.lng }
@@ -692,6 +719,13 @@ function ResultEnrichment({
           ) : floodData?.mode === 'no_data' ? (
             <p style={{ fontSize: 13.5, margin: '4px 0' }}>Flood zone not checked — FEMA has no mapped flood hazard zone at this point.</p>
           ) : null}
+          <button
+            type="button"
+            onClick={analyzeLookup}
+            style={{ marginTop: 8, fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0', cursor: 'pointer' }}
+          >
+            🤖 Analyze
+          </button>
         </div>
       )}
 

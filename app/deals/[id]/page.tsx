@@ -104,6 +104,7 @@ import DealAttentionStats from '../../../components/DealAttentionStats';
 import DealStatusBadge from '../../../components/DealStatusBadge';
 import CopyDealToOblButton from '../../../components/CopyDealToOblButton';
 import { updateDealStatus, normalizeDealStatus, DEAL_STATUSES, type DealStatus } from '../../../lib/deal-status';
+import { openCopilot } from '../../../lib/ai-copilot';
 
 const money = (n: number | null | undefined): string =>
   n == null ? 'not provided' : `$${Math.round(n).toLocaleString()}`;
@@ -605,6 +606,34 @@ export default function DealDetailPage() {
   const bothShared = (r: DealResponse) => !!r.owner_contact_shared && !!r.responder_contact_shared;
   const center = boundary?.centroid || null;
 
+  // Slice 137 — "Analyze with AI" on the deal detail view. Opens
+  // the widget with real deal context only — city/state/ZIP,
+  // asking price, ARV range, property type, condition, rehab
+  // budget and notes. NEVER a street address (published deals
+  // hold none), NEVER seller contact, NEVER a phone number. No
+  // auto-question: openCopilot(context) only, so the drawer opens
+  // with the context banner and the input focused.
+  const analyzeDeal = () => {
+    if (!deal) return;
+    const parts: string[] = [];
+    const place = [deal.city, deal.state].filter(Boolean).join(', ');
+    const head = `${place}${deal.zip ? ` ${deal.zip}` : ''}`.trim();
+    if (head) parts.push(`Off-market deal, ${head}`);
+    if (deal.asking_price != null) parts.push(`asking ${money(deal.asking_price)}`);
+    const arv =
+      deal.arv_low == null && deal.arv_high == null
+        ? null
+        : deal.arv_low != null && deal.arv_high != null
+          ? `${money(deal.arv_low)}–${money(deal.arv_high)}`
+          : money(deal.arv_low ?? deal.arv_high);
+    if (arv) parts.push(`ARV ${arv}`);
+    if (deal.property_type) parts.push(deal.property_type);
+    if (deal.condition) parts.push(`condition ${deal.condition}`);
+    if (deal.repair_estimate != null) parts.push(`rehab budget ${money(deal.repair_estimate)}`);
+    if (deal.notes) parts.push(`notes: ${deal.notes}`);
+    openCopilot(parts.join(' — '));
+  };
+
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
       <p style={{ fontSize: 13 }}>
@@ -628,6 +657,15 @@ export default function DealDetailPage() {
         {deal.created_at ? ` · Published ${new Date(deal.created_at).toLocaleDateString()}` : ''}
       </p>
       {msg && <p style={{ fontSize: 14 }}>{msg}</p>}
+      <div style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={analyzeDeal}
+          style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#0f172a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}
+        >
+          🤖 Analyze with AI
+        </button>
+      </div>
 
       {/* Slice 133 — public buyer-invite CTA. Visible at the top of
           the deal, without scrolling. It routes to

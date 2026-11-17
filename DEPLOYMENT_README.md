@@ -430,6 +430,59 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   rejected: no `public.deals` table, no anon SELECT `USING(true)`
   policy. Build tag reads Slice 133.
 
+### Slice 137 (part A) — AI Wholesale Copilot Edge Function + provider store (file only, NOT live)
+
+- `supabase/functions/ai-wholesale-copilot/index.ts` — Edge Function,
+  file only, **NOT deployed** (owner step after push):
+  `supabase functions deploy ai-wholesale-copilot`. **BYOK only, no
+  shared key**: it reads the CALLER's own Gemini or Groq key from
+  their own `wholesaler_provider_settings` row via the service-role
+  client; it never reads a global `GEMINI_API_KEY` / `GROQ_API_KEY`
+  secret (none exists), never takes a key from a request param, and
+  never logs a key. `verify_jwt` is ON and the caller is resolved
+  with `supabase.auth.getUser(token)` — no `user_id` is ever trusted
+  from the request body (the body is only `{ question, deal_context? }`).
+  Gemini (default) calls `POST
+  https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
+  with the key as `?key=`; Groq calls `POST
+  https://api.groq.com/openai/v1/chat/completions` with Bearer auth
+  and model `llama-3.3-70b-versatile`. Both use temperature 0.4 and
+  800 max output tokens. The system prompt covers MAO = ARV x 0.70 -
+  repairs - wholesale fee, seller objection handling, SMS/email
+  pitches to cash buyers and Realtors, creative finance (Subject-To,
+  Seller Finance, Novations) and Florida assignment contracts
+  explained plainly — concise, practical, copy-paste ready; it never
+  invents prices, people, or legal advice beyond general
+  information, and never asks for or repeats sensitive personal data
+  (no SSNs, no seller phone numbers). Honest errors, no retries: no
+  key configured → 400 "AI not connected — add your own free Gemini
+  or Groq key in My Providers" (never a fake answer); provider 429 →
+  429 "free-tier limit reached — check your quota in AI Studio /
+  Groq console and try again later" (never retried in a loop); other
+  provider errors are quoted verbatim in the message.
+- `supabase/migrations/20261117160000_slice137_provider_settings.sql` —
+  the unified provider store `wholesaler_provider_settings` (one row
+  per wholesaler: `UNIQUE(user_id)`; `ai_provider` gemini/groq,
+  default gemini; `gemini_api_key` + `groq_api_key` as plain TEXT —
+  never claimed "encrypted"; owner-only RLS, no anon access; GRANTs
+  to `authenticated` + `service_role` in the same file) + the
+  SECURITY DEFINER RPC `get_ai_key_status()` (one row for the caller
+  only: provider, has-each-key booleans, each key masked to first 4
+  + '…' + last 4 chars or null — client code never reads a full key;
+  GRANT EXECUTE to `authenticated` in the same file). **Not live
+  until the migration is applied, a key is entered, and the function
+  is deployed.** Slice 134 will ADD the skip-trace / email / SMS
+  columns to this same table — no second store; until then `/api/send`
+  and the skip-trace functions keep failing closed (`not_configured`),
+  because the columns they select do not exist yet.
+- **Where to get a free key:** Google AI Studio —
+  `https://aistudio.google.com`; Groq console —
+  `https://console.groq.com/keys`. **Honest limits:** Gemini's free
+  tier is rate-limited with a daily ceiling that varies by project —
+  check AI Studio; Groq's free tier has per-model caps — check the
+  Groq console Limits page; both return 429 at the ceiling, and the
+  function reports that honestly instead of retrying.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -473,6 +526,7 @@ New in this push (Slices 130–135 — apply after the deploy, except where note
 | `20261117144000_slice133_deal_status.sql` | `published_deals.status` (Active/Under Contract/Sold, default Active) + owner SELECT policy for own rows + DB trigger rejecting offer INSERTs on non-Active deals |
 | `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
 | `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; apply after the Slice 136 deploy |
+| `20261117160000_slice137_provider_settings.sql` | Slice 137 (part A) — unified provider store `wholesaler_provider_settings` (AI columns only: `ai_provider`, `gemini_api_key`, `groq_api_key`, plain TEXT) + SECURITY DEFINER RPC `get_ai_key_status()` (masked keys only) + owner-only RLS + GRANTs to `authenticated` + `service_role` in the same file; NOT applied yet — apply after the Slice 137 deploy; skip-trace / email / SMS columns come with Slice 134, on this same table |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -517,12 +571,16 @@ reading that wholesaler's own settings) — never from a single global
 secret. Do not wire a global `BATCHDATA_API_KEY` secret: a shared key
 would violate BYOK.
 
-- The per-wholesaler settings store (table + key encryption) is a
-  **follow-up slice**: it does not exist yet, no provider is chosen yet
-  (the founder is researching options and costs first), and nothing is to
-  be set up yet. Until a provider is chosen and the settings store exists,
-  the function returns `{ success: false, mode: 'not_configured' }` and
-  writes **nothing**. The UI falls back to manual entry.
+- The per-wholesaler settings store is the `wholesaler_provider_settings`
+  table created by Slice 137's migration
+  (`20261117160000_slice137_provider_settings.sql`, NOT yet applied —
+  see §2). Its keys are plain TEXT columns, never claimed "encrypted".
+  The skip-trace columns (`batchdata_api_key`, `google_api_key`,
+  `google_cse_id`) are NOT in that migration — Slice 134 adds them to
+  this same table. Until Slice 134 lands, no skip-trace provider is
+  connected, so the function returns
+  `{ success: false, mode: 'not_configured' }` and writes **nothing**.
+  The UI falls back to manual entry.
 - Outreach and the deal blast already open the wholesaler's own mail/SMS
   app (copy + `mailto:`/`sms:`) — that IS the BYOK behavior for now. Do
   not add any platform-sent email/SMS. Per-wholesaler connected sending is
@@ -549,8 +607,10 @@ would violate BYOK.
   deployed**, NO keys. It verifies the caller JWT and allows the lookup
   only when the lead belongs to the caller or the caller is the operator
   (403 otherwise). Keys resolve **per calling wholesaler** via
-  `getGoogleKeys(userId)` (the future `wholesaler_provider_settings`
-  store — it does not exist yet, so the lookup returns null). It NEVER
+  `getGoogleKeys(userId)` (the `wholesaler_provider_settings` store
+  created by Slice 137's migration — NOT yet applied, and its
+  `google_api_key` / `google_cse_id` columns come with Slice 134, so
+  the lookup returns null today). It NEVER
   reads a global `GOOGLE_SEARCH_API_KEY` / `GOOGLE_CSE_ID` secret. No
   provider → `{ success: false, mode: 'not_configured' }`, writes
   nothing; the modal falls back to the Google link + manual entry.

@@ -28,6 +28,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabase';
+import { openCopilot } from '../lib/ai-copilot';
 import { loadLeads, importLeads, type Lead } from '../lib/leads';
 import { buildDistressLeads } from './CsvLeadImporter';
 import {
@@ -74,6 +75,22 @@ const errBox: React.CSSProperties = {
 function rowKey(feedId: string, index: number): string {
   return `${feedId}-${index}`;
 }
+
+// Slice 137 — "Analyze with AI" per row. The context summary
+// carries city/state and the row's real violation description
+// only — NEVER a street address, NEVER a parcel owner, NEVER a
+// phone number. A field that is unknown is left out, never
+// invented.
+function distressedSummary(r: DistressedRow): string {
+  const place = [r.city, r.state].filter(Boolean).join(', ');
+  const violation = (r.violation || '').trim();
+  return violation
+    ? `Distressed property, ${place} — active code violation: ${violation}`
+    : `Distressed property, ${place}`;
+}
+
+const DISTRESSED_AUTO_QUESTION =
+  'Write a compassionate cold-call opener and SMS for this distressed owner facing code enforcement.';
 
 export default function DistressedFinder() {
   const [feedId, setFeedId] = useState('orlando');
@@ -405,6 +422,7 @@ export default function DistressedFinder() {
                 <th style={{ padding: 8 }}>Status</th>
                 <th style={{ padding: 8 }}>Parcel</th>
                 <th style={{ padding: 8 }}>Save</th>
+                <th style={{ padding: 8 }}>Analyze</th>
               </tr>
             </thead>
             <tbody>
@@ -498,6 +516,24 @@ export default function DistressedFinder() {
                           {contact.email ? `✉️ ${contact.email}` : ''}
                         </div>
                       )}
+                    </td>
+                    <td style={{ padding: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => openCopilot(distressedSummary(r), DISTRESSED_AUTO_QUESTION)}
+                        style={{
+                          fontSize: 12,
+                          padding: '5px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #cbd5e1',
+                          background: '#fff',
+                          color: '#0f172a',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        🤖 Analyze
+                      </button>
                     </td>
                   </tr>
                 );

@@ -67,6 +67,7 @@ import OperatorStats from '../components/OperatorStats';
 import RealtorPocketListings from '../components/RealtorPocketListings';
 import ReportProblemModal from '../components/ReportProblemModal';
 import SubscriptionBanner from '../components/SubscriptionBanner';
+import MyProviders from '../components/MyProviders';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
 import StorefrontSettingsCard from '../components/StorefrontSettings';
 import SignKit from '../components/SignKit';
@@ -391,7 +392,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 136</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 137</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,
@@ -496,6 +497,9 @@ export default function Home() {
                     It hides itself when the table does not exist
                     yet (migration 20261115170000 not applied). */}
                 {userId && <SubscriptionBanner userId={userId} />}
+                {/* Slice 137, Part B — My Providers (BYOK keys for the
+                    AI Deal Copilot), next to the billing banner. */}
+                {userId && <MyProviders userId={userId} />}
                 {role === 'wholesaler' && userId && <CommandCenter userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <Sprint userId={userId} onNavigate={setView} />}
                 {role === 'wholesaler' && userId && <DealRadar onNavigate={setView} />}
