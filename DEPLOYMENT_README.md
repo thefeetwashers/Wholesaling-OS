@@ -180,6 +180,35 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   app and the app does not send email. The "Report a problem" button
   sits at the foot of the sidebar (signed-in users only).
 
+### Slice 131 — Buyer Networks (OpenBuyersList links + my buy box)
+
+- `supabase/migrations/20261117124100_buyer_networks_buy_box.sql` —
+  `wholesaler_buy_boxes` table (one row per wholesaler:
+  `UNIQUE(user_id)`, markets + property_types, min/max price,
+  notes; owner RLS + operator read via `public.is_operator()`,
+  `set_updated_at()` trigger) — with the GRANTs in the SAME file
+  (SELECT/INSERT/UPDATE/DELETE to `authenticated` and to
+  `service_role`), per the Nov 17 lesson: tables created by
+  migrations get no data grants by default, and without them the app
+  fails with "permission denied for table".
+- `lib/buy-box.ts` — `loadMyBuyBox()` + `saveMyBuyBox()` (upsert on
+  `user_id`, verified write — the saved row is selected back).
+  `components/BuyerNetworks.tsx` — rendered INSIDE the Cash Buyers
+  view, below the buyer list: plain text that OpenBuyersList is a
+  free network where cash buyers publish their buy box, with the
+  plain statement that WholesalingOS does not copy their buyer list;
+  "Browse buyers on OpenBuyersList" →
+  `https://openbuyerslist.com/off-market-deals` (verified Nov 17,
+  2026 by following the homepage's own "Browse All Off Market
+  Deals" link) and "Join or post on OpenBuyersList" →
+  `https://openbuyerslist.com/`; the "My buy box" card (67-county
+  markets, same property-type options as the cash-buyer form, min/max
+  price, notes — all empty by default; Save via verified write;
+  "Copy my buy box" for pasting into OpenBuyersList); the honest
+  hedge-fund line (institutional buyers buy through their own
+  acquisition teams, not from a shared list). No OBL counts shown,
+  no fund named, no buyer data copied, no API client or scraper.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -205,11 +234,12 @@ Already applied (Nov 15–16, 2026 — do not re-run unless the database was res
 | `20261115170000_saas_subscriptions.sql` | Slice 129 |
 | `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (Slice 130 — apply after the deploy):
+New in this push (Slices 130–131 — apply after the deploy):
 
 | File | Contents |
 | --- | --- |
 | `20261117090000_slice130_operator_visibility.sql` | `scout_leads.w9_received` + `w9_received_at` + W-9-before-paid CHECK; `funding_requests.interest_rate` + `loan_term_months`; `problem_reports` table + RLS |
+| `20261117124100_buyer_networks_buy_box.sql` | `wholesaler_buy_boxes` table (one buy box per wholesaler) + owner/operator RLS + GRANTs to `authenticated` and `service_role` in the same file |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 

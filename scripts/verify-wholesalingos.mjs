@@ -2,7 +2,7 @@
 //
 // What it checks, honestly:
 //   (1) The REAL files this repo actually has (the files Slices
-//       126–129 created + the existing key files). It does NOT
+//       126–131 created + the existing key files). It does NOT
 //       check for the paste-listed files that do not exist and must
 //       never be created (app/dashboard/page.tsx,
 //       components/WholesalingOSDashboard.tsx,
@@ -65,11 +65,13 @@ const EXPECTED_FILES = [
   'components/AdminSaaSDashboard.tsx',
   'components/OperatorStats.tsx',
   'components/ReportProblemModal.tsx',
+  'components/BuyerNetworks.tsx',
   // Libraries.
   'lib/floridaCountyPresets.ts',
   'lib/probate-import.ts',
   'lib/probate-leads-api.ts',
   'lib/problem-reports.ts',
+  'lib/buy-box.ts',
   'lib/spreadsheet.ts',
   'lib/contracts.ts',
   'lib/storefront.ts',
@@ -84,6 +86,7 @@ const EXPECTED_FILES = [
   'supabase/migrations/20261115170000_saas_subscriptions.sql',
   'supabase/migrations/20261115180000_leads_owner_contact.sql',
   'supabase/migrations/20261117090000_slice130_operator_visibility.sql',
+  'supabase/migrations/20261117124100_buyer_networks_buy_box.sql',
 ];
 
 // --- (2) Real tables --------------------------------------------------------
@@ -105,6 +108,7 @@ const EXPECTED_TABLES = [
   'school_progress',
   'seller_advance_requests',
   'problem_reports',
+  'wholesaler_buy_boxes',
 ];
 
 // --- (3) Edge Functions (files only, NOT deployed yet) ---------------------

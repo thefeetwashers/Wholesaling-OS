@@ -41,6 +41,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { loadMyStorefront, type StorefrontProfile } from '../lib/storefront';
 import { FLORIDA_COUNTIES } from '../lib/vendor-marketplace';
+import BuyerNetworks from './BuyerNetworks';
 
 export interface DealBlastPrefill {
   propertyAddress?: string;
@@ -401,6 +402,8 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
           ))}
         </ul>
       )}
+      {/* Slice 131 — Buyer Networks (OpenBuyersList links + my buy box). */}
+      <BuyerNetworks userId={userId} />
     </div>
   );
 }
