@@ -483,6 +483,39 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   Groq console Limits page; both return 429 at the ceiling, and the
   function reports that honestly instead of retrying.
 
+### Slice 138 — RLS infinite-recursion fix (funding_requests / lender_boxes)
+
+- **The bug (found live Nov 17, 2026 ~15:45 EST):** the signed-in
+  dashboard's Capital & Lending Partner Desk shows `infinite
+  recursion detected in policy for relation "funding_requests"
+  [42P17]`. This is very likely the real cause behind the
+  long-standing "Could not load packets." failure — Slice 136 only
+  surfaced the database's error message; it did not fix the query.
+- **The loop:** the `lender_boxes` policy "requester reads matched
+  lender boxes" ran an EXISTS subquery directly against
+  `funding_requests`, while the `funding_requests` policies
+  "matched lenders read iso funding requests" and "matched lenders
+  update iso funding request status" ran EXISTS subqueries directly
+  against `lender_boxes` — a cross-table policy loop.
+  `is_operator()` is SECURITY DEFINER and reads only `profiles`,
+  so it is NOT the loop and is untouched.
+- **The fix** (`supabase/migrations/20261117170000_slice138_rls_recursion_fix.sql`,
+  apply after the Slice 138 deploy): two SECURITY DEFINER helpers,
+  `requester_has_matching_iso_request(uuid, text[], text[])` and
+  `lender_has_matching_box(uuid, text, text)`, each `STABLE` with
+  `set search_path = public`, returning a boolean only. The three
+  affected policies are dropped and re-created to call the helpers
+  instead of subquerying the other table. Matching semantics are
+  preserved exactly (verified partner + agreement accepted + state
+  covered + financing type offered, ISO-network track only). GRANT
+  EXECUTE on both functions to `authenticated` is in the same file.
+  No other policy, table, column, or grant is changed.
+- **Live re-check still needed after the migration is applied:**
+  sign in as a lender, open the Capital & Lending Partner Desk,
+  and confirm the recursion error is gone and the packets load.
+  That check is the proof — do not claim the fix works live until
+  it passes.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -527,6 +560,7 @@ New in this push (Slices 130–135 — apply after the deploy, except where note
 | `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
 | `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; apply after the Slice 136 deploy |
 | `20261117160000_slice137_provider_settings.sql` | Slice 137 (part A) — unified provider store `wholesaler_provider_settings` (AI columns only: `ai_provider`, `gemini_api_key`, `groq_api_key`, plain TEXT) + SECURITY DEFINER RPC `get_ai_key_status()` (masked keys only) + owner-only RLS + GRANTs to `authenticated` + `service_role` in the same file; NOT applied yet — apply after the Slice 137 deploy; skip-trace / email / SMS columns come with Slice 134, on this same table |
+| `20261117170000_slice138_rls_recursion_fix.sql` | Slice 138 — RLS infinite-recursion fix: SECURITY DEFINER helpers `requester_has_matching_iso_request(uuid, text[], text[])` + `lender_has_matching_box(uuid, text, text)` (boolean only, `set search_path = public`) + the three affected policies dropped and re-created to call them (matching semantics unchanged) + GRANT EXECUTE to `authenticated` in the same file; apply after the Slice 138 deploy |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -731,6 +765,11 @@ repo. Do not commit `.env`.
    was applied + verified live 12:40–12:42 EST, and the Slice 130 columns
    migration `20261117090000` was applied + verified live 05:04–05:07 EST —
    and the packets failure was observed ~14:03 EST, after both were live.
+   Update Nov 17 ~15:45 EST: the surfaced message turned out to be an
+   RLS infinite recursion (`funding_requests` [42P17]) — a cross-table
+   policy loop between `lender_boxes` and `funding_requests`. Slice 138
+   fixes it with SECURITY DEFINER helpers (see the Slice 138 section
+   above); the live re-check after that migration is the proof.
    Confirm in the Supabase SQL editor with:
    `select has_table_privilege('authenticated', 'public.funding_requests', 'SELECT');`
    and `select column_name from information_schema.columns where table_name = 'funding_requests';`
