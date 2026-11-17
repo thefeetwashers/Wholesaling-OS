@@ -32,6 +32,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // build time and an id list would go stale.
     { url: `${BASE}/deals`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.8 },
     { url: `${BASE}/buyers`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.8 },
+    // Slice 135 — new public routes. /agents and /parcel-enricher
+    // are built by sibling builders in the same slice; the routes
+    // are listed here so the sitemap lands with the slice.
+    { url: `${BASE}/api-docs`, lastModified: new Date('2026-11-17'), changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE}/distressed-finder`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${BASE}/agents`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${BASE}/parcel-enricher`, lastModified: new Date('2026-11-17'), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE}/privacy`, lastModified: new Date('2026-10-31'), changeFrequency: 'yearly', priority: 0.4 },
     { url: `${BASE}/terms`, lastModified: new Date('2026-10-31'), changeFrequency: 'yearly', priority: 0.4 },
   ];

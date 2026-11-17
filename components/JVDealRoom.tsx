@@ -362,13 +362,18 @@ export default function JVDealRoom({ userId }: { userId: string }) {
         Split the work, split the fee. Post a deal you need a partner on, or browse open deals from other wholesalers. Listings show city,
         state, type, prices, and split only — never a street address or seller contact. Partnering is a mutual opt-in: your email is shared
         with the originator when you express interest, and theirs is shared with you only when they accept. The JV split agreement is
-        generated after a match; it is not signed in-app. The platform takes 0% of any JV split.
+        generated after a match; it is not signed in-app. The platform takes 0% of any JV split. The JV Split Agreement carries a
+        24-month non-circumvention term: for 24 months, neither side contacts the seller or bypasses the other.
       </p>
       {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
       {msg && <p style={{ color: '#6ee7b7', fontSize: 13 }}>{msg}</p>}
 
       <form onSubmit={post} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', color: '#0f172a', marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Post a JV deal</h3>
+        <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+          Mutual opt-in only: no street address or seller contact is asked for here, and none is shared until both sides
+          agree. The JV Split Agreement carries a 24-month non-circumvention term, and the platform takes 0% of any JV split.
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <label style={{ display: 'block', fontSize: 13 }}>
             City *

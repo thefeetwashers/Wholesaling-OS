@@ -64,6 +64,7 @@ import CashBuyersDealBlast from '../components/CashBuyersDealBlast';
 import JVCoWholesalingCalculator from '../components/JVCoWholesalingCalculator';
 import AdminSaaSDashboard from '../components/AdminSaaSDashboard';
 import OperatorStats from '../components/OperatorStats';
+import RealtorPocketListings from '../components/RealtorPocketListings';
 import ReportProblemModal from '../components/ReportProblemModal';
 import SubscriptionBanner from '../components/SubscriptionBanner';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
@@ -390,7 +391,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 133</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 135</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,
@@ -401,6 +402,10 @@ export default function Home() {
           <span style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginLeft: 'auto', fontSize: 14 }}>
             <a href="/deals" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Off-Market Deals</a>
             <a href="/buyers" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Cash Buyers</a>
+            <a href="/distressed-finder" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Distressed Finder</a>
+            <a href="/parcel-enricher" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Parcel Enricher</a>
+            <a href="/agents" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Agents</a>
+            <a href="/api-docs" style={{ color: '#cbd5e1', textDecoration: 'none' }}>API Docs</a>
             <a href="/join" style={{ color: '#fff', fontWeight: 700, textDecoration: 'none' }}>Join</a>
             <a href="#signin" style={{ color: '#fff', fontWeight: 700, textDecoration: 'none' }}>Sign in</a>
           </span>
@@ -477,6 +482,10 @@ export default function Home() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
                     <a href="/deals" style={{ background: '#059669', color: '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>🏠 Off-Market Deals</a>
                     <a href="/buyers" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>💵 Cash Buyers</a>
+                    <a href="/distressed-finder" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>🚨 Distressed Finder</a>
+                    <a href="/parcel-enricher" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>📦 Parcel Enricher</a>
+                    <a href="/agents" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>🤝 Agents</a>
+                    <a href="/api-docs" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>🔌 API Docs</a>
                     <button type="button" onClick={() => setView('cashbuyers')} style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>🤝 Buyer Networks</button>
                     <a href="/managed-dispo" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>📣 Managed Dispo</a>
                   </div>
@@ -626,7 +635,9 @@ export default function Home() {
               <div id="saasadmin"><AdminSaaSDashboard /></div>
             )}
             {view === 'opstats' && userEmail === OWNER_EMAIL && (
-              <div id="opstats"><OperatorStats userEmail={userEmail} /></div>
+              <div id="opstats"><OperatorStats userEmail={userEmail} />
+                {userId && <RealtorPocketListings userId={userId} operatorEmail={userEmail} />}
+              </div>
             )}
           </div>
         </div>
