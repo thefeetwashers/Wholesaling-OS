@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabaseConfigured } from '../lib/supabase';
 import { dealFromContract, loadDeals, saveDeal, type DealRow } from '../lib/deals';
 import { sellerView, buyerView, titlePackage, canSignBC, buildTransactionalNote, buildTitleEscrowLetter, buildReferralFeeNotice, buildTermSheet, addBusinessDays, referralFeeAmount, FUNDING_MERGE_TAGS, type DealContract, type SigStatus, type FundingPacketFields } from '../lib/contracts';
-import { loadMyFundingRequests, loadDirectFundingRequests, loadFundingRequestHistory, countMatchedLenders, setFundingRequestStatus, setFundingFee, markFeePaid, OPERATOR_EMAIL, FUNDING_STATUSES, type FundingRequest, type FundingStatus, type FundingStatusHistory } from '../lib/funding';
+import { loadMyFundingRequests, loadDirectFundingRequests, loadFundingRequestHistory, countMatchedLenders, setFundingRequestStatus, setFundingFee, setFundingRateTerm, markFeePaid, OPERATOR_EMAIL, FUNDING_STATUSES, type FundingRequest, type FundingStatus, type FundingStatusHistory } from '../lib/funding';
 
 const EMPTY: DealContract = {
   property_address: '', city: '', state: '', seller_name: '', buyer_name: '',
@@ -64,6 +64,11 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
   const [feePctInput, setFeePctInput] = useState<Record<string, string>>({});
   const [feePaidAmtInput, setFeePaidAmtInput] = useState<Record<string, string>>({});
   const [feePaidDateInput, setFeePaidDateInput] = useState<Record<string, string>>({});
+  // Slice 130 — term sheet rate/term inputs (operator only, empty
+  // by default — a blank input clears the stored value back to
+  // NULL and the term sheet shows "TO BE AGREED" for it).
+  const [rateInput, setRateInput] = useState<Record<string, string>>({});
+  const [termInput, setTermInput] = useState<Record<string, string>>({});
   const [feeMsg, setFeeMsg] = useState('');
   const [historyVersion, setHistoryVersion] = useState(0);
   const [packetFor, setPacketFor] = useState<string | null>(null);
@@ -206,6 +211,11 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                         // when the operator set one; otherwise the
                         // notice keeps the 1.5%–2.0% range.
                         referral_fee_percent: r.fee_percentage ?? null,
+                        // Slice 130: the stored rate/term when the
+                        // operator set them; otherwise the term
+                        // sheet keeps "TO BE AGREED" for each.
+                        interest_rate: r.interest_rate != null ? `${r.interest_rate}% per year` : null,
+                        loan_term_months: r.loan_term_months != null ? `${r.loan_term_months} months` : null,
                         // Slice 120, item 2: DRAFT until the request
                         // reaches term_sheet_issued (or later).
                         term_sheet_draft: !['term_sheet_issued', 'clear_to_close', 'funded'].includes(r.status),
@@ -232,8 +242,8 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                         { tag: '{{fee_percentage}}', value: fields.referral_fee_percent != null ? `${fields.referral_fee_percent}%` : '1.5%–2.0% (exact percent agreed before closing)' },
                         { tag: '{{fee_amount}}', value: referralFeeAmount(fields.loan_amount, fields.referral_fee_percent) },
                         { tag: '{{financing_type}}', value: fields.financing_type || '[type not given]' },
-                        { tag: '{{interest_rate}}', value: 'TO BE AGREED — no rate is stated in the term sheet' },
-                        { tag: '{{loan_term_months}}', value: 'TO BE AGREED — no term is stated in the term sheet' },
+                        { tag: '{{interest_rate}}', value: r.interest_rate != null ? `${r.interest_rate}% per year` : 'TO BE AGREED — no rate is stated in the term sheet' },
+                        { tag: '{{loan_term_months}}', value: r.loan_term_months != null ? `${r.loan_term_months} months` : 'TO BE AGREED — no term is stated in the term sheet' },
                         { tag: '{{maturity_date}}', value: fields.financing_type === 'transactional' ? addBusinessDays(fields.closing_date, 3) : 'to be agreed with the lender' },
                       ]);
                       setPacketFor(r.id || null);
@@ -290,6 +300,54 @@ export default function Contracts({ userId, userEmail }: { userId: string | null
                         >
                           Set agreed fee %
                         </button>
+                      </label>
+                      {/* Slice 130 — term sheet rate/term (operator
+                          only). Empty by default; a blank field
+                          clears the stored value back to NULL and
+                          the term sheet shows TO BE AGREED for it. */}
+                      <label style={{ fontSize: 12.5 }}>
+                        Term sheet — interest rate % per year:{' '}
+                        <input
+                          inputMode="decimal"
+                          placeholder={r.interest_rate != null ? String(r.interest_rate) : 'e.g. 12'}
+                          value={rateInput[r.id || ''] ?? ''}
+                          onChange={(e) => setRateInput((prev) => ({ ...prev, [r.id as string]: e.target.value }))}
+                          style={{ width: 80 }}
+                        />{' '}
+                        loan term (months):{' '}
+                        <input
+                          inputMode="numeric"
+                          placeholder={r.loan_term_months != null ? String(r.loan_term_months) : 'e.g. 6'}
+                          value={termInput[r.id || ''] ?? ''}
+                          onChange={(e) => setTermInput((prev) => ({ ...prev, [r.id as string]: e.target.value }))}
+                          style={{ width: 80 }}
+                        />{' '}
+                        <button
+                          onClick={async () => {
+                            const rawRate = (rateInput[r.id || ''] || '').replace(/[%]/g, '').trim();
+                            const rawTerm = (termInput[r.id || ''] || '').trim();
+                            const rate = rawRate === '' ? null : parseFloat(rawRate);
+                            const term = rawTerm === '' ? null : parseInt(rawTerm, 10);
+                            try {
+                              await setFundingRateTerm(r.id!, rate, term, userEmail ?? null);
+                              setFundingRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, interest_rate: rate, loan_term_months: term } : x)));
+                              setFeeMsg(
+                                rate == null && term == null
+                                  ? 'Rate and term cleared — the term sheet shows TO BE AGREED for both.'
+                                  : `Rate and term saved${rate != null ? ` — ${rate}% per year` : ''}${term != null ? `, ${term} months` : ''}.`
+                              );
+                            } catch (err2) {
+                              setFeeMsg(err2 instanceof Error ? err2.message : 'Saving the rate and term failed.');
+                            }
+                          }}
+                        >
+                          Save rate &amp; term
+                        </button>
+                        <br />
+                        <span style={{ color: '#94a3b8' }}>
+                          Now: {r.interest_rate != null ? `${r.interest_rate}% per year` : 'rate not set'} · {r.loan_term_months != null ? `${r.loan_term_months} months` : 'term not set'}.
+                          Leave a field blank to clear it.
+                        </span>
                       </label>
                       {!r.fee_paid && (
                         <label style={{ fontSize: 12.5 }}>

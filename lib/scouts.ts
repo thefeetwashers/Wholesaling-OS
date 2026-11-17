@@ -70,12 +70,18 @@ export interface ScoutLead {
   claimed_by_wholesaler_id?: string | null;
   status: ScoutLeadStatus;
   payout_amount?: number | null;
+  // Slice 130 — W-9 gate. w9_received is true only once the
+  // scout's IRS Form W-9 is on file; the database CHECK refuses
+  // status 'closed_paid_1000' while it is false. w9_received_at
+  // is stamped when the box is first checked.
+  w9_received?: boolean;
+  w9_received_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
 const SCOUT_SELECT =
-  'id, scout_id, property_address, city, state, zip_code, distress_tags, photo_urls, seller_notes, claimed_by_wholesaler_id, status, payout_amount, created_at, updated_at';
+  'id, scout_id, property_address, city, state, zip_code, distress_tags, photo_urls, seller_notes, claimed_by_wholesaler_id, status, payout_amount, w9_received, w9_received_at, created_at, updated_at';
 
 function requireSupabase() {
   if (!supabaseConfigured || !supabase) {
@@ -178,6 +184,32 @@ export async function setScoutLeadStatus(leadId: string, status: ScoutLeadStatus
   const client = requireSupabase();
   const { error } = await client.from('scout_leads').update({ status }).eq('id', leadId);
   if (error) throw error;
+}
+
+// Slice 130 — W-9 gate. The claiming wholesaler (or operator) ticks
+// "W-9 received" when the scout's IRS Form W-9 is on file. The
+// Scout Finder's Fee Agreement already pays only "upon receipt of
+// the Scout's completed IRS Form W-9"; the database CHECK refuses
+// status 'closed_paid_1000' while w9_received is false, so this
+// flag is the gate, not a note. Verified write: the update selects
+// its own row back, so a refused save (RLS, missing migration)
+// throws instead of looking saved. Unchecking clears the stamp.
+export async function setScoutLeadW9(leadId: string, received: boolean): Promise<void> {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('scout_leads')
+    .update({
+      w9_received: received,
+      w9_received_at: received ? new Date().toISOString() : null,
+    })
+    .eq('id', leadId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error(
+      'The W-9 flag did not save — the lead may not be yours to update, or the Slice 130 migration has not been applied yet.'
+    );
+  }
 }
 
 // Attach uploaded photo paths to a lead the scout just submitted.

@@ -44,10 +44,12 @@ export default function Sidebar({
   view,
   onView,
   showAdmin,
+  onReportProblem,
 }: {
   view: string;
   onView: (key: string) => void;
   showAdmin: boolean;
+  onReportProblem?: () => void;
 }) {
   const item = (v: ShellView) => (
     <button
@@ -76,7 +78,20 @@ export default function Sidebar({
               countdowns, plan status) is operator-only, like Owner
               Admin. RLS enforces it server-side too. */}
           {item({ key: 'saasadmin', label: 'SaaS Admin', icon: '💳', group: 'Platform owner' })}
+          {/* Slice 130 — Operator Stats (real counts from live rows
+              + problem-report triage) is operator-only too. */}
+          {item({ key: 'opstats', label: 'Operator Stats', icon: '📈', group: 'Platform owner' })}
         </>
+      )}
+      {/* Slice 130 — Report a problem. The sidebar only renders for
+          signed-in users, so this button is too. It opens the modal
+          rendered by app/page.tsx; the report goes to the operator's
+          desk in the app (the app never emails). */}
+      {onReportProblem && (
+        <button className="ws-side-item" onClick={onReportProblem}>
+          <span className="ws-side-ico">🚩</span>
+          Report a problem
+        </button>
       )}
     </nav>
   );

@@ -63,6 +63,8 @@ import WholesaleContractGenerator, { type ContractPrefill } from '../components/
 import CashBuyersDealBlast from '../components/CashBuyersDealBlast';
 import JVCoWholesalingCalculator from '../components/JVCoWholesalingCalculator';
 import AdminSaaSDashboard from '../components/AdminSaaSDashboard';
+import OperatorStats from '../components/OperatorStats';
+import ReportProblemModal from '../components/ReportProblemModal';
 import SubscriptionBanner from '../components/SubscriptionBanner';
 import SellerPageSettingsCard from '../components/SellerPageSettings';
 import StorefrontSettingsCard from '../components/StorefrontSettings';
@@ -94,6 +96,11 @@ export default function Home() {
     setView('contracts');
   };
   const [access, setAccess] = useState<ProfileAccess | null>(null);
+  // Slice 130 — Report a Problem modal. The button lives at the
+  // foot of the sidebar; the report records the view open at the
+  // time as its page context, and goes to the operator's desk in
+  // the app (the app never emails).
+  const [reportOpen, setReportOpen] = useState(false);
   useEffect(() => { if (userId) { getProfileAccess(userId).then(setAccess).catch(() => {}); } }, [userId]);
   const [role, setRole] = useState<string | null>(null);
   const [authKey, setAuthKey] = useState(0);
@@ -134,7 +141,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 129</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 130</p>
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -183,7 +190,10 @@ export default function Home() {
         </>
       ) : userId ? (
         <div className="ws-shell">
-          <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} />
+          <Sidebar view={view} onView={setView} showAdmin={userEmail === OWNER_EMAIL} onReportProblem={() => setReportOpen(true)} />
+          {reportOpen && userId && (
+            <ReportProblemModal userId={userId} pageContext={view} onClose={() => setReportOpen(false)} />
+          )}
           <div className="ws-view">
             <GlobalSearch userId={userId} onNavigate={setView} onDraftContract={openContractDraft} />
             {view === 'dashboard' && (
@@ -330,6 +340,9 @@ export default function Home() {
             )}
             {view === 'saasadmin' && userEmail === OWNER_EMAIL && (
               <div id="saasadmin"><AdminSaaSDashboard /></div>
+            )}
+            {view === 'opstats' && userEmail === OWNER_EMAIL && (
+              <div id="opstats"><OperatorStats userEmail={userEmail} /></div>
             )}
           </div>
         </div>

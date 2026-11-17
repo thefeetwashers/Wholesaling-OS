@@ -141,6 +141,45 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   prove RLS; RLS is proven by the migration files. Edge Functions are
   expected to report missing until the owner deploys them.
 
+### Slice 130 — Operator Stats, W-9 gate, Report-a-Problem, term sheet rate/term
+
+- `supabase/migrations/20261117090000_slice130_operator_visibility.sql` —
+  `scout_leads.w9_received` + `w9_received_at` + CHECK that
+  `closed_paid_1000` requires `w9_received = TRUE`;
+  `funding_requests.interest_rate` (numeric, NULL or > 0) +
+  `loan_term_months` (integer, NULL or > 0); `problem_reports` table
+  (category CHECK, subject + details NOT NULL, status
+  open/reviewing/resolved, reporter INSERT own + SELECT own, operator
+  SELECT all + UPDATE status via `public.is_operator()`).
+- `lib/scouts.ts` — `w9_received` / `w9_received_at` on the ScoutLead
+  type and select, plus `setScoutLeadW9` (verified write).
+  `components/ScoutPortal.tsx` — "W-9 received" checkbox on each
+  claimed lead in MyClaimedLeads + the payout block
+  ("W-9 needed before payout — mark W-9 received first."). No change
+  to the $1,000 amount or the 180-day rule; no RLS change (the
+  claiming wholesaler could already update their claimed leads).
+- `lib/funding.ts` — `interest_rate` / `loan_term_months` on the
+  FundingRequest type and select, plus `setFundingRateTerm` (operator
+  email guard; blank clears to NULL). `components/Contracts.tsx` —
+  rate + term inputs next to "Set agreed fee %" in the operator
+  direct-track view (empty by default) and the stored values passed
+  into the packet; `buildTermSheet` renders them when set, "TO BE
+  AGREED" when blank, DRAFT until `term_sheet_issued` (unchanged).
+- `components/OperatorStats.tsx` — operator-only view (real rows
+  only: wholesalers, verified badges, leads total + by distress tag +
+  seller submissions, probate total/open/pro se, funding by status,
+  scouts by status + W-9 count, cash buyers, JV listings, vendors;
+  honest "0 — none yet" states; no billing numbers — SaaS Admin
+  covers billing) + the problem-report triage list (Mark reviewing /
+  Mark resolved, verified writes). Wired as the "Operator Stats" view
+  under Platform owner in the sidebar.
+- `lib/problem-reports.ts` + `components/ReportProblemModal.tsx` —
+  category select, subject + details (both required, empty by
+  default), page context auto-filled from the open view; the modal
+  states plainly that the report goes to the operator's desk in the
+  app and the app does not send email. The "Report a problem" button
+  sits at the foot of the sidebar (signed-in users only).
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -151,7 +190,7 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
 
 ## 3. Migrations — order and the commit-pinned URL rule
 
-Already applied (Nov 15, 2026 — do not re-run unless the database was reset):
+Already applied (Nov 15–16, 2026 — do not re-run unless the database was reset):
 
 | File | Slice |
 | --- | --- |
@@ -161,15 +200,16 @@ Already applied (Nov 15, 2026 — do not re-run unless the database was reset):
 | `20261115120000_slice123_leads_columns.sql` | Slice 123 |
 | `20261115130000_slice124_storefront.sql` | Slice 124 |
 | `20261115140000_slice125_seller_firsts.sql` | Slice 125 |
+| `20261115150000_probate_leads.sql` | Slice 127 |
+| `20261115160000_cash_buyers.sql` | Slice 128 |
+| `20261115170000_saas_subscriptions.sql` | Slice 129 |
+| `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (apply in order, after the deploy):
+New in this push (Slice 130 — apply after the deploy):
 
 | File | Contents |
 | --- | --- |
-| `20261115150000_probate_leads.sql` | `probate_leads` + `leads.probate_case_number` + 18-param seller RPCs + `probate_lead_activity` |
-| `20261115160000_cash_buyers.sql` | `cash_buyers` |
-| `20261115170000_saas_subscriptions.sql` | `saas_subscriptions` + signup trigger + storefront sync trigger |
-| `20261115180000_leads_owner_contact.sql` | `owner_phone` / `owner_email` on `public.leads` |
+| `20261117090000_slice130_operator_visibility.sql` | `scout_leads.w9_received` + `w9_received_at` + W-9-before-paid CHECK; `funding_requests.interest_rate` + `loan_term_months`; `problem_reports` table + RLS |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 

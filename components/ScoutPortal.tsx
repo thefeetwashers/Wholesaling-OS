@@ -6,6 +6,7 @@ import {
   loadMyClaimedScoutLeads,
   claimScoutLead,
   setScoutLeadStatus,
+  setScoutLeadW9,
   setScoutLeadPhotos,
   signScoutPhotoUrls,
   uploadScoutPhoto,
@@ -573,13 +574,30 @@ export function MyClaimedLeads({
     };
   }, [userId]);
 
-  const advance = async (leadId: string, status: ScoutLeadStatus) => {
+  const advance = async (lead: ScoutLead, status: ScoutLeadStatus) => {
     setErr('');
+    // Slice 130 — W-9 gate: no payout without the scout's W-9 on
+    // file. The database CHECK enforces the same rule, so this
+    // message is the friendly path, not the only guard.
+    if (status === 'closed_paid_1000' && !lead.w9_received) {
+      setErr('W-9 needed before payout — mark W-9 received first.');
+      return;
+    }
     try {
-      await setScoutLeadStatus(leadId, status);
+      await setScoutLeadStatus(lead.id!, status);
       load();
     } catch (e: any) {
       setErr(e?.message || 'Status update failed.');
+    }
+  };
+
+  const toggleW9 = async (lead: ScoutLead, received: boolean) => {
+    setErr('');
+    try {
+      await setScoutLeadW9(lead.id!, received);
+      load();
+    } catch (e: any) {
+      setErr(e?.message || 'W-9 flag did not save.');
     }
   };
 
@@ -617,7 +635,7 @@ export function MyClaimedLeads({
             {nextOptions(l).map((o) => (
               <button
                 key={o.value}
-                onClick={() => advance(l.id!, o.value)}
+                onClick={() => advance(l, o.value)}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
               >
                 {o.label}
@@ -633,6 +651,26 @@ export function MyClaimedLeads({
           {l.status === 'in_escrow' && !isOperator && (
             <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>
               &quot;Closed — $1,000 Paid&quot; is marked by the operator when the money is paid at the closing table.
+            </p>
+          )}
+          {/* Slice 130 — W-9 gate. The checkbox is ticked by the
+              claiming wholesaler (or the operator) once the scout's
+              IRS Form W-9 is on file; the finder&apos;s fee agreement
+              pays only "upon receipt of the Scout's completed IRS
+              Form W-9", and the lead cannot move to Closed &amp; Paid
+              without it. */}
+          <label style={{ display: 'block', fontSize: 13, marginTop: 10 }}>
+            <input
+              type="checkbox"
+              checked={l.w9_received === true}
+              onChange={(e) => toggleW9(l, e.target.checked)}
+            />{' '}
+            W-9 received — the scout&apos;s IRS Form W-9 is on file
+            {l.w9_received && l.w9_received_at ? ` (marked ${new Date(l.w9_received_at).toLocaleDateString()})` : ''}
+          </label>
+          {l.status === 'in_escrow' && !l.w9_received && (
+            <p style={{ fontSize: 12, color: '#b45309', margin: '6px 0 0' }}>
+              W-9 needed before payout — mark W-9 received first.
             </p>
           )}
           {agreementFor === l.id && (

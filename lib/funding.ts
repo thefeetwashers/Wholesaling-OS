@@ -137,6 +137,11 @@ export interface FundingRequest {
   fee_paid?: boolean;
   fee_paid_at?: string | null;
   fee_paid_amount?: number | null;
+  // Slice 130 — term sheet rate/term. Both start empty: NULL means
+  // no rate/term agreed yet (the term sheet shows "TO BE AGREED"),
+  // and the database CHECK refuses a rate or term of zero or less.
+  interest_rate?: number | null;
+  loan_term_months?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -172,7 +177,7 @@ function requireSupabase() {
 }
 
 const FUNDING_SELECT =
-  'id, requester_id, deal_id, financing_type, borrowing_entity_name, entity_state, business_purpose_certified, no_upfront_fee_acknowledged, property_address, property_state, purchase_price, loan_amount_requested, estimated_arv, rehab_budget, monthly_rent, target_closing_date, title_company_name, title_officer_email, routing_track, assigned_lender_id, status, fee_percentage, fee_amount, fee_paid, fee_paid_at, fee_paid_amount, created_at, updated_at';
+  'id, requester_id, deal_id, financing_type, borrowing_entity_name, entity_state, business_purpose_certified, no_upfront_fee_acknowledged, property_address, property_state, purchase_price, loan_amount_requested, estimated_arv, rehab_budget, monthly_rent, target_closing_date, title_company_name, title_officer_email, routing_track, assigned_lender_id, status, fee_percentage, fee_amount, fee_paid, fee_paid_at, fee_paid_amount, interest_rate, loan_term_months, created_at, updated_at';
 
 const LENDER_BOX_SELECT =
   'id, lender_id, company_name, lending_types, states_covered, min_loan_amount, max_loan_amount, max_ltv_percent, min_dscr, partner_agreement_accepted, partner_agreement_accepted_at, is_verified_partner, created_at, updated_at';
@@ -444,6 +449,35 @@ export async function markFeePaid(
       fee_paid_amount: amount,
       fee_paid_at: paidAt || new Date().toISOString(),
     })
+    .eq('id', requestId);
+  if (error) throw error;
+}
+
+// Slice 130 — operator only: set the term sheet's interest rate
+// (% per year) and loan term (months) on a request. Either may be
+// left blank — a blank input clears that field back to NULL, and
+// the term sheet shows "TO BE AGREED" for it. The client-side
+// checks are UI guards; the database CHECK refuses a rate or term
+// of zero or less regardless.
+export async function setFundingRateTerm(
+  requestId: string,
+  rate: number | null,
+  termMonths: number | null,
+  operatorEmail: string | null
+): Promise<void> {
+  if (operatorEmail !== OPERATOR_EMAIL) {
+    throw new Error('Only the operator account can set the term sheet rate and term.');
+  }
+  if (rate != null && (!Number.isFinite(rate) || rate <= 0)) {
+    throw new Error('The interest rate must be above 0% when it is set.');
+  }
+  if (termMonths != null && (!Number.isInteger(termMonths) || termMonths <= 0)) {
+    throw new Error('The loan term must be a whole number of months above 0 when it is set.');
+  }
+  const client = requireSupabase();
+  const { error } = await client
+    .from('funding_requests')
+    .update({ interest_rate: rate, loan_term_months: termMonths })
     .eq('id', requestId);
   if (error) throw error;
 }

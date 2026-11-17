@@ -63,10 +63,13 @@ const EXPECTED_FILES = [
   'components/CountyPresetBar.tsx',
   'components/SubscriptionBanner.tsx',
   'components/AdminSaaSDashboard.tsx',
+  'components/OperatorStats.tsx',
+  'components/ReportProblemModal.tsx',
   // Libraries.
   'lib/floridaCountyPresets.ts',
   'lib/probate-import.ts',
   'lib/probate-leads-api.ts',
+  'lib/problem-reports.ts',
   'lib/spreadsheet.ts',
   'lib/contracts.ts',
   'lib/storefront.ts',
@@ -80,6 +83,7 @@ const EXPECTED_FILES = [
   'supabase/migrations/20261115160000_cash_buyers.sql',
   'supabase/migrations/20261115170000_saas_subscriptions.sql',
   'supabase/migrations/20261115180000_leads_owner_contact.sql',
+  'supabase/migrations/20261117090000_slice130_operator_visibility.sql',
 ];
 
 // --- (2) Real tables --------------------------------------------------------
@@ -100,6 +104,7 @@ const EXPECTED_TABLES = [
   'mail_credits_ledger',
   'school_progress',
   'seller_advance_requests',
+  'problem_reports',
 ];
 
 // --- (3) Edge Functions (files only, NOT deployed yet) ---------------------
