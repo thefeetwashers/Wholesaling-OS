@@ -326,7 +326,12 @@ export function parseProbateCsv(text: string, county: string = DEFAULT_PROBATE_C
   }
 
   const leads: ProbateParsedLead[] = [];
-  for (const [caseNumber, group] of byCase) {
+  // forEach (not for...of over the Map): the repo has no
+  // tsconfig.json, so Next.js type-checks the build with its own
+  // auto-created config at a target below ES2015 — iterating a
+  // Map with for...of fails that build. forEach is a method call
+  // and works at any target.
+  byCase.forEach((group, caseNumber) => {
     const caseStatus: 'OPEN' | 'CLOSED' = group.status === 'CLOSED' ? 'CLOSED' : 'OPEN';
     const decedentRows = group.rows.filter((r) => r.type === 'DECEDENT' && r.name);
     const rawDecedentName = decedentRows.length > 0 ? decedentRows[0].name : null;
@@ -400,7 +405,7 @@ export function parseProbateCsv(text: string, county: string = DEFAULT_PROBATE_C
     };
     lead.notes_flags = buildNotesFlags(lead);
     leads.push(lead);
-  }
+  });
 
   return {
     leads,
