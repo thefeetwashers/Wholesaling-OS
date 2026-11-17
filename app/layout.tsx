@@ -1,6 +1,8 @@
 import React from 'react';
 import './globals.css';
 import AiCopilot from '../components/AiCopilot';
+import ConnectDialer from '../components/ConnectDialer';
+import PostCallModal from '../components/PostCallModal';
 
 // Slice 94 — SEO foundation. Every claim in this metadata is a
 // fact the platform's own machinery backs (see /verify). The
@@ -88,6 +90,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             on every page; it opens only via the 'ws:open-copilot'
             event from lib/ai-copilot.ts. */}
         <AiCopilot />
+        {/* Slice 139 — Amazon Connect softphone (BYOK) floating dialer.
+            Bottom-right, opposite the Copilot's bottom-left button, so
+            the two widgets never overlap. Opens via the
+            'ws:connect-call' CustomEvent; see components/ConnectDialer.tsx. */}
+        <ConnectDialer />
+        {/* Slice 139 — Post-Call Seller Summary modal. Opens only on
+            the 'ws:post-call' event from the dialer when a call ends. */}
+        <PostCallModal />
         <footer className="ws-footer">
           WholesalingOS is operated by THE FEET WASHERS, INC. Contracts in this app carry attorney-review labels.
           This app does not scrape, auto-dial, or auto-send messages.

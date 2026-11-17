@@ -35,6 +35,16 @@ import { courtesyHold, courtesyHoldLine } from '../lib/courtesy';
 
 const card: React.CSSProperties = { background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 };
 
+// Slice 139 — Amazon Connect click-to-call (BYOK). Dispatches the
+// 'ws:connect-call' event with the lead's real number; the softphone
+// (components/ConnectDialer.tsx) listens for it and dials. Human tap
+// only — nothing here auto-dials. The button lives inside the
+// blocklist-cleared channel row, so it follows the same gate as every
+// other channel: no call until the blocklist check answers "clear".
+function dispatchConnectCall(phone: string) {
+  window.dispatchEvent(new CustomEvent('ws:connect-call', { detail: { phone } }));
+}
+
 export default function CommsCenter({ userId }: { userId: string | null }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tagsByLead, setTagsByLead] = useState<Record<string, DistressTagRow[]>>({});
@@ -236,6 +246,11 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
                   <p>Clear — not on the blocklist. Tap a channel; each tap is logged to this lead:</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     {links.tel && <a href={links.tel} onClick={() => tapChannel('call')}>📞 Call {firstPhone(lead)}</a>}
+                    {links.tel && firstPhone(lead) && (
+                      <button type="button" onClick={() => dispatchConnectCall(firstPhone(lead) as string)}>
+                        📞 Call via Connect
+                      </button>
+                    )}
                     {links.sms && <a href={links.sms} onClick={() => tapChannel('sms')}>💬 Text</a>}
                     {links.whatsapp && <a href={links.whatsapp} target="_blank" rel="noreferrer" onClick={() => tapChannel('whatsapp')}>WhatsApp</a>}
                     {links.mailto && <a href={links.mailto} onClick={() => tapChannel('email')}>✉️ Email</a>}

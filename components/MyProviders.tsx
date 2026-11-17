@@ -16,6 +16,14 @@
 //
 // If the RPC does not exist yet (Slice 137 migration not run), the
 // card says so honestly instead of crashing.
+//
+// Slice 139 — Amazon Connect softphone (BYOK). Each wholesaler
+// pastes their OWN Connect instance CCP URL into the section below;
+// it is stored in the same own row (connect_ccp_url, Slice 139
+// migration). The saved URL is loaded with a targeted select of
+// connect_ccp_url only — never select('*') — and the input is never
+// repopulated with the stored value; a separate saved-state line
+// shows what is stored.
 
 'use client';
 
@@ -69,6 +77,12 @@ export default function MyProviders({ userId }: { userId: string | null }) {
   const [msg, setMsg] = useState('');
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
+  // Slice 139 — Amazon Connect CCP URL (BYOK, optional softphone).
+  const [ccpUrlInput, setCcpUrlInput] = useState('');
+  const [ccpUrlSaved, setCcpUrlSaved] = useState<string | null>(null);
+  const [ccpNotSetUp, setCcpNotSetUp] = useState(false);
+  const [ccpSaving, setCcpSaving] = useState(false);
+  const [ccpMsg, setCcpMsg] = useState('');
 
   // Load status through the RPC only — never select('*') the
   // settings row, so the full key never reaches the browser.
@@ -109,6 +123,43 @@ export default function MyProviders({ userId }: { userId: string | null }) {
       live = false;
     };
   }, []);
+
+  // Slice 139 — load only the saved CCP URL for the caller's own
+  // row. Targeted select of connect_ccp_url only — never
+  // select('*'), so no secrets are read into the browser.
+  useEffect(() => {
+    let live = true;
+    async function loadCcp() {
+      if (!supabase || !userId) return;
+      try {
+        const { data, error } = await supabase
+          .from('wholesaler_provider_settings')
+          .select('connect_ccp_url')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (!live) return;
+        if (error) {
+          if (/column .* does not exist|PGRST204|schema cache/i.test(error.message || '')) {
+            setCcpNotSetUp(true);
+          } else {
+            setCcpMsg(`Could not load the saved Connect URL: ${error.message}`);
+          }
+          return;
+        }
+        const url = (data as { connect_ccp_url?: string | null } | null)?.connect_ccp_url;
+        if (url) setCcpUrlSaved(url);
+      } catch (err) {
+        if (!live) return;
+        setCcpMsg(
+          `Could not load the saved Connect URL: ${err instanceof Error ? err.message : 'unknown error'}`,
+        );
+      }
+    }
+    loadCcp();
+    return () => {
+      live = false;
+    };
+  }, [userId]);
 
   if (!userId) return null;
 
@@ -154,6 +205,45 @@ export default function MyProviders({ userId }: { userId: string | null }) {
       setMsg(`Saving failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Slice 139 — save the caller's own Connect CCP URL. Upserts the
+  // caller's own row only (onConflict user_id), same as the key
+  // save above; connect_ccp_url is included in that same row.
+  const saveCcpUrl = async () => {
+    const url = ccpUrlInput.trim();
+    if (url === '') {
+      setCcpMsg('Paste your Connect CCP URL first — the field is empty.');
+      return;
+    }
+    if (!/^https:\/\//i.test(url)) {
+      setCcpMsg('That URL must start with https:// — paste the full CCP URL from your own Amazon Connect instance.');
+      return;
+    }
+    if (!supabase) {
+      setCcpMsg('Supabase is not configured on this deployment — the URL cannot be saved.');
+      return;
+    }
+    setCcpSaving(true);
+    setCcpMsg('');
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const uid = authData?.user?.id || userId;
+      if (authError || !uid) throw new Error(authError?.message || 'Could not confirm your signed-in account.');
+      const { error } = await supabase
+        .from('wholesaler_provider_settings')
+        .upsert({ user_id: uid, connect_ccp_url: url }, { onConflict: 'user_id' });
+      if (error) throw new Error(error.message);
+      // Never repopulate the input with the stored URL; show the
+      // saved state as a separate line instead.
+      setCcpUrlInput('');
+      setCcpUrlSaved(url);
+      setCcpMsg('Saved — your Amazon Connect CCP URL is stored for this account only.');
+    } catch (err) {
+      setCcpMsg(`Saving failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setCcpSaving(false);
     }
   };
 
@@ -293,6 +383,43 @@ export default function MyProviders({ userId }: { userId: string | null }) {
           {testError !== null && (
             <p role="alert" style={{ fontSize: 13.5, color: '#fca5a5', margin: '10px 0 0' }}>{testError}</p>
           )}
+
+          {/* Slice 139 — Amazon Connect softphone (BYOK, optional). */}
+          <div style={{ borderTop: '1px solid rgba(148,163,184,0.28)', marginTop: 18, paddingTop: 16 }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>📞 Amazon Connect softphone (optional)</h3>
+            <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '0 0 10px', maxWidth: 720 }}>
+              Paste your OWN Amazon Connect instance CCP URL (BYOK — never a shared instance).
+              The softphone connects to your instance and your Connect account only.
+            </p>
+            {ccpNotSetUp ? (
+              <p style={{ fontSize: 13.5, color: '#fca5a5', margin: 0 }}>
+                Connect URL storage is not set up yet — run the Slice 139 migration.
+              </p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    type="url"
+                    value={ccpUrlInput}
+                    onChange={(e) => setCcpUrlInput(e.target.value)}
+                    placeholder="https://<your-instance>.my.connect.aws/ccp-v2/"
+                    aria-label="Amazon Connect CCP URL"
+                    autoComplete="off"
+                    style={{ flex: '1 1 280px', minWidth: 220, margin: 0 }}
+                  />
+                  <button type="button" onClick={saveCcpUrl} disabled={ccpSaving}>
+                    {ccpSaving ? 'Saving…' : 'Save Connect URL'}
+                  </button>
+                </div>
+                <p style={{ fontSize: 13, color: '#94a3b8', margin: '10px 0 0' }}>
+                  {ccpUrlSaved
+                    ? `Amazon Connect CCP URL saved: ${ccpUrlSaved}`
+                    : 'No Amazon Connect CCP URL saved yet.'}
+                </p>
+                {ccpMsg && <p style={{ fontSize: 13, color: '#6ee7b7', margin: '10px 0 0' }}>{ccpMsg}</p>}
+              </>
+            )}
+          </div>
 
           {msg && <p style={{ fontSize: 13, color: '#6ee7b7', marginTop: 10 }}>{msg}</p>}
         </>

@@ -516,6 +516,61 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   That check is the proof — do not claim the fix works live until
   it passes.
 
+### Slice 139 — Amazon Connect softphone, BYOK (NOT live — no instance exists yet)
+
+- **BYOK only, no shared instance:** each wholesaler brings their OWN
+  Amazon Connect instance and pastes their OWN instance CCP URL into
+  My Providers; it is stored on their own
+  `wholesaler_provider_settings` row as `connect_ccp_url`
+  (`supabase/migrations/20261117180000_slice139_connect_ccp_url.sql`,
+  adds the column only — apply after the Slice 139 deploy).
+  `components/MyProviders.tsx` saves/loads that URL with a targeted
+  select of `connect_ccp_url` only. The platform runs no Connect
+  instance of its own and shares no number across wholesalers.
+- **How the pieces talk (window events only, no imports between
+  them):** `components/ProbateLeads.tsx` (a "Call" button next to
+  each skip-traced decision-maker phone) and
+  `components/CommsCenter.tsx` (a "Call via Connect" button in the
+  blocklist-cleared channel row, next to the existing phone-app Call
+  link) dispatch `new CustomEvent('ws:connect-call', { detail: {
+  phone } })` on a human tap — human tap only, never auto-dial, and
+  the button renders only where a real phone number is actually
+  shown. The softphone (`components/ConnectDialer.tsx`) listens for
+  that event and dials through the saved CCP URL; when the call ends
+  it dispatches `ws:post-call` with `{ phone, durationSec }`.
+  `components/PostCallModal.tsx` listens for that event and opens the
+  "Post-Call Seller Summary" modal (asking price / debt, ARV &
+  repairs, motivation / timeline / notes — all empty by default, no
+  dollar figures anywhere). Its "Analyze Offer & Draft Follow-Up"
+  button calls `openCopilot(context, autoQuestion)` from
+  `lib/ai-copilot.ts` with the exact question "Based on these call
+  notes, calculate my Maximum Allowable Offer (MAO), suggest a
+  negotiation angle, and write a short follow-up SMS I can send them
+  right now." The context is built from the three note fields only —
+  the phone number stays in the modal meta line and is NEVER sent to
+  the AI (free-tier prompts may be used for training). Mount the
+  modal once, in `app/layout.tsx` next to `<AiCopilot />`:
+  `import PostCallModal from '../components/PostCallModal';` +
+  `<PostCallModal />`.
+- **Owner setup steps (each wholesaler, in AWS + the app):** 1) an
+  AWS account; 2) create an Amazon Connect instance in the AWS
+  Console; 3) claim a phone number in that instance; 4) in the
+  instance settings, approve the app origins
+  `https://wholesalingos.thefeetwashers.com` and
+  `https://wholesalingos.vercel.app` (the CCP / Streams embed refuses
+  any origin that is not approved); 5) copy the instance CCP URL and
+  paste it in My Providers; 6) apply the Slice 139 migration above.
+- **Honest limits:** no Connect instance exists yet, so nothing is
+  live until a CCP URL is saved AND the instance exists with the
+  domain approved — until then the Call buttons dispatch an event no
+  dialer answers and no call is placed. The softphone needs the
+  Streams library and a live instance; neither is verified here.
+- **Recording / transcription is intentionally NOT built.** Florida is
+  two-party consent for recording (Fla. Stat. §934.03) — the call is
+  not recorded, not transcribed, and no recording consent prompt
+  exists. The post-call notes are typed by the wholesaler after the
+  call, nothing more.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof

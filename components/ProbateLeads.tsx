@@ -62,6 +62,15 @@ function storefrontLink(slug: string, caseNumber: string): string {
   return `${STOREFRONT_BASE}/sell/${slug}?case=${encodeURIComponent(caseNumber)}`;
 }
 
+// Slice 139 — Amazon Connect click-to-call (BYOK). The button below
+// only DISPATCHES the 'ws:connect-call' event with the real number;
+// the softphone (components/ConnectDialer.tsx) listens for it and
+// dials. Human tap only — nothing here auto-dials, and the button
+// renders only where a real phone number is actually shown.
+function dispatchConnectCall(phone: string) {
+  window.dispatchEvent(new CustomEvent('ws:connect-call', { detail: { phone } }));
+}
+
 type TabKey = 'proSe' | 'creditor' | 'all' | 'archived';
 
 interface SkipTraceTarget {
@@ -690,6 +699,13 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                               <>
                                 <a href={`tel:${dm.phone}`}>📞 {dm.phone}</a>
                                 <a href={`sms:${dm.phone}`}>💬 Text</a>
+                                <button
+                                  type="button"
+                                  onClick={() => dispatchConnectCall(dm.phone)}
+                                  style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
+                                >
+                                  Call
+                                </button>
                               </>
                             )}
                             {dm.email && <a href={`mailto:${dm.email}`}>✉️ {dm.email}</a>}
