@@ -35,6 +35,19 @@ const OBL_BROWSE_URL = 'https://openbuyerslist.com/off-market-deals';
 // CashBuyersDealBlast.tsx — one list, not two.
 const PROPERTY_TYPES = ['Single Family', 'Multi-Family', 'Condo / Townhouse', 'Land', 'Mobile Home', 'Commercial'];
 
+// Slice 132 follow-up (D) — the standard 50 U.S. state codes +
+// DC, for the buy-box states multi-select. Empty by default: no
+// state picked means no state constraint.
+const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
+
+const REHAB_OPTIONS = [
+  { value: '', label: 'No preference' },
+  { value: 'any', label: 'Any — no preference' },
+  { value: 'light', label: 'Light rehab or better (Turnkey, Light rehab)' },
+  { value: 'moderate', label: 'Moderate rehab or better (+ Moderate rehab)' },
+  { value: 'heavy', label: 'Heavy rehab — any condition' },
+];
+
 function numOrNull(v: string): number | null {
   if (v.trim() === '') return null;
   const n = Number(v.replace(/[^0-9.]/g, ''));
@@ -51,6 +64,17 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [notes, setNotes] = useState('');
+  // Slice 132 — publish toggle (saved with the buy box), plus the
+  // matching fields from follow-ups (1) and (D). All empty by
+  // default; savedPublished is what the last SAVE stored, so the
+  // note under the form never claims a publish that has not
+  // actually been saved yet.
+  const [published, setPublished] = useState(false);
+  const [savedPublished, setSavedPublished] = useState(false);
+  const [emailAlerts, setEmailAlerts] = useState(false);
+  const [zipCodes, setZipCodes] = useState('');
+  const [rehab, setRehab] = useState('');
+  const [states, setStates] = useState<string[]>([]);
   const [hasSaved, setHasSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -67,6 +91,12 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
           setMinPrice(box.min_price != null ? String(box.min_price) : '');
           setMaxPrice(box.max_price != null ? String(box.max_price) : '');
           setNotes(box.notes || '');
+          setPublished(box.published === true);
+          setSavedPublished(box.published === true);
+          setEmailAlerts(box.email_alerts_opt_in === true);
+          setZipCodes((box.zip_codes || []).join(', '));
+          setRehab(box.rehab_tolerance || '');
+          setStates(box.states || []);
           setHasSaved(true);
         }
       })
@@ -85,8 +115,14 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
         min_price: numOrNull(minPrice),
         max_price: numOrNull(maxPrice),
         notes,
+        published,
+        email_alerts_opt_in: emailAlerts,
+        zip_codes: zipCodes.split(',').map((z) => z.trim()).filter(Boolean),
+        rehab_tolerance: rehab || null,
+        states,
       });
       setHasSaved(true);
+      setSavedPublished(published);
       setBanner('Buy box saved.');
     } catch (e) {
       setBanner(e instanceof Error ? e.message : 'Could not save your buy box.');
@@ -99,9 +135,12 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
     const lines: string[] = [];
     lines.push('My buy box — what we buy:');
     lines.push(`Markets: ${markets.length > 0 ? markets.join(', ') : 'not set'}`);
+    lines.push(`States: ${states.length > 0 ? states.join(', ') : 'not set'}`);
+    lines.push(`ZIP codes: ${zipCodes.trim() || 'not set'}`);
     lines.push(`Property types: ${propTypes.length > 0 ? propTypes.join(', ') : 'not set'}`);
     lines.push(`Min price: ${money(numOrNull(minPrice))}`);
     lines.push(`Max price: ${money(numOrNull(maxPrice))}`);
+    lines.push(`Rehab tolerance: ${rehab || 'no preference'}`);
     if (notes.trim()) lines.push(`Notes: ${notes.trim()}`);
     return lines.join('\n');
   }
@@ -167,6 +206,15 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
               </select>
               <span style={{ fontSize: 12, color: '#64748b' }}>Hold Ctrl/Cmd to pick several. Empty means no markets set.</span>
             </label>
+            <label style={labelStyle}>States
+              <select multiple value={states} onChange={(e) => setStates(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
+                {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <span style={{ fontSize: 12, color: '#64748b' }}>Hold Ctrl/Cmd to pick several. Empty means no state constraint. Florida is the only state with live parcel data today — other states join only after their real service is verified.</span>
+            </label>
+            <label style={labelStyle}>Target ZIP codes<input style={inputStyle} value={zipCodes} onChange={(e) => setZipCodes(e.target.value)} placeholder="e.g. 34950, 33313 (comma-separated, optional)" inputMode="numeric" />
+              <span style={{ fontSize: 12, color: '#64748b' }}>Empty means no ZIP constraint.</span>
+            </label>
             <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
               <legend style={{ fontSize: 13 }}>Property types</legend>
               {PROPERTY_TYPES.map((t) => (
@@ -180,6 +228,34 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
               <label style={labelStyle}>Max price<input style={inputStyle} value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Max price (optional)" inputMode="decimal" /></label>
             </div>
             <label style={labelStyle}>Notes<textarea style={inputStyle} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything else about what you buy…" rows={2} /></label>
+            <label style={labelStyle}>Rehab tolerance
+              <select style={inputStyle} value={rehab} onChange={(e) => setRehab(e.target.value)}>
+                {REHAB_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <span style={{ fontSize: 12, color: '#64748b' }}>Empty means no preference — any condition matches.</span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 10, alignItems: 'center' }}>
+              <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
+              Publish my buy box
+            </label>
+            <label style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 10, alignItems: 'flex-start' }}>
+              <input type="checkbox" checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} style={{ marginTop: 2 }} />
+              <span>
+                Email me when a published deal matches my buy box
+                <br />
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  Email alerts only happen if the founder ever connects an email provider — nothing
+                  is sent today, and matching deals are shown in the app.
+                </span>
+              </span>
+            </label>
+            {hasSaved && (
+              <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+                {savedPublished
+                  ? 'Your buy box is published — it now appears in the public Cash Buyers directory with no contact details.'
+                  : 'Your buy box is private — it does not appear in the public Cash Buyers directory.'}
+              </p>
+            )}
             {banner && <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>{banner}</div>}
             {copied && <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>Buy box copied to clipboard.</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

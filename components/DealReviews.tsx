@@ -96,7 +96,7 @@ export default function DealReviews({ userId, escrowFileId, outcome }: { userId:
           <label>Role{' '}
             <select value={role} onChange={(e) => setRole(e.target.value as 'buyer' | 'seller')}>
               <option value="buyer">Buyer</option>
-              <option value="seller">Seller</option>
+              <option value="seller">Property owner</option>
             </select>
           </label>
           <label>Rating{' '}

@@ -1,8 +1,15 @@
 'use client';
 
+import { useState } from 'react';
+
 // Sidebar — workspace navigation, grouped by job (Slice 25 built the
 // shell; Slice 43 grouped it and added the Listings, Seller Page, and
 // Title Companies doors by splitting them out of combined views).
+// Slice 132 adds the Marketplace dropdown: the public marketplace
+// routes (/deals, /buyers, /managed-dispo) plus Buyer Networks,
+// which is the existing Cash Buyers dashboard view — reached here
+// through onView('cashbuyers'), exactly the way the dashboard
+// already navigates to views. No new view, no new route invented.
 // Every part of the office is one click from here; the main area
 // shows ONE view at a time. The Owner Admin item appears only for
 // the platform owner's account (the console itself also self-gates).
@@ -23,7 +30,8 @@ export const SHELL_VIEWS: ShellView[] = [
   { key: 'board', label: 'Pipeline Board', icon: '📋', group: 'Pipeline' },
   { key: 'field', label: 'Field Capture', icon: '📍', group: 'Pipeline' },
   { key: 'comms', label: 'Comms Center', icon: '💬', group: 'Pipeline' },
-  { key: 'sellerpage', label: 'Seller Page & Intake', icon: '🎙️', group: 'Pipeline' },
+  // Slice 132 — display label only; the view key stays 'sellerpage'.
+  { key: 'sellerpage', label: 'Property Owner Page & Intake', icon: '🎙️', group: 'Pipeline' },
   { key: 'contracts', label: 'Contracts & Closing', icon: '📝', group: 'Pipeline' },
   // Slice 129 — the JV Split calculator lives in Pipeline, next to
   // the contracts it feeds (it prints the existing JV agreement).
@@ -51,6 +59,7 @@ export default function Sidebar({
   showAdmin: boolean;
   onReportProblem?: () => void;
 }) {
+  const [marketOpen, setMarketOpen] = useState(false);
   const item = (v: ShellView) => (
     <button
       key={v.key}
@@ -70,6 +79,41 @@ export default function Sidebar({
           {SHELL_VIEWS.filter((v) => v.group === g).map(item)}
         </div>
       ))}
+      {/* Slice 132 — Marketplace dropdown. The public marketplace
+          pages live at their own routes (built by the Slice 132
+          routes workers); Buyer Networks is the existing Cash
+          Buyers view, opened with onView like any other view. */}
+      <div>
+        <div className="ws-side-label">Marketplace</div>
+        <button
+          className="ws-side-item"
+          aria-expanded={marketOpen}
+          onClick={() => setMarketOpen((o) => !o)}
+        >
+          <span className="ws-side-ico">🏪</span>
+          Marketplace {marketOpen ? '▾' : '▸'}
+        </button>
+        {marketOpen && (
+          <div style={{ paddingLeft: 12 }}>
+            <a className="ws-side-item" style={{ textDecoration: 'none' }} href="/deals">
+              <span className="ws-side-ico">🏠</span>
+              Off-Market Deals
+            </a>
+            <a className="ws-side-item" style={{ textDecoration: 'none' }} href="/buyers">
+              <span className="ws-side-ico">💵</span>
+              Cash Buyers
+            </a>
+            <button className="ws-side-item" onClick={() => onView('cashbuyers')}>
+              <span className="ws-side-ico">🤝</span>
+              Buyer Networks
+            </button>
+            <a className="ws-side-item" style={{ textDecoration: 'none' }} href="/managed-dispo">
+              <span className="ws-side-ico">📣</span>
+              Managed Dispo
+            </a>
+          </div>
+        )}
+      </div>
       {showAdmin && (
         <>
           <div className="ws-side-label">Platform owner</div>

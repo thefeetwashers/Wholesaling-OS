@@ -209,6 +209,94 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   acquisition teams, not from a shared list). No OBL counts shown,
   no fund named, no buyer data copied, no API client or scraper.
 
+### Slice 132 — OBL-inspired marketplace + dashboard upgrade + buy-box matching + free-stack underwriting
+
+- `supabase/migrations/20261117130000_slice132_marketplace_tables.sql` —
+  `published_deals` (owner opt-in public listing; condition pinned to
+  the five values; comps jsonb max 4 wholesaler-entered only;
+  `county` column for matching; public SELECT on published rows
+  only + owner INSERT/UPDATE/DELETE + operator read), `deal_responses`
+  (mutual-opt-in flags `owner_contact_shared` /
+  `responder_contact_shared`; participants read/update, operator
+  read), `managed_dispo_requests` (status requested default; owner +
+  operator RLS) — GRANTs to `authenticated` + `service_role` and
+  SELECT to `anon` on published_deals in the SAME file; no anon
+  INSERT anywhere. No `public.deals` table (duplicate of
+  published_deals — rejected).
+- `supabase/migrations/20261117131000_slice132_buy_box_published.sql` —
+  adds `published` + `zip_codes` + `rehab_tolerance` + `states` +
+  `email_alerts_opt_in` (default false) to `wholesaler_buy_boxes`,
+  plus the minimal public read (SELECT for anon + authenticated
+  where `published = true`; anon SELECT grant only).
+- `supabase/migrations/20261117133000_slice132_buyer_contact_profiles.sql` —
+  ALTER TABLE `profiles` adds `contact_name`, `contact_phone`,
+  `contact_private` only (the `buyer_profiles` table instruction was
+  WITHDRAWN and that file deleted; no new buyer table; no anon
+  INSERT policy) + the mutual-opt-in RPC
+  `get_buyer_contact_for_response(uuid)` (SECURITY DEFINER; responder
+  is `deal_responses.responder_id`, owner is `published_deals.user_id`
+  via the deal_id join; returns the responder's profile contact only
+  when BOTH share flags are true and the caller is the operator or
+  one of the two parties).
+- `lib/published-deals.ts` + `lib/managed-dispo.ts` — verified writes
+  (saved rows selected back). `lib/match-buy-box.ts` — pinned
+  matching contract (`dealMatchesBuyBox`, `findMatchingBuyers`,
+  `findMatchingDeals`; geography county-or-ZIP, state, type, price,
+  rehab tolerance; computed on read only; no email/SMS; `[]` never
+  throw; `DealSummary` carries `county`; `findMatchingBuyers`
+  attaches `display_name` + `company_name` from the buyer's
+  `storefront_profiles` row when one exists).
+  `lib/buyer-profile.ts` — VIP contact load/save on `profiles`
+  (pre-migration fallback) + `loadBuyerContactForResponse` via the
+  RPC. `lib/marketplace-stats.ts` — real published-deals / published-
+  buyers counts (honest zeros until real).
+- Public routes: `app/deals/page.tsx` + `app/deals/[id]/page.tsx`
+  (filters; honest "No deals published yet."; ZIP-only location with
+  ZCTA map; demographics/FMR/flood-zone sections; Matching buyers
+  (N); respond + mutual-opt-in share buttons; owner
+  Unpublish/Republish; no photos), `app/buyers/page.tsx` (published
+  buy boxes only; no contact on cards; "Send this buyer a deal"
+  links to the dashboard Cash Buyers view — CashBuyersDealBlast has
+  no URL route, so no deeper wiring exists), `app/join/page.tsx`
+  (role cards; signup preselection via the existing
+  `localStorage['ws_pending_role']` mechanism; agent → stored
+  referrer), `app/managed-dispo/page.tsx` (request not a booking;
+  fee agreed in writing; separate signed agreement; in-app only),
+  `app/vip/page.tsx` (signed-in buyers only: private contact +
+  buy box + in-app matching deals). `components/PublishDealButton.tsx`
+  on the wholesaler's own synced lead rows (`Leads.tsx`, 4-line
+  diff). `components/ManagedDispoRequests.tsx` wired into
+  `OperatorStats` (operator list + status buttons).
+- Dashboard + landing: `app/page.tsx` (build tag Slice 132;
+  `MarketplaceLanding` after `<Landing/>`; header band; Marketplace
+  quick-links pills; `MarketplaceStatsStrip`), `components/Sidebar.tsx`
+  ("Marketplace" dropdown: Off-Market Deals / Cash Buyers / Buyer
+  Networks / Managed Dispo), `components/PortalHome.tsx` (card shell
+  refresh; Matching deals in BuyerPortal; role label "Seller" →
+  "Property owner" as DISPLAY only — stored `'seller'` untouched).
+  `components/BuyerNetworks.tsx` gains the publish toggle + ZIPs +
+  rehab select + states multi-select.
+- Free-stack underwriting (all server-side Next.js API routes, 30s
+  timeout, cache, errors quoted verbatim; no Cloudflare Worker):
+  `app/api/demographics` (Census ACS — needs `CENSUS_API_KEY`; the
+  no-key claim was wrong, the API returns "Missing Key" without
+  one), `app/api/fmr` (HUD — needs `HUD_API_TOKEN`), `app/api/flood-zone`
+  (FEMA NFHL layer 28, verified live — the `/gis/nfhl/` path is DEAD),
+  `app/api/boundary` (Census TIGERweb), `app/api/parcel-boundary`
+  (FL cadastral geometry; roll code = DOR + 10), `app/api/broward-record`
+  (BCPA GIS, verified live), `app/api/corporate-buyers` (RESEARCH
+  lookup, 25 rows, CSV export; Sunbiz manual link-out only).
+  `components/PropertyMap.tsx` (Leaflet 1.9.4 via npm + OSM; parcel
+  polygon, TIGERweb GeoJSON, Regrid tile toggle default off, zoom 17
+  — parcels render only at zoom 15+). Dropped honestly: FHFA HPI (no
+  free API — only static downloads), Socrata municipal feed (no city
+  verifies), OpenCorporates company check (v0.4 returns HTTP 401
+  without a token). No bulk harvesting of roll owners into buyer
+  lists. `supabase/functions/match-and-email/index.ts` is file only,
+  NOT live, NOT_CONFIGURED (needs `RESEND_API_KEY` + a verified
+  sender domain — neither exists; Resend setup is a FOUNDER task
+  for later).
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -234,12 +322,15 @@ Already applied (Nov 15–16, 2026 — do not re-run unless the database was res
 | `20261115170000_saas_subscriptions.sql` | Slice 129 |
 | `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (Slices 130–131 — apply after the deploy):
+New in this push (Slices 130–132 — apply after the deploy):
 
 | File | Contents |
 | --- | --- |
 | `20261117090000_slice130_operator_visibility.sql` | `scout_leads.w9_received` + `w9_received_at` + W-9-before-paid CHECK; `funding_requests.interest_rate` + `loan_term_months`; `problem_reports` table + RLS |
 | `20261117124100_buyer_networks_buy_box.sql` | `wholesaler_buy_boxes` table (one buy box per wholesaler) + owner/operator RLS + GRANTs to `authenticated` and `service_role` in the same file |
+| `20261117130000_slice132_marketplace_tables.sql` | `published_deals` + `deal_responses` + `managed_dispo_requests` tables + RLS + GRANTs (incl. anon SELECT on published deals only) in the same file |
+| `20261117131000_slice132_buy_box_published.sql` | `wholesaler_buy_boxes.published` + `zip_codes` + `rehab_tolerance` + `states` + `email_alerts_opt_in`; minimal public read policy + anon SELECT grant |
+| `20261117133000_slice132_buyer_contact_profiles.sql` | `profiles.contact_name` + `contact_phone` + `contact_private` (ALTER only) + mutual-opt-in RPC `get_buyer_contact_for_response(uuid)` |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -261,6 +352,13 @@ function reference a table created later in the same file.
   the case number lands on `leads.probate_case_number`.
 - `/track/[token]` — private seller status tracker.
 - `/school` — 7-day bootcamp (Day 7 quiz 4/5 = Verified Operator badge).
+- `/deals` — public off-market deals (published deals only; ZIP-only location; no photos).
+- `/deals/[id]` — public deal detail (facts, comps, highlights, ZCTA map, demographics/FMR/flood zone, Matching buyers, respond + mutual-opt-in).
+- `/buyers` — public cash buyers directory (published buy boxes only; no contact on cards).
+- `/join` — role picker (Buyer / Wholesaler / Real estate agent / Property owner / I'm multiple) routing to signup with the role preselected.
+- `/managed-dispo` — operator's managed disposition service (request form, in-app only).
+- `/vip` — signed-in Cash Buyer VIP Portal (private contact + buy box + in-app matching deals).
+- `/api/demographics`, `/api/fmr`, `/api/flood-zone`, `/api/boundary`, `/api/parcel-boundary`, `/api/broward-record`, `/api/corporate-buyers` — server-side underwriting/research routes (see §2 Slice 132).
 
 ## 5. Skip-trace Edge Function — BYOK, no sandbox, no shared key
 

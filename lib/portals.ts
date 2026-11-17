@@ -8,7 +8,7 @@ export const PORTAL_ROLES: PortalRole[] = ['wholesaler', 'buyer', 'seller', 'tit
 export const ROLE_LABELS: Record<PortalRole, string> = {
   wholesaler: 'Wholesaler',
   buyer: 'Cash Buyer',
-  seller: 'Seller',
+  seller: 'Property owner',
   title: 'Title Company',
   referrer: 'Referrer',
   lender: 'Capital & Lending Partner',

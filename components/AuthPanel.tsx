@@ -111,7 +111,7 @@ export default function AuthPanel({ onUser }: { onUser: (id: string | null, emai
         <select value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="wholesaler">Wholesaler</option>
           <option value="buyer">Cash Buyer</option>
-          <option value="seller">Seller</option>
+          <option value="seller">Property owner</option>
           <option value="title">Title Company</option>
           <option value="referrer">Referrer — earn $1,000 per closed referral</option>
           <option value="lender">Capital &amp; Lending Partner</option>

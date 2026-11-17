@@ -26,6 +26,7 @@ import {
   type ProblemReport,
   type ProblemStatus,
 } from '../lib/problem-reports';
+import ManagedDispoRequests from './ManagedDispoRequests';
 
 function countBy<T extends string>(values: (T | null | undefined)[]): Record<string, number> {
   const out: Record<string, number> = {};
@@ -320,6 +321,9 @@ export default function OperatorStats({ userEmail }: { userEmail: string | null 
           ))}
         </ul>
       )}
+
+      <h4 style={{ marginTop: 20 }}>Managed disposition requests</h4>
+      <ManagedDispoRequests operatorEmail={userEmail} />
     </div>
   );
 }

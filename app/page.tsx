@@ -75,10 +75,207 @@ import ImportInbox from '../components/ImportInbox';
 import WebhookPanel from '../components/WebhookPanel';
 import ListingParser from '../components/ListingParser';
 import Sidebar from '../components/Sidebar';
+import { fetchMarketplaceCounts } from '../lib/marketplace-stats';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
 
 const STAGES = ['Find', 'Qualify', 'Contract', 'Market', 'Show', 'Close', 'Track'];
+
+// Slice 132 — Marketplace stats strip. Real counts only, from
+// lib/marketplace-stats.ts (published deals + published buyers).
+// A 0 is honest: nothing published yet (or the Slice 132 tables
+// are not there yet) — never OBL's numbers, never estimated.
+// Used on the dashboard home and on the public landing page.
+function MarketplaceStatsStrip() {
+  const [counts, setCounts] = useState<{ publishedDeals: number; publishedBuyers: number } | null>(null);
+  useEffect(() => {
+    let on = true;
+    fetchMarketplaceCounts()
+      .then((c) => { if (on) setCounts(c); })
+      .catch(() => { if (on) setCounts({ publishedDeals: 0, publishedBuyers: 0 }); });
+    return () => { on = false; };
+  }, []);
+  return (
+    <section style={{ background: '#0f172a', border: '1px solid rgba(110,231,183,0.35)', borderRadius: 12, padding: '14px 16px', marginTop: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#6ee7b7' }}>Marketplace</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, marginTop: 8 }}>
+        <div><strong style={{ fontSize: 22 }}>{counts ? counts.publishedDeals : '…'}</strong><br /><span style={{ fontSize: 13, color: '#94a3b8' }}>Off-market deals published</span></div>
+        <div><strong style={{ fontSize: 22 }}>{counts ? counts.publishedBuyers : '…'}</strong><br /><span style={{ fontSize: 13, color: '#94a3b8' }}>Cash buyers published</span></div>
+      </div>
+      <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0' }}>Counted from published marketplace rows. A 0 means nothing published yet — nothing here is estimated.</p>
+    </section>
+  );
+}
+
+// Slice 132 — Part 7: marketplace sections for the public landing
+// page. OBL's STRUCTURE only (hero, how-it-works, trust & safety,
+// difference table, FAQ, real stats) with OUR words — nothing
+// copied from OBL, no OBL numbers, listings, buyers, or prices.
+// Every claim below is a feature that exists in the signed-in
+// product today; the stats are real published rows only.
+const MKT_PANEL: React.CSSProperties = { background: '#16213a', border: '1px solid rgba(148,163,184,0.28)', borderRadius: 14, padding: '16px 18px' };
+const MKT_H2: React.CSSProperties = { fontSize: 22, margin: '28px 0 6px' };
+const MKT_SUB: React.CSSProperties = { fontSize: 14, color: '#94a3b8', margin: '0 0 14px', maxWidth: 760 };
+
+function MarketplaceLanding() {
+  const [mode, setMode] = useState<'buyer' | 'owner'>('buyer');
+  const steps = mode === 'buyer'
+    ? [
+        { n: '1', title: 'Publish your buy box', body: 'Tell the marketplace what you buy: the markets, the property types, and the price range. Your buy box is how deals find you — and confirming it keeps it live.' },
+        { n: '2', title: 'Find matching deals', body: 'Browse off-market deals and see the ones that match your buy box first. Every listing states plainly that it is an assignment of contract rights, not the property itself.' },
+        { n: '3', title: 'Connect when there is interest', body: 'Make an offer on a deal you like. The wholesaler sees it in their offers inbox and replies there — accept, counter, or decline.' },
+      ]
+    : [
+        { n: '1', title: 'Find matching buyers', body: 'See published buy boxes: the markets, property types, and price ranges buyers are actually looking for — criteria, not a cold list of names.' },
+        { n: '2', title: 'Share the property', body: 'Share it once: what it is, where it is, and what you are asking. One share is matched against every published buy box.' },
+        { n: '3', title: 'Connect when there is interest', body: 'When a buyer matches, you connect through the platform. Only what you chose to publish is shown.' },
+      ];
+  const toggleBtn = (m: 'buyer' | 'owner', label: string) => (
+    <button
+      type="button"
+      onClick={() => setMode(m)}
+      style={{
+        background: mode === m ? '#059669' : 'transparent',
+        color: mode === m ? '#fff' : '#cbd5e1',
+        border: mode === m ? '1px solid #059669' : '1px solid rgba(148,163,184,0.4)',
+        borderRadius: 999, padding: '9px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  );
+  const cell: React.CSSProperties = { textAlign: 'left', verticalAlign: 'top', padding: '10px 12px', fontSize: 13.5, lineHeight: 1.55, borderBottom: '1px solid rgba(148,163,184,0.2)' };
+  return (
+    <div>
+      <section style={{ background: 'linear-gradient(135deg, #064e3b 0%, #0b2e26 55%, #0b1220 100%)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: 14, padding: '22px 20px', marginTop: 18 }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 24, color: '#fff' }}>Off-market deals, meet the buyers looking for them.</h2>
+        <p style={{ fontSize: 15, color: '#cbd5e1', maxWidth: 720, margin: '0 0 14px' }}>
+          WholesalingOS puts the two sides of an off-market deal in one place: buyers publish what they buy,
+          property owners and wholesalers share what they have, and the match happens on criteria — not on
+          a stale list of names. Free for buyers and property owners.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <a href="/deals" style={{ background: '#059669', color: '#fff', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>Browse off-market deals</a>
+          <a href="/buyers" style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(148,163,184,0.5)', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>See cash buyers</a>
+          <a href="/join" style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(148,163,184,0.5)', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>Join free</a>
+        </div>
+      </section>
+
+      <MarketplaceStatsStrip />
+
+      <h2 style={MKT_H2}>How it works</h2>
+      <p style={MKT_SUB}>Three steps, whichever side of the deal you are on:</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {toggleBtn('buyer', 'I am a buyer')}
+        {toggleBtn('owner', 'I have a property')}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+        {steps.map((s) => (
+          <div key={s.n} style={MKT_PANEL}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#6ee7b7' }}>STEP {s.n}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 4 }}>{s.title}</div>
+            <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>{s.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <h2 style={MKT_H2}>Trust &amp; safety</h2>
+      <p style={MKT_SUB}>No stars, no paid badges. What you can check here is what the platform itself counted or reviewed:</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🏆 Earned record</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>A buyer&apos;s standing comes from closings this platform counted — accepted offers, signed assignments, escrow outcomes. It cannot be bought, and a buyer cannot write it for themselves.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🚩 Report a problem</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>Signed in, anyone can flag a problem from the sidebar — a listing, a buyer, or anything that looks wrong. The report goes to the operator&apos;s desk inside the app.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🛡️ Operator review</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>Every report is reviewed by the operator — not by an algorithm. There is no public review system yet, so a record here is counted closings, not stars.</p>
+        </div>
+      </div>
+
+      <h2 style={MKT_H2}>The difference</h2>
+      <p style={MKT_SUB}>A buyers list is a list of names. This is a marketplace that keeps the names honest:</p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#16213a', border: '1px solid rgba(148,163,184,0.28)', borderRadius: 14 }}>
+          <thead>
+            <tr>
+              <th style={{ ...cell, color: '#fff', fontWeight: 800 }}>What matters</th>
+              <th style={{ ...cell, color: '#fff', fontWeight: 800 }}>A plain buyers list</th>
+              <th style={{ ...cell, color: '#6ee7b7', fontWeight: 800 }}>WholesalingOS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={cell}><strong style={{ color: '#fff' }}>What a buyer wants</strong></td>
+              <td style={cell}>Names and phone numbers, if that</td>
+              <td style={cell}>A published buy box — markets, property types, price range — kept current by the buyer</td>
+            </tr>
+            <tr>
+              <td style={cell}><strong style={{ color: '#fff' }}>Proof a buyer closes</strong></td>
+              <td style={cell}>Their word for it</td>
+              <td style={cell}>An earned tier counted from this platform&apos;s closings</td>
+            </tr>
+            <tr>
+              <td style={cell}><strong style={{ color: '#fff' }}>Whose eyes see it</strong></td>
+              <td style={cell}>Whoever holds the list</td>
+              <td style={cell}>Criteria only — buyer identities are never shown on the demand board</td>
+            </tr>
+            <tr>
+              <td style={cell}><strong style={{ color: '#fff' }}>Cost to join as a buyer</strong></td>
+              <td style={cell}>Varies — often a paid list</td>
+              <td style={cell}>Free</td>
+            </tr>
+            <tr>
+              <td style={cell}><strong style={{ color: '#fff' }}>Your leads and buyers</strong></td>
+              <td style={cell}>On someone else&apos;s list</td>
+              <td style={cell}>Sealed in your own office — the platform owner cannot open them</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style={MKT_H2}>Marketplace questions, answered straight</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>Do buyers pay to join the marketplace?</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>No. Cash buyers register free, publish a buy box, and see matching deals. Only wholesalers pay — 90 days free, then $150 a month — and buyers, property owners, title companies, and lenders are free.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>What does a published deal actually sell?</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>An assignment of contract rights, not the property itself. Every public listing carries that disclosure: verify all figures with the wholesaler and the title company before sending any funds.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>Who sees my contact details?</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>Buyers are shown by their criteria, not their identity — the demand board lists what buyers want, never who they are. Share your own contact details only when you choose to.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>How do I know a buyer is real?</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>You do not take their word for it: their tier is earned from closings this platform counted, and their proof of funds is labelled self-reported until you see the letter.</p>
+        </div>
+        <div style={MKT_PANEL}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>How do I report a problem?</div>
+          <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: '8px 0 0', lineHeight: 1.6 }}>Sign in and use Report a problem in the sidebar. Your report goes to the operator&apos;s desk in the app for review.</p>
+        </div>
+      </div>
+
+      <section style={{ background: '#052e16', border: '1px solid #166534', padding: 22, borderRadius: 12, marginTop: 28 }}>
+        <h2 style={{ margin: '0 0 8px' }}>Start from your side of the deal.</h2>
+        <p style={{ fontSize: 14.5, maxWidth: 720, margin: '0 0 14px' }}>
+          Buyers publish what they buy. Property owners share what they have. Wholesalers work the match
+          between them — in one office, with real records behind every number.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <a href="/join" style={{ background: '#059669', color: '#fff', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>Join free</a>
+          <a href="#signin" style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(148,163,184,0.5)', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>Sign in</a>
+          <a href="/deals" style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(148,163,184,0.5)', borderRadius: 10, padding: '11px 16px', fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>Browse off-market deals</a>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -141,7 +338,22 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 131</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 132</p>
+      {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
+          goes to #signin, exactly the way the app already reaches
+          sign-in (the AuthPanel lives in the #signin block below,
+          and the footer already links there). No auth rebuilt. */}
+      {!userId && (
+        <nav aria-label="Marketplace" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+          <a href="/" style={{ fontWeight: 800, fontSize: 16, color: '#fff', textDecoration: 'none' }}>WholesalingOS</a>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginLeft: 'auto', fontSize: 14 }}>
+            <a href="/deals" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Off-Market Deals</a>
+            <a href="/buyers" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Cash Buyers</a>
+            <a href="/join" style={{ color: '#fff', fontWeight: 700, textDecoration: 'none' }}>Join</a>
+            <a href="#signin" style={{ color: '#fff', fontWeight: 700, textDecoration: 'none' }}>Sign in</a>
+          </span>
+        </nav>
+      )}
       {!userId && (
         <div className="ws-hero">
           <h1>Your whole wholesaling business. One office.</h1>
@@ -157,7 +369,7 @@ export default function Home() {
           </div>
           <ul>
             <li>Your company office is sealed: your leads and buyer list are yours alone — not even the platform owner can see them.</li>
-            <li>Sellers see their price only. Your assignment fee stays yours.</li>
+            <li>Property owners see their price only. Your assignment fee stays yours.</li>
             <li>One pipeline, one deal record: Find → Qualify → Contract → Market → Show → Close → Track.</li>
           </ul>
         </div>
@@ -172,6 +384,10 @@ export default function Home() {
       </section>
 
       {!userId && <Landing onPickRole={pickRole} userId={userId} onOpenJvRoom={() => setView('jvboard')} />}
+      {/* Slice 132, Part 7 — marketplace landing sections (hero, real
+          stats, how-it-works, trust & safety, difference table, FAQ).
+          The existing landing content above is kept as-is. */}
+      {!userId && <MarketplaceLanding />}
       <div id="signin" style={{ marginTop: 16 }}>
         <AuthPanel key={authKey} onUser={(id, email) => { setUserId(id); setUserEmail(email); }} />
       </div>
@@ -198,6 +414,22 @@ export default function Home() {
             <GlobalSearch userId={userId} onNavigate={setView} onDraftContract={openContractDraft} />
             {view === 'dashboard' && (
               <>
+                {/* Slice 132, Part 6 — dashboard refresh: a header band
+                    + the Marketplace quick links and the real-data
+                    stats strip. Everything below is unchanged: every
+                    existing view, role gate, and data flow still runs
+                    in the same order. */}
+                <section style={{ background: 'linear-gradient(135deg, #064e3b 0%, #0b2e26 55%, #0b1220 100%)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: 14, padding: '18px 20px' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>Your dashboard</h2>
+                  <p style={{ fontSize: 13.5, color: '#cbd5e1', margin: 0, maxWidth: 720 }}>Your office at a glance — your portal below, your pipeline, and the marketplace in one place.</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                    <a href="/deals" style={{ background: '#059669', color: '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>🏠 Off-Market Deals</a>
+                    <a href="/buyers" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>💵 Cash Buyers</a>
+                    <button type="button" onClick={() => setView('cashbuyers')} style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>🤝 Buyer Networks</button>
+                    <a href="/managed-dispo" style={{ background: 'rgba(148,163,184,0.12)', color: '#fff', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 999, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>📣 Managed Dispo</a>
+                  </div>
+                </section>
+                <MarketplaceStatsStrip />
                 {/* Slice 129 — the subscription banner: trial countdown
                     + Activate Plan, or Pro Active + Manage Billing.
                     It hides itself when the table does not exist
@@ -240,7 +472,7 @@ export default function Home() {
                 {role === 'wholesaler' && userId && <SellerPageSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <StorefrontSettingsCard userId={userId} />}
                 {role === 'wholesaler' && userId && <SignKit userId={userId} />}
-                {role !== 'wholesaler' && <p style={{ fontSize: 14 }}>The seller page belongs to wholesaler accounts.</p>}
+                {role !== 'wholesaler' && <p style={{ fontSize: 14 }}>The property owner page belongs to wholesaler accounts.</p>}
               </>
             )}
             {view === 'titles' && (

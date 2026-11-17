@@ -16,6 +16,7 @@ import ConsentPassport from './ConsentPassport';
 import RollCheck from './RollCheck';
 import LeadOfferTracker from './LeadOfferTracker';
 import GoogleSkipTraceModal from './GoogleSkipTraceModal';
+import PublishDealButton from './PublishDealButton';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -281,6 +282,9 @@ export default function Leads({ userId, userEmail, onLeads, onDraftContract }: {
             )}{' '}
             {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
               <button onClick={() => startEdit(l)}>Edit</button>
+            )}{' '}
+            {userId && mode === 'synced' && l.id && !l.id.startsWith('local-') && (
+              <PublishDealButton lead={l} userId={userId} />
             )}{' '}
             {onDraftContract && (
               <button onClick={() => onDraftContract({

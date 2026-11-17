@@ -48,6 +48,17 @@ import ScoutPortal, { ScoutClaimBoard, MyClaimedLeads } from './ScoutPortal';
 import BuyerProofCard from './BuyerProofCard';
 import LenderDashboard from './LenderDashboard';
 import { loadMySchoolBadge } from '../lib/school';
+import { loadMyBuyBox, type BuyBox as Slice131BuyBox } from '../lib/buy-box';
+// Slice 132 — Matching deals. lib/match-buy-box.ts is built by
+// another Slice 132 worker; import its exact contract here, do
+// not redefine it. The file lands before the build runs.
+// The deal-row type is derived from findMatchingDeals itself
+// (DealSummary in the original contract; the matching worker
+// calls the row type DealForMatching) so the name difference
+// cannot break this file — only the function and the
+// BuyBoxForMatching input shape are imported by name.
+import { findMatchingDeals, type BuyBoxForMatching } from '../lib/match-buy-box';
+type MatchingDealRow = Awaited<ReturnType<typeof findMatchingDeals>>[number];
 
 // Full Portals home (Slices 9-10). One signed-in home, routed by
 // profiles.role: wholesaler command dashboard + offers inbox + buyer
@@ -55,8 +66,8 @@ import { loadMySchoolBadge } from '../lib/school';
 // company files. Every list is real data under RLS with honest empty
 // states — nothing is simulated.
 
-const card: React.CSSProperties = { background: '#1e293b', padding: 16, borderRadius: 12, marginTop: 16 };
-const stat: React.CSSProperties = { background: '#0f172a', padding: 12, borderRadius: 10, minWidth: 130, flex: '1 1 130px' };
+const card: React.CSSProperties = { background: '#1e293b', border: '1px solid rgba(148,163,184,0.25)', padding: 20, borderRadius: 14, marginTop: 16 };
+const stat: React.CSSProperties = { background: '#0f172a', border: '1px solid rgba(148,163,184,0.2)', padding: 12, borderRadius: 10, minWidth: 130, flex: '1 1 130px' };
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const splitList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 const offerAddress = (o: OfferRow) => o.listing?.deals?.documents?.property_address || 'Property';
@@ -66,6 +77,15 @@ const offerAddress = (o: OfferRow) => o.listing?.deals?.documents?.property_addr
 // icon, the desk's name, and one line stating what the desk
 // actually does — each line checked against the portal below it.
 // Same shell, same frame, each role's own tools inside.
+// Slice 132 — display labels only. The stored role value stays
+// 'seller' (lib/portals.ts ROLE_LABELS, the role checks, the URL
+// slugs, and every variable name are untouched); only the words
+// a person reads say "Property owner" instead of "Seller".
+const DISPLAY_ROLE_LABELS: Record<PortalRole, string> = {
+  ...ROLE_LABELS,
+  seller: 'Property owner',
+};
+
 const ROLE_BAND: Record<string, { icon: string; line: string }> = {
   wholesaler: { icon: '🏢', line: 'Your portal summary — pipeline, fees in play, offers received. The full office is in the sidebar; everything here is counted from your own records.' },
   buyer: { icon: '💵', line: 'Publish your buy box so deals can be matched to you, work the offers you make and receive — and your proof card above counts your real record from platform events, never from claims.' },
@@ -97,7 +117,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
       ) : (
         <>
           <p style={{ fontSize: 13 }}>
-            You are registered as: <strong>{ROLE_LABELS[role]}</strong>{' '}
+            You are registered as: <strong>{DISPLAY_ROLE_LABELS[role]}</strong>{' '}
             <label style={{ marginLeft: 12 }}>
               Switch role:{' '}
               <select
@@ -114,7 +134,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
                 }}
               >
                 {PORTAL_ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  <option key={r} value={r}>{DISPLAY_ROLE_LABELS[r]}</option>
                 ))}
               </select>
             </label>
@@ -125,7 +145,7 @@ export default function PortalHome({ userId }: { userId: string | null }) {
           {note && <p style={{ fontSize: 13 }}>{note}</p>}
           {ROLE_BAND[role] && (
             <div style={{ background: '#0f172a', border: '1px solid rgba(110,231,183,0.35)', borderRadius: 10, padding: '12px 14px', margin: '10px 0' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{ROLE_BAND[role].icon} Your {ROLE_LABELS[role]} desk</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{ROLE_BAND[role].icon} Your {DISPLAY_ROLE_LABELS[role]} desk</div>
               <p style={{ fontSize: 13, color: '#cbd5e1', margin: '4px 0 0' }}>{ROLE_BAND[role].line}</p>
             </div>
           )}
@@ -408,6 +428,96 @@ function BuyerSignatures({ userId }: { userId: string }) {
   );
 }
 
+// Slice 132 — Matching deals for the signed-in buyer.
+//
+// Loads the buyer's own saved buy box (lib/buy-box.ts) and passes
+// the FULL box through to findMatchingDeals() from
+// lib/match-buy-box.ts — including zip_codes, rehab_tolerance,
+// and states, which another Slice 132 worker is adding to the box.
+// The casts below read those fields when they exist and fall back
+// to an empty list / null when they do not, so this compiles either
+// way; the coordinator reconciles the box type at the end.
+//
+// Behaviour, all honest: no saved buy box → "Save your buy box to
+// see matching deals." No matches → "No matching deals yet."
+// (count in the heading is the real row count, 0 until real).
+// If the matching function or its table is unavailable, the whole
+// section hides itself — it never throws into the dashboard and
+// never shows a fake number. No email/SMS alerts anywhere: no
+// provider is connected, so buyers check back here for new matches.
+function MatchingDeals({ userId }: { userId: string }) {
+  const [box, setBox] = useState<Slice131BuyBox | null | undefined>(undefined);
+  const [deals, setDeals] = useState<MatchingDealRow[] | null>(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    void (async () => {
+      try {
+        const b = await loadMyBuyBox(userId);
+        if (!on) return;
+        if (!b) { setBox(null); return; }
+        setBox(b);
+        const boxForMatching: BuyBoxForMatching = {
+          user_id: b.user_id ?? userId,
+          markets: b.markets || [],
+          // Slice 132 follow-up: BuyBoxForMatching gains `states`
+          // (U.S. state codes, empty by default). Read the box's
+          // real states when the field exists; empty until then.
+          states: (b as unknown as { states?: string[] }).states ?? [],
+          zip_codes: (b as unknown as { zip_codes?: string[] }).zip_codes ?? [],
+          property_types: b.property_types || [],
+          min_price: b.min_price ?? null,
+          max_price: b.max_price ?? null,
+          rehab_tolerance: (b as unknown as { rehab_tolerance?: string | null }).rehab_tolerance ?? null,
+        };
+        const matches = await findMatchingDeals(boxForMatching);
+        if (on) setDeals(matches || []);
+      } catch {
+        // Matching unavailable (function/table not there yet) —
+        // hide the section instead of breaking the dashboard.
+        if (on) setHidden(true);
+      }
+    })();
+    return () => { on = false; };
+  }, [userId]);
+
+  if (hidden) return null;
+  if (box === undefined) return null;
+  if (box === null) {
+    return (
+      <div>
+        <h4>Matching deals</h4>
+        <p style={{ fontSize: 13 }}>Save your buy box to see matching deals.</p>
+      </div>
+    );
+  }
+  if (deals === null) return null;
+  return (
+    <div>
+      <h4>Matching deals ({deals.length})</h4>
+      {deals.length === 0 ? (
+        <p style={{ fontSize: 13 }}>No matching deals yet.</p>
+      ) : (
+        <ul style={{ fontSize: 13 }}>
+          {deals.map((d) => (
+            <li key={d.id} style={{ marginBottom: 6 }}>
+              <a href={`/deals/${d.id}`}>{[d.city, d.state].filter(Boolean).join(', ') || 'Property'}</a>
+              {d.property_type ? ` · ${d.property_type}` : ''}
+              {d.asking_price != null ? ` · asking ${money(Number(d.asking_price))}` : ''}
+              {d.zip ? ` · ${d.zip}` : ''}
+              {d.condition ? ` · ${d.condition}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p style={{ fontSize: 12, color: '#94a3b8' }}>
+        Matched from your saved buy box against published deals. No alerts are sent — check back here for new matches.
+      </p>
+    </div>
+  );
+}
+
 function BuyerPortal({ userId }: { userId: string }) {
   const [boxes, setBoxes] = useState<BuyBox[]>([]);
   const [feed, setFeed] = useState<FeedListing[]>([]);
@@ -477,6 +587,7 @@ function BuyerPortal({ userId }: { userId: string }) {
           })}
         </ul>
       )}
+      <MatchingDeals userId={userId} />
       <h4>Deal feed — active public listings</h4>
       {feed.length === 0 ? (
         <p style={{ fontSize: 13 }}>No active public listings yet. When a wholesaler activates a listing, it appears here.</p>
@@ -594,7 +705,7 @@ function SellerPortal({ userId }: { userId: string }) {
   useEffect(refresh, [userId]);
   return (
     <div>
-      <h3>Seller Portal</h3>
+      <h3>Property Owner Portal</h3>
       <p style={{ fontSize: 13 }}>
         Link a contract your wholesaler sent you: paste the deal ID they gave you.{' '}
         <input placeholder="Deal ID" value={claimId} onChange={(e) => setClaimId(e.target.value)} style={{ width: 280 }} />{' '}

@@ -1,4 +1,4 @@
-// Slice 129 — pre-flight verification script.
+// Slice 132 — pre-flight verification script.
 //
 // What it checks, honestly:
 //   (1) The REAL files this repo actually has (the files Slices
@@ -51,6 +51,19 @@ const EXPECTED_FILES = [
   'app/sell/[slug]/page.tsx',
   'app/track/[token]/page.tsx',
   'app/school/page.tsx',
+  'app/deals/page.tsx',
+  'app/deals/[id]/page.tsx',
+  'app/buyers/page.tsx',
+  'app/join/page.tsx',
+  'app/managed-dispo/page.tsx',
+  'app/vip/page.tsx',
+  'app/api/demographics/route.ts',
+  'app/api/fmr/route.ts',
+  'app/api/flood-zone/route.ts',
+  'app/api/boundary/route.ts',
+  'app/api/parcel-boundary/route.ts',
+  'app/api/broward-record/route.ts',
+  'app/api/corporate-buyers/route.ts',
   // Components — desks, modals, calculators, admin.
   'components/ProbateLeads.tsx',
   'components/ProbateOutreachModal.tsx',
@@ -66,12 +79,27 @@ const EXPECTED_FILES = [
   'components/OperatorStats.tsx',
   'components/ReportProblemModal.tsx',
   'components/BuyerNetworks.tsx',
+  'components/PublishDealButton.tsx',
+  'components/PropertyMap.tsx',
+  'components/ManagedDispoRequests.tsx',
   // Libraries.
   'lib/floridaCountyPresets.ts',
   'lib/probate-import.ts',
   'lib/probate-leads-api.ts',
   'lib/problem-reports.ts',
   'lib/buy-box.ts',
+  'lib/match-buy-box.ts',
+  'lib/buyer-profile.ts',
+  'lib/published-deals.ts',
+  'lib/managed-dispo.ts',
+  'lib/marketplace-stats.ts',
+  'lib/demographics.ts',
+  'lib/fmr.ts',
+  'lib/flood-zone.ts',
+  'lib/boundary.ts',
+  'lib/parcel-geometry.ts',
+  'lib/broward-record.ts',
+  'lib/corporate-buyers.ts',
   'lib/spreadsheet.ts',
   'lib/contracts.ts',
   'lib/storefront.ts',
@@ -81,12 +109,16 @@ const EXPECTED_FILES = [
   'supabase/functions/skip-trace-decision-maker/index.ts',
   'supabase/functions/google-skip-trace/index.ts',
   'supabase/functions/stripe-billing/index.ts',
+  'supabase/functions/match-and-email/index.ts',
   'supabase/migrations/20261115150000_probate_leads.sql',
   'supabase/migrations/20261115160000_cash_buyers.sql',
   'supabase/migrations/20261115170000_saas_subscriptions.sql',
   'supabase/migrations/20261115180000_leads_owner_contact.sql',
   'supabase/migrations/20261117090000_slice130_operator_visibility.sql',
   'supabase/migrations/20261117124100_buyer_networks_buy_box.sql',
+  'supabase/migrations/20261117130000_slice132_marketplace_tables.sql',
+  'supabase/migrations/20261117131000_slice132_buy_box_published.sql',
+  'supabase/migrations/20261117133000_slice132_buyer_contact_profiles.sql',
 ];
 
 // --- (2) Real tables --------------------------------------------------------
@@ -109,6 +141,9 @@ const EXPECTED_TABLES = [
   'seller_advance_requests',
   'problem_reports',
   'wholesaler_buy_boxes',
+  'published_deals',
+  'deal_responses',
+  'managed_dispo_requests',
 ];
 
 // --- (3) Edge Functions (files only, NOT deployed yet) ---------------------
@@ -116,6 +151,7 @@ const EXPECTED_FUNCTIONS = [
   'skip-trace-decision-maker',
   'google-skip-trace',
   'stripe-billing',
+  'match-and-email',
 ];
 
 let failures = 0;

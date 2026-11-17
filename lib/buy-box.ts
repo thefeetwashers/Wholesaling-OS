@@ -20,12 +20,30 @@ export interface BuyBox {
   min_price: number | null;
   max_price: number | null;
   notes: string;
+  // Slice 132 — publish this buy box to the public Cash Buyers
+  // directory (/buyers). False by default: a buy box is private
+  // until its owner turns publishing on.
+  published: boolean;
+  // Slice 132 follow-up (1) — automated matching. Target ZIP codes
+  // (empty = no ZIP constraint) and rehab tolerance ('any' /
+  // 'light' / 'moderate' / 'heavy'; null/empty = no preference).
+  zip_codes: string[];
+  rehab_tolerance: string | null;
+  // Slice 132 follow-up (D) — U.S. state codes (empty = no state
+  // constraint), so nationwide matching works later. Florida
+  // remains the only state with live parcel data today; other
+  // states join only after their real service URL is verified live.
+  states: string[];
+  // Slice 132 follow-up (5) — email-alert opt-in for the
+  // match-and-email Edge Function. False by default: the function
+  // only emails published buy boxes with this flag true.
+  email_alerts_opt_in: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
 const BUY_BOX_SELECT =
-  'id, user_id, markets, property_types, min_price, max_price, notes, created_at, updated_at';
+  'id, user_id, markets, property_types, min_price, max_price, notes, published, zip_codes, rehab_tolerance, states, email_alerts_opt_in, created_at, updated_at';
 
 export async function loadMyBuyBox(userId: string): Promise<BuyBox | null> {
   if (!supabaseConfigured || !supabase) return null;
@@ -60,6 +78,13 @@ export async function saveMyBuyBox(
         min_price: box.min_price ?? null,
         max_price: box.max_price ?? null,
         notes: box.notes?.trim() || '',
+        published: box.published ?? false,
+        zip_codes: (box.zip_codes || []).map((z) => z.trim()).filter(Boolean),
+        rehab_tolerance: ['any', 'light', 'moderate', 'heavy'].includes((box.rehab_tolerance || '').trim().toLowerCase())
+          ? (box.rehab_tolerance as string).trim().toLowerCase()
+          : null,
+        states: (box.states || []).map((s) => s.trim().toUpperCase()).filter(Boolean),
+        email_alerts_opt_in: box.email_alerts_opt_in === true,
       },
       { onConflict: 'user_id' },
     )

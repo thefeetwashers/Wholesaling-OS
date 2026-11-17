@@ -51,7 +51,7 @@ export const FAQS: { q: string; a: string }[] = [
 const ROLES: { key: string; icon: string; title: string; body: string; cta: string }[] = [
   { key: 'wholesaler', icon: '🏘️', title: 'Wholesaler', body: 'The full office: leads, call desk, analyzers, contracts, buyers, title, money. 90 days free, then $150/mo.', cta: 'Start my 90 days free' },
   { key: 'buyer', icon: '💵', title: 'Cash Buyer', body: 'Free forever. Publish your buy box, see deals that match it, build a closing record that speaks for itself.', cta: 'Register as a buyer — free' },
-  { key: 'seller', icon: '🏡', title: 'Seller', body: 'Free. Follow your deal, see your price, sign in your own portal when your wholesaler sends you a deal.', cta: 'Register as a seller — free' },
+  { key: 'seller', icon: '🏡', title: 'Property owner', body: 'Free. Follow your deal, see your price, sign in your own portal when your wholesaler sends you a deal.', cta: 'Register as a property owner — free' },
   { key: 'title', icon: '🏛️', title: 'Title Company', body: 'Free. Receive files, track milestones, and be findable by the wholesalers closing with you.', cta: 'Register as title — free' },
   { key: 'referrer', icon: '🤝', title: 'Referrer', body: 'Free. Spot a vacant or distressed property? Snap a photo from your phone, track it live, and earn $1,000 at the title company closing table.', cta: 'Register as a referrer — free' },
   { key: 'lender', icon: '🏦', title: 'Capital & Lending Partner', body: 'Free. Publish your lending criteria, review opt-in commercial deal packets, and fund verified real estate investors and double closings.', cta: 'Register as a lender — free' },
