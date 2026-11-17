@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
+// Slice 140 — FOUNDER EXEMPTION: public.saas_subscriptions
+// is_founder_exempt (boolean, NOT NULL DEFAULT false; migration
+// 20261117190000) marks the founder's own account, which does NOT
+// pay the $150/mo fee and must never be charged or status-changed
+// by Stripe. When the resolved subscription row is exempt, this
+// route skips ALL writes to that row in EVERY branch — no
+// saas_subscriptions patch of any kind and no
+// profiles.subscription_status update — and logs the skip with
+// the subscription id. The flag column is the only test; no
+// operator email is hardcoded anywhere here. A future Stripe
+// webhook event therefore cannot undo the exemption. Non-exempt
+// rows behave exactly as before.
+//
 // Slice 136 — Stripe webhook, REWRITTEN to the live billing table.
 //
 // Writes ONLY public.saas_subscriptions (migration
@@ -135,6 +148,30 @@ export async function POST(req: Request) {
     return null;
   };
 
+  // Slice 140 — founder exemption check. The flag column is the
+  // only test; no operator email is hardcoded. On a read error the
+  // check fails CLOSED to exempt (skip the write, log it): a
+  // skipped write is recoverable — Stripe retries webhooks and the
+  // next event corrects a normal row — while a write landing on
+  // the founder's row is the exact harm the exemption exists to
+  // prevent.
+  const isExemptByUserId = async (userId: string): Promise<boolean> => {
+    const { data, error } = await supabase.from('saas_subscriptions').select('is_founder_exempt').eq('user_id', userId).maybeSingle();
+    if (error) {
+      console.error('[stripe-webhook] is_founder_exempt read by user_id failed — failing closed to exempt, write skipped:', error.message);
+      return true;
+    }
+    return data?.is_founder_exempt === true;
+  };
+  const isExemptByStripeSubscriptionId = async (stripeSubscriptionId: string): Promise<boolean> => {
+    const { data, error } = await supabase.from('saas_subscriptions').select('is_founder_exempt').eq('stripe_subscription_id', stripeSubscriptionId).maybeSingle();
+    if (error) {
+      console.error('[stripe-webhook] is_founder_exempt read by stripe_subscription_id failed — failing closed to exempt, write skipped:', error.message);
+      return true;
+    }
+    return data?.is_founder_exempt === true;
+  };
+
   // trial_ends_at is NOT NULL: only include it when Stripe reports
   // a trial end — never write null into it.
   const trialEndPatch = (sub: Stripe.Subscription): Pick<SaasPatch, 'trial_ends_at'> =>
@@ -155,6 +192,11 @@ export async function POST(req: Request) {
       }
       if (!userId) {
         console.warn('[stripe-webhook] checkout.session.completed with no client_reference_id and no matching profile — skipped, no user row invented.', { sessionId: session.id ?? null });
+      } else if (await isExemptByUserId(userId)) {
+        // Slice 140 — founder-exempt row: skip BOTH the profiles
+        // update and the saas_subscriptions patch. Nothing is
+        // written for this subscription.
+        console.warn('[stripe-webhook] checkout.session.completed for a founder-exempt subscription — skipped, no profiles or saas_subscriptions write.', { sessionId: session.id ?? null, subscriptionId: typeof session.subscription === 'string' ? session.subscription : null, userId });
       } else {
         if (customerId) {
           await supabase.from('profiles').update({ subscription_status: 'trialing', stripe_customer_id: customerId }).eq('id', userId);
@@ -177,23 +219,37 @@ export async function POST(req: Request) {
       if (typeof sub.customer === 'string') patch.stripe_customer_id = sub.customer;
       if (mapped) patch.plan_status = mapped;
       const userId = await resolveUserId(sub);
+      // Slice 140 — founder-exempt row: skip BOTH the
+      // saas_subscriptions patch and the profiles update.
+      const exempt = userId ? await isExemptByUserId(userId) : false;
       if (userId) {
-        await updateByUserId(userId, patch);
+        if (exempt) {
+          console.warn('[stripe-webhook] subscription event for a founder-exempt subscription — skipped, no saas_subscriptions or profiles write.', { subscriptionId: sub.id, status: sub.status });
+        } else {
+          await updateByUserId(userId, patch);
+        }
       } else {
         console.warn('[stripe-webhook] subscription event with no resolvable user — skipped, no row invented.', { subscriptionId: sub.id, status: sub.status });
       }
-      if (typeof sub.customer === 'string') await setProfile(sub.customer, sub.status);
+      if (typeof sub.customer === 'string' && !exempt) await setProfile(sub.customer, sub.status);
     } else if (event.type === 'customer.subscription.deleted') {
       const sub = obj as unknown as Stripe.Subscription;
       const patch: SaasPatch = { stripe_subscription_id: sub.id, plan_status: 'canceled', ...trialEndPatch(sub) };
       if (typeof sub.customer === 'string') patch.stripe_customer_id = sub.customer;
       const userId = await resolveUserId(sub);
+      // Slice 140 — founder-exempt row: skip BOTH the
+      // saas_subscriptions patch and the profiles update.
+      const exempt = userId ? await isExemptByUserId(userId) : false;
       if (userId) {
-        await updateByUserId(userId, patch);
+        if (exempt) {
+          console.warn('[stripe-webhook] subscription.deleted for a founder-exempt subscription — skipped, no saas_subscriptions or profiles write.', { subscriptionId: sub.id });
+        } else {
+          await updateByUserId(userId, patch);
+        }
       } else {
         console.warn('[stripe-webhook] subscription.deleted with no resolvable user — skipped, no row invented.', { subscriptionId: sub.id });
       }
-      if (typeof sub.customer === 'string') await setProfile(sub.customer, 'canceled');
+      if (typeof sub.customer === 'string' && !exempt) await setProfile(sub.customer, 'canceled');
     } else if (event.type === 'invoice.payment_failed') {
       // A failed payment means past_due on the row that already
       // carries this subscription id. Update-only: no row, no write.
@@ -212,9 +268,14 @@ export async function POST(req: Request) {
             ? subDetails.subscription
             : null;
       if (subscriptionId) {
-        const written = await updateByStripeSubscriptionId(subscriptionId, { plan_status: 'past_due' });
-        if (!written) {
-          console.warn('[stripe-webhook] invoice.payment_failed with no matching saas_subscriptions row — skipped.', { subscriptionId });
+        // Slice 140 — founder-exempt row: skip the past_due write.
+        if (await isExemptByStripeSubscriptionId(subscriptionId)) {
+          console.warn('[stripe-webhook] invoice.payment_failed for a founder-exempt subscription — skipped, no past_due write.', { subscriptionId });
+        } else {
+          const written = await updateByStripeSubscriptionId(subscriptionId, { plan_status: 'past_due' });
+          if (!written) {
+            console.warn('[stripe-webhook] invoice.payment_failed with no matching saas_subscriptions row — skipped.', { subscriptionId });
+          }
         }
       }
     }

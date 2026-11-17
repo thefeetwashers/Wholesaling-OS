@@ -571,6 +571,52 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   exists. The post-call notes are typed by the wholesaler after the
   call, nothing more.
 
+### Slice 140 — Founder billing exemption (the founder never pays)
+
+- **The decision (founder, Nov 17, 2026):** thefeetwashers@gmail.com
+  is the founder's own account — the founder does NOT pay the $150/mo
+  fee, never sees a trial-expired / pay prompt, and must never be
+  charged or status-changed by Stripe. The founder's
+  `saas_subscriptions` row currently reads `trialing` with
+  `trial_ends_at` Jan 27, 2027; after that date the banner would have
+  said "trial expired — then $150/mo". This slice neutralizes that.
+- **The flag:** `supabase/migrations/20261117190000_slice140_founder_billing_exemption.sql`
+  adds `is_founder_exempt boolean NOT NULL DEFAULT false` to
+  `public.saas_subscriptions` and sets it true on the founder's row
+  only (matched by the profiles email literal `is_operator()` uses —
+  the one place the email appears; it appears nowhere in app code).
+  The existing row-based policies from migration 20261115170000
+  already cover the new column, so no new policies, grants, or
+  tables. No new `plan_status` value. Apply after the Slice 140
+  deploy, after the Slice 139 migration, in timestamp order.
+- **What the founder sees:** `components/SubscriptionBanner.tsx`
+  reads the flag and renders a green "Founder account — no
+  subscription fee. You never pay the $150/mo." state with NO
+  "Activate Plan" button, NO trial countdown, NO "Manage Billing"
+  button, whatever `plan_status` or `trial_ends_at` says. Every other
+  wholesaler's banner is unchanged. `components/AdminSaaSDashboard.tsx`
+  shows a green "Founder — exempt" pill on the exempt row.
+- **What Stripe can never do to the founder:** `app/api/stripe/webhook/route.ts`
+  and `supabase/functions/stripe-billing/index.ts` both check the flag
+  (service-role client) before any write, in EVERY branch
+  (checkout.session.completed, subscription created/updated/deleted,
+  invoice.payment_failed) — an exempt row gets NO
+  `saas_subscriptions` write of any kind and NO
+  `profiles.subscription_status` write, and the skip is logged with
+  the subscription id. The Edge Function's `create_checkout` refuses
+  an exempt caller with 403 before any Stripe call, so no Stripe
+  customer or Checkout session is ever created for the founder. If
+  the flag cannot be read (a failed query), both files fail CLOSED
+  to exempt — the write is skipped and logged — because a skipped
+  write is recoverable (Stripe retries webhooks) while a write
+  landing on the founder's row is the exact harm the exemption
+  exists to prevent. Non-exempt rows behave exactly as before.
+- **Honest limits:** Stripe is NOT connected (no account, product,
+  or price ID), so no live Stripe event has ever tested the skip —
+  it is verified by code reading only until Stripe connects. The
+  exemption survives a future webhook event by design; it does not
+  depend on the banner.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -614,8 +660,10 @@ New in this push (Slices 130–135 — apply after the deploy, except where note
 | `20261117144000_slice133_deal_status.sql` | `published_deals.status` (Active/Under Contract/Sold, default Active) + owner SELECT policy for own rows + DB trigger rejecting offer INSERTs on non-Active deals |
 | `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
 | `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; apply after the Slice 136 deploy |
-| `20261117160000_slice137_provider_settings.sql` | Slice 137 (part A) — unified provider store `wholesaler_provider_settings` (AI columns only: `ai_provider`, `gemini_api_key`, `groq_api_key`, plain TEXT) + SECURITY DEFINER RPC `get_ai_key_status()` (masked keys only) + owner-only RLS + GRANTs to `authenticated` + `service_role` in the same file; NOT applied yet — apply after the Slice 137 deploy; skip-trace / email / SMS columns come with Slice 134, on this same table |
+| `20261117160000_slice137_provider_settings.sql` | Slice 137 (part A) — unified provider store `wholesaler_provider_settings` (AI columns only: `ai_provider`, `gemini_api_key`, `groq_api_key`, plain TEXT) + SECURITY DEFINER RPC `get_ai_key_status()` (masked keys only) + owner-only RLS + GRANTs to `authenticated` + `service_role` in the same file; Applied + verified Nov 17, 2026 (15:46–15:48 EST); skip-trace / email / SMS columns come with Slice 134, on this same table |
 | `20261117170000_slice138_rls_recursion_fix.sql` | Slice 138 — RLS infinite-recursion fix: SECURITY DEFINER helpers `requester_has_matching_iso_request(uuid, text[], text[])` + `lender_has_matching_box(uuid, text, text)` (boolean only, `set search_path = public`) + the three affected policies dropped and re-created to call them (matching semantics unchanged) + GRANT EXECUTE to `authenticated` in the same file; apply after the Slice 138 deploy |
+| `20261117180000_slice139_connect_ccp_url.sql` | Slice 139 — Amazon Connect softphone (BYOK): `wholesaler_provider_settings.connect_ccp_url` (text, nullable); no new policies/grants/tables; Applied + verified Nov 17, 2026 (16:14–16:16 EST) |
+| `20261117190000_slice140_founder_billing_exemption.sql` | Slice 140 — founder billing exemption: `saas_subscriptions.is_founder_exempt` (boolean, NOT NULL DEFAULT false) + UPDATE setting it true on the founder's row only (profiles email literal matching `is_operator()`); no new policies/grants/tables; apply after the Slice 140 deploy, after the Slice 139 migration, in timestamp order |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -662,7 +710,7 @@ would violate BYOK.
 
 - The per-wholesaler settings store is the `wholesaler_provider_settings`
   table created by Slice 137's migration
-  (`20261117160000_slice137_provider_settings.sql`, NOT yet applied —
+  (`20261117160000_slice137_provider_settings.sql`, applied Nov 17, 2026 —
   see §2). Its keys are plain TEXT columns, never claimed "encrypted".
   The skip-trace columns (`batchdata_api_key`, `google_api_key`,
   `google_cse_id`) are NOT in that migration — Slice 134 adds them to

@@ -24,6 +24,7 @@ interface SubRow {
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   monthly_rate: number | null;
+  is_founder_exempt: boolean;
 }
 
 export default function SubscriptionBanner({ userId }: { userId: string }) {
@@ -39,7 +40,7 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
         if (!supabase) return;
         const { data, error } = await supabase
           .from('saas_subscriptions')
-          .select('id, plan_status, trial_ends_at, stripe_customer_id, monthly_rate')
+          .select('id, plan_status, trial_ends_at, stripe_customer_id, monthly_rate, is_founder_exempt')
           .eq('user_id', userId)
           .maybeSingle();
         if (error) throw error;
@@ -103,12 +104,16 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
 
   const isTrial = row.plan_status === 'trialing';
   const isActive = row.plan_status === 'active';
+  // Slice 140 — founder billing exemption: an exempt row never
+  // sees a trial countdown, an "Activate Plan" button, or a
+  // "Manage Billing" button, whatever its plan_status says.
+  const isFounderExempt = row.is_founder_exempt === true;
 
   return (
     <div
       style={{
-        background: isActive ? '#ecfdf5' : isTrial ? '#eff6ff' : '#fffbeb',
-        border: `1px solid ${isActive ? '#a7f3d0' : isTrial ? '#bfdbfe' : '#fde68a'}`,
+        background: isFounderExempt ? '#ecfdf5' : isActive ? '#ecfdf5' : isTrial ? '#eff6ff' : '#fffbeb',
+        border: `1px solid ${isFounderExempt ? '#a7f3d0' : isActive ? '#a7f3d0' : isTrial ? '#bfdbfe' : '#fde68a'}`,
         borderRadius: 8,
         color: '#0f172a',
         padding: '12px 16px',
@@ -121,18 +126,21 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
       }}
     >
       <div style={{ fontSize: 13 }}>
-        {isTrial && (
+        {isFounderExempt && (
+          <span>Founder account — no subscription fee. You never pay the $150/mo.</span>
+        )}
+        {!isFounderExempt && isTrial && (
           <span>
             <strong>Free trial</strong> —{' '}
             {daysLeft == null ? 'trial end date not set' : daysLeft > 0 ? `${daysLeft} days left of your 90 days free` : 'trial expired'} — then $150/mo.
           </span>
         )}
-        {isActive && (
+        {!isFounderExempt && isActive && (
           <span>
             <strong>Pro Active ($150/mo)</strong> — your subscription is current.
           </span>
         )}
-        {!isTrial && !isActive && (
+        {!isFounderExempt && !isTrial && !isActive && (
           <span>
             <strong>Plan: {row.plan_status}</strong> — your subscription is not active.
           </span>
@@ -140,7 +148,7 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
         {message && <div style={{ marginTop: 6, color: '#92400e' }}>{message}</div>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        {isTrial && (
+        {!isFounderExempt && isTrial && (
           <button
             type="button"
             onClick={() => callBilling('create_checkout')}
@@ -150,7 +158,7 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
             {busy ? 'Opening…' : 'Activate Plan'}
           </button>
         )}
-        {isActive && (
+        {!isFounderExempt && isActive && (
           <button
             type="button"
             onClick={() => callBilling('customer_portal')}

@@ -1,3 +1,17 @@
+// Slice 140 — FOUNDER EXEMPTION: public.saas_subscriptions
+// is_founder_exempt (boolean, NOT NULL DEFAULT false; migration
+// 20261117190000) marks the founder's own account, which does NOT
+// pay the $150/mo fee and must never be charged or status-changed
+// by Stripe. (a) create_checkout refuses for an exempt caller —
+// no Stripe customer or Checkout session is ever created for the
+// founder. (b) The webhook branch skips plan_status writes for
+// exempt rows in every event branch and logs the skip with the
+// subscription id, so a future Stripe event cannot undo the
+// exemption. The flag column is the only test; no operator email
+// is hardcoded anywhere here. Non-exempt rows behave exactly as
+// before. This file is still NOT deployed and NOT live — see the
+// deployment note below.
+//
 // Slice 129 — stripe-billing Edge Function.
 //
 // What this function is: the server-side hop between a wholesaler's
@@ -118,6 +132,46 @@ function mapSubscriptionStatus(status: string): string | null {
   }
 }
 
+// Slice 140 — founder exemption checks. The is_founder_exempt
+// flag column is the only test; no operator email is hardcoded.
+// On a read error the check fails CLOSED to exempt (skip the
+// write, log it): a skipped write is recoverable — Stripe retries
+// webhooks and the next event corrects a normal row — while a
+// write landing on the founder's row is the exact harm the
+// exemption exists to prevent. `admin` is the service-role client
+// passed in by the caller.
+async function isExemptByUserId(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("saas_subscriptions")
+    .select("is_founder_exempt")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.log("[stripe-billing webhook] is_founder_exempt read by user_id failed — failing closed to exempt, write skipped:", error.message);
+    return true;
+  }
+  return (data as { is_founder_exempt?: unknown } | null)?.is_founder_exempt === true;
+}
+
+async function isExemptByStripeSubscriptionId(
+  admin: ReturnType<typeof createClient>,
+  stripeSubscriptionId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("saas_subscriptions")
+    .select("is_founder_exempt")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+  if (error) {
+    console.log("[stripe-billing webhook] is_founder_exempt read by stripe_subscription_id failed — failing closed to exempt, write skipped:", error.message);
+    return true;
+  }
+  return (data as { is_founder_exempt?: unknown } | null)?.is_founder_exempt === true;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -195,6 +249,17 @@ serve(async (req: Request) => {
             );
             return json({ success: true, received: true, skipped: "no_supabase_user_id" });
           }
+          // Slice 140 — founder-exempt row: skip the patch (and
+          // the Stripe retrieve it would need) and log the skip
+          // with the subscription id. No write happens for this
+          // subscription.
+          if (await isExemptByUserId(admin, sessionUserId)) {
+            console.log(
+              "[stripe-billing webhook] checkout.session.completed for a founder-exempt subscription — skipped, no saas_subscriptions write.",
+              { subscriptionId, customerId },
+            );
+            return json({ success: true, received: true, skipped: "founder_exempt" });
+          }
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
           const mappedStatus = mapSubscriptionStatus(sub.status);
           const patch: Record<string, unknown> = {
@@ -239,6 +304,16 @@ serve(async (req: Request) => {
           );
           return json({ success: true, received: true, skipped: "no_supabase_user_id" });
         }
+        // Slice 140 — founder-exempt row: skip the patch and log
+        // the skip with the subscription id. No write happens for
+        // this subscription.
+        if (await isExemptByUserId(admin, metaUserId)) {
+          console.log(
+            "[stripe-billing webhook] subscription event for a founder-exempt subscription — skipped, no saas_subscriptions write.",
+            { subscriptionId: sub.id, status: sub.status },
+          );
+          return json({ success: true, received: true, skipped: "founder_exempt" });
+        }
         const mappedStatus = mapSubscriptionStatus(sub.status);
         const patch: Record<string, unknown> = {
           stripe_subscription_id: sub.id,
@@ -277,10 +352,19 @@ serve(async (req: Request) => {
               ? subDetails.subscription
               : null;
         if (subscriptionId) {
-          await admin
-            .from("saas_subscriptions")
-            .update({ plan_status: "past_due" })
-            .eq("stripe_subscription_id", subscriptionId);
+          // Slice 140 — founder-exempt row: skip the past_due
+          // write and log the skip with the subscription id.
+          if (await isExemptByStripeSubscriptionId(admin, subscriptionId)) {
+            console.log(
+              "[stripe-billing webhook] invoice.payment_failed for a founder-exempt subscription — skipped, no past_due write.",
+              { subscriptionId },
+            );
+          } else {
+            await admin
+              .from("saas_subscriptions")
+              .update({ plan_status: "past_due" })
+              .eq("stripe_subscription_id", subscriptionId);
+          }
         }
       }
       return json({ success: true, received: true });
@@ -306,7 +390,7 @@ serve(async (req: Request) => {
 
     const { data: subRow, error: subError } = await admin
       .from("saas_subscriptions")
-      .select("id, email, company_name, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id")
+      .select("id, email, company_name, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, is_founder_exempt")
       .eq("user_id", caller.id)
       .maybeSingle();
     if (subError) {
@@ -323,6 +407,7 @@ serve(async (req: Request) => {
       trial_ends_at: string | null;
       stripe_customer_id: string | null;
       stripe_subscription_id: string | null;
+      is_founder_exempt: boolean | null;
     };
 
     // Trial days left on the row (0 when expired) — the checkout
@@ -336,6 +421,19 @@ serve(async (req: Request) => {
     }
 
     if (action === "create_checkout") {
+      // Slice 140 — founder-exempt caller: refuse BEFORE any
+      // Stripe call. No Stripe customer and no Checkout session
+      // are ever created for the founder; the account does not
+      // pay the $150/mo fee.
+      if (row.is_founder_exempt === true) {
+        return json(
+          {
+            success: false,
+            error: "This account is exempt from billing — no payment is required and no checkout will be created.",
+          },
+          403,
+        );
+      }
       let customerId = row.stripe_customer_id;
       if (!customerId) {
         const customer = await stripe.customers.create({

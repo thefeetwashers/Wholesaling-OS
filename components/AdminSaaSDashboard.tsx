@@ -30,6 +30,7 @@ interface SaaSRow {
   monthly_rate: number | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  is_founder_exempt: boolean;
   created_at: string;
 }
 
@@ -203,6 +204,22 @@ export default function AdminSaaSDashboard() {
                       >
                         {row.plan_status}
                       </span>
+                      {row.is_founder_exempt === true && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: '#dcfce7',
+                            color: '#166534',
+                            marginLeft: 6,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Founder — exempt
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       {row.plan_status === 'trialing'
