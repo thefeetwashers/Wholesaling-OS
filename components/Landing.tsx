@@ -273,7 +273,7 @@ export function LandingFooter({ userId }: { userId?: string | null }) {
           have your own attorney review any loan documents before you sign them.
         </p>
       </section>
-      <p style={{ fontSize: 12, color: '#64748b', marginTop: 18 }}>
+      <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 18 }}>
         © {new Date().getFullYear()} The Feet Washers, Inc. Wholesaling laws differ by state — know yours before you contract.
       </p>
     </footer>

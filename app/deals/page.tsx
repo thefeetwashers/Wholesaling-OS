@@ -15,10 +15,24 @@
 // published yet." Sign-in links to the homepage sign-in section
 // (/#signin), the same way the landing page reaches it — auth is
 // not rebuilt here.
+//
+// Slice 133 — each card shows the deal status badge
+// (components/DealStatusBadge.tsx; missing status reads 'Active',
+// the column default). The signed-in OWNER of a deal also gets a
+// "Copy Deal & Open OBL" button on their own card only — it copies
+// the deal text and opens OpenBuyersList for hand cross-posting;
+// it never auto-posts and is hidden for everyone else. A public
+// buyer-invite CTA above the filters ("Get deals like this —
+// register your buy box", /join?role=buyer) invites buyers to
+// register THEMSELVES — the platform never registers buyers for
+// anyone, and no buyer is auto-added.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { supabase } from '../../lib/supabase';
 import { fetchPublishedDeals, DEAL_CONDITIONS, type PublishedDeal } from '../../lib/published-deals';
+import DealStatusBadge from '../../components/DealStatusBadge';
+import CopyDealToOblButton from '../../components/CopyDealToOblButton';
 
 const money = (n: number | null | undefined): string =>
   n == null ? 'not provided' : `$${Math.round(n).toLocaleString()}`;
@@ -50,6 +64,10 @@ export default function DealsPage() {
   const [strategy, setStrategy] = useState('');
   const [condition, setCondition] = useState('');
   const [search, setSearch] = useState('');
+  // Slice 133 — signed-in user id, so the "Copy Deal & Open OBL"
+  // button renders ONLY on the viewer's OWN deals. Signed-out
+  // visitors and other wholesalers never see it.
+  const [userId, setUserId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +92,11 @@ export default function DealsPage() {
 
   useEffect(() => {
     load();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        setUserId(data.session?.user?.id || null);
+      }).catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,11 +117,51 @@ export default function DealsPage() {
         <Link href="/managed-dispo">Managed disposition</Link>
       </p>
       <h1 style={{ fontSize: 28, margin: '8px 0 4px' }}>Off-Market Deals</h1>
-      <p style={{ fontSize: 14, color: '#475569', marginTop: 0 }}>
+      <p style={{ fontSize: 14, color: '#cbd5e1', marginTop: 0 }}>
         Deals published by wholesalers on WholesalingOS. Details are submitter-provided — asking prices, ARV, and repair estimates
         come from the wholesaler who published the deal. Confirm the property&apos;s condition and supporting estimates with the
         submitter before making a decision. Street addresses are hidden; locations show the ZIP area only.
       </p>
+
+      {/* Slice 133 (founder addition, Nov 17) — public buyer-invite
+          CTA. Buyers register THEMSELVES by tapping the link and
+          picking the Buyer role on /join; the platform never
+          registers buyers for anyone and no buyer is auto-added.
+          /join reads ?role=buyer from the URL query (Slice 133),
+          so the Buyer card is pre-selected on arrival. */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#0f766e',
+          borderRadius: 10,
+          padding: '12px 16px',
+          marginBottom: 16,
+        }}
+      >
+        <p style={{ fontSize: 14, color: '#fff', margin: 0 }}>
+          <strong>Want deals like these in your buy box?</strong> Register your buy box and matching deals show
+          up for you — you register yourself, in about a minute.
+        </p>
+        <Link
+          href="/join?role=buyer"
+          style={{
+            background: '#fff',
+            color: '#0f766e',
+            fontWeight: 700,
+            fontSize: 14,
+            padding: '9px 16px',
+            borderRadius: 8,
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Get deals like this — register your buy box
+        </Link>
+      </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
         <input
@@ -154,15 +217,15 @@ export default function DealsPage() {
         <button onClick={load} style={{ padding: '8px 14px', borderRadius: 6, border: 'none', background: '#0f766e', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
           Filter
         </button>
-        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>
+        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>
           Clear
         </button>
       </div>
 
-      {loading && <p style={{ fontSize: 14, color: '#64748b' }}>Loading deals…</p>}
-      {error && <p style={{ fontSize: 14, color: '#b91c1c' }}>{error}</p>}
+      {loading && <p style={{ fontSize: 14, color: '#cbd5e1' }}>Loading deals…</p>}
+      {error && <p style={{ fontSize: 14, color: '#fca5a5' }}>{error}</p>}
       {!loading && !error && deals.length === 0 && (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 32, textAlign: 'center' }}>
+        <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>No deals published yet.</div>
           <p style={{ fontSize: 14, color: '#64748b' }}>
             No wholesaler has published a deal yet. Wholesalers publish from their own lead rows in the dashboard —{' '}
@@ -171,23 +234,35 @@ export default function DealsPage() {
         </div>
       )}
       {!loading && !error && deals.length > 0 && (
-        <p style={{ fontSize: 13, color: '#64748b' }}>
+        <p style={{ fontSize: 13, color: '#cbd5e1' }}>
           {deals.length} {deals.length === 1 ? 'deal' : 'deals'} published.
         </p>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-        {deals.map((d) => (
-          <Link
-            key={d.id}
-            href={`/deals/${d.id}`}
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            <article style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, height: '100%', boxSizing: 'border-box' }}>
+      {/* Slice 133 — min(300px, 100%): at phone width the card
+          column can shrink to the viewport instead of forcing a
+          300px track inside the padded main, which scrolled
+          horizontally at 320px. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))', gap: 14 }}>
+        {deals.map((d) => {
+          // Slice 133 — the card is an <article> (not a <Link>) so
+          // the owner-only copy button inside it is valid markup
+          // and never navigates. The status comes from the row
+          // once lib/published-deals.ts DEAL_SELECT carries it
+          // (see the snippet in the Slice 133 report); until then
+          // the badge reads the column default, 'Active'.
+          const isOwner = !!userId && !!d.user_id && d.user_id === userId;
+          const status = (d as PublishedDeal & { status?: string | null }).status;
+          return (
+            <article
+              key={d.id}
+              style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, height: '100%', boxSizing: 'border-box' }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{money(d.asking_price)}</span>
-                <span style={{ fontSize: 12, color: '#64748b' }}>Asking price</span>
+                <DealStatusBadge status={status} />
               </div>
+              <Link href={`/deals/${d.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>
                 {typeIcon(d.property_type)} {d.city || 'City not given'}
                 {d.state ? `, ${d.state}` : ''} {d.zip || ''}
@@ -210,12 +285,18 @@ export default function DealsPage() {
               <p style={{ fontSize: 12, color: '#64748b', margin: '6px 0 0' }}>
                 Published {d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}
               </p>
+              </Link>
+              {isOwner && (
+                <div style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+                  <CopyDealToOblButton deal={d} />
+                </div>
+              )}
             </article>
-          </Link>
-        ))}
+          );
+        })}
       </div>
 
-      <p style={{ fontSize: 12.5, color: '#64748b', marginTop: 24 }}>
+      <p style={{ fontSize: 12.5, color: '#cbd5e1', marginTop: 24 }}>
         WholesalingOS is a connection platform, not a broker, lender, title company, or legal advisor. Have a property to submit?{' '}
         <Link href="/#signin">Sign in</Link> and publish it from your leads.
       </p>

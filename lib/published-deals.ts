@@ -58,6 +58,14 @@ export interface PublishedDeal {
   notes?: string | null;
   comps?: DealComp[];
   published?: boolean;
+  // Slice 133 — deal status, added by sibling migration
+  // 20261117144000: 'Active' | 'Under Contract' | 'Sold',
+  // NOT NULL DEFAULT 'Active'. A missing status (column not yet
+  // applied, or an older row) reads as Active — the deal page
+  // normalizes with `deal.status || 'Active'`. The status badge
+  // and changer are the sibling's; this file only carries the
+  // value so the offer form can respect it.
+  status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -71,6 +79,18 @@ export interface DealResponse {
   responder_contact_shared?: boolean;
   status?: string;
   created_at?: string;
+}
+
+// Slice 133 — one recorded asking-price value for a deal. The
+// initial row has old_price null (no earlier published price).
+// Rows are written by the deal owner only (see the migration
+// 20261117142000 policy "owner inserts own deal price history").
+export interface DealPriceHistoryEntry {
+  id?: string;
+  deal_id: string;
+  old_price: number | null;
+  new_price: number | null;
+  changed_at?: string;
 }
 
 export interface DealFilters {
@@ -154,17 +174,26 @@ function cleanDealInput(
 // state, ZIP, or county (no street address exists to match).
 export async function fetchPublishedDeals(filters: DealFilters = {}): Promise<PublishedDeal[]> {
   if (!supabaseConfigured || !supabase) return [];
-  let q = supabase
-    .from('published_deals')
-    .select(DEAL_SELECT)
-    .eq('published', true)
-    .order('created_at', { ascending: false });
-  if (filters.property_type) q = q.eq('property_type', filters.property_type);
-  if (filters.strategy) q = q.eq('strategy', filters.strategy);
-  if (filters.condition) q = q.eq('condition', filters.condition);
-  if (filters.min_price != null) q = q.gte('asking_price', filters.min_price);
-  if (filters.max_price != null) q = q.lte('asking_price', filters.max_price);
-  const { data, error } = await q;
+  // Slice 133 — the status column comes from sibling migration
+  // 20261117144000; select it when present, retry without it when
+  // the migration has not been applied yet (same defensive read
+  // as the by-id fetchers below). A missing status reads as
+  // Active on the deal page.
+  const run = async (withStatus: boolean) => {
+    let q = supabase
+      .from('published_deals')
+      .select(withStatus ? `${DEAL_SELECT}, status` : DEAL_SELECT)
+      .eq('published', true)
+      .order('created_at', { ascending: false });
+    if (filters.property_type) q = q.eq('property_type', filters.property_type);
+    if (filters.strategy) q = q.eq('strategy', filters.strategy);
+    if (filters.condition) q = q.eq('condition', filters.condition);
+    if (filters.min_price != null) q = q.gte('asking_price', filters.min_price);
+    if (filters.max_price != null) q = q.lte('asking_price', filters.max_price);
+    return q;
+  };
+  let { data, error } = await run(true);
+  if (error) ({ data, error } = await run(false));
   if (error) throw error;
   let rows = (data || []) as PublishedDeal[];
   const market = (filters.market || '').trim().toLowerCase();
@@ -185,12 +214,26 @@ export async function fetchPublishedDeals(filters: DealFilters = {}): Promise<Pu
 
 export async function fetchPublishedDealById(id: string): Promise<PublishedDeal | null> {
   if (!supabaseConfigured || !supabase) return null;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('published_deals')
-    .select(DEAL_SELECT)
+    .select(`${DEAL_SELECT}, status`)
     .eq('id', id)
     .eq('published', true)
     .single();
+  if (error) {
+    // Slice 133 — defensive read: the status column comes from
+    // sibling migration 20261117144000, which was NOT in the repo
+    // when this was written. If the column does not exist yet the
+    // select fails, so retry without it; a missing status reads as
+    // Active on the deal page. (A genuinely missing row fails the
+    // retry too and still returns null.)
+    ({ data, error } = await supabase
+      .from('published_deals')
+      .select(DEAL_SELECT)
+      .eq('id', id)
+      .eq('published', true)
+      .single());
+  }
   if (error || !data) return null;
   return data as PublishedDeal;
 }
@@ -200,11 +243,21 @@ export async function fetchPublishedDealById(id: string): Promise<PublishedDeal 
 // ownership — another wholesaler's unpublished row never returns.
 export async function fetchMyPublishedDealById(id: string): Promise<PublishedDeal | null> {
   if (!supabaseConfigured || !supabase) return null;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('published_deals')
-    .select(DEAL_SELECT)
+    .select(`${DEAL_SELECT}, status`)
     .eq('id', id)
     .single();
+  if (error) {
+    // Slice 133 — same defensive read as fetchPublishedDealById:
+    // retry without status when the sibling migration
+    // 20261117144000 has not been applied yet.
+    ({ data, error } = await supabase
+      .from('published_deals')
+      .select(DEAL_SELECT)
+      .eq('id', id)
+      .single());
+  }
   if (error || !data) return null;
   return data as PublishedDeal;
 }
@@ -212,6 +265,16 @@ export async function fetchMyPublishedDealById(id: string): Promise<PublishedDea
 // Explicit opt-in only: the wholesaler confirms the publish form.
 // The write selects its row back, so a refused save throws
 // instead of looking published.
+//
+// Slice 133 — the initial asking price is recorded in
+// public.deal_price_history (old_price null) right after the deal
+// row is created, so price drops can later be derived from real
+// recorded prices. The history write is best-effort and never
+// fails the publish: if it is refused (e.g. the Slice 133
+// migration has not been applied yet), the deal is still
+// published and the detail page honestly says price history was
+// not recorded. No price is ever invented here — a null asking
+// price records no row.
 export async function publishDeal(
   userId: string,
   deal: Omit<PublishedDeal, 'id' | 'user_id' | 'published' | 'created_at' | 'updated_at'>
@@ -223,7 +286,34 @@ export async function publishDeal(
     .select(DEAL_SELECT)
     .single();
   if (error) throw error;
-  return data as PublishedDeal;
+  const created = data as PublishedDeal;
+  if (typeof created.asking_price === 'number' && Number.isFinite(created.asking_price)) {
+    try {
+      await recordDealPriceHistory(created.id!, null, created.asking_price);
+    } catch {
+      // Best-effort only — see the header note above.
+    }
+  }
+  return created;
+}
+
+// Slice 133 — record one asking-price value for a deal the caller
+// owns. Used for the initial price at publish time (old_price
+// null); a future edit flow for a published deal's asking price
+// must call this with the previous price as old_price so drops
+// stay derived from real rows. Throws when the write is refused.
+export async function recordDealPriceHistory(
+  dealId: string,
+  oldPrice: number | null,
+  newPrice: number | null
+): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from('deal_price_history').insert({
+    deal_id: dealId,
+    old_price: typeof oldPrice === 'number' && Number.isFinite(oldPrice) ? oldPrice : null,
+    new_price: typeof newPrice === 'number' && Number.isFinite(newPrice) ? newPrice : null,
+  });
+  if (error) throw error;
 }
 
 // Owner-only unpublish (hides the deal from the public pages;

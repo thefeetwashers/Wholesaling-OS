@@ -15,6 +15,7 @@ const modalOverlay: React.CSSProperties = {
 };
 const modalBox: React.CSSProperties = {
   background: '#fff',
+  color: '#0f172a',
   borderRadius: 14,
   padding: 20,
   width: '100%',

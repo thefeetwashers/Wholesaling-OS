@@ -110,12 +110,12 @@ export default function ManagedDispoPage() {
         <Link href="/#signin">Sign in</Link>
       </p>
       <h1 style={{ fontSize: 28, margin: '8px 0 4px' }}>Managed Disposition — We Market Your Deal For You</h1>
-      <p style={{ fontSize: 15, color: '#334155' }}>
+      <p style={{ fontSize: 15, color: '#cbd5e1' }}>
         You found the deal and got it under contract. We take it from there: the operator markets your deal to the buyer network —
         the cash buyers and investors already on the platform — and works the responses, so you do not have to blast it out yourself
         or chase buyers one by one. You stay the wholesaler of record; we do the disposition work.
       </p>
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, fontSize: 14 }}>
+      <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, fontSize: 14 }}>
         <strong>How it works — honestly:</strong>
         <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
           <li style={{ marginBottom: 6 }}>You submit the deal below — address, city, asking price, ARV, and repair estimate if you have them.</li>
@@ -132,7 +132,7 @@ export default function ManagedDispoPage() {
           <Link href="/#signin">Sign in</Link> to submit a deal for managed disposition.
         </p>
       ) : (
-        <form onSubmit={submit} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16 }}>
+        <form onSubmit={submit} style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <label style={{ fontSize: 13, gridColumn: '1 / -1' }}>
               Property address
@@ -183,7 +183,7 @@ export default function ManagedDispoPage() {
           <h2 style={{ fontSize: 18, marginTop: 24 }}>My requests</h2>
           <ul style={{ fontSize: 14 }}>
             {mine.map((r) => (
-              <li key={r.id} style={{ marginBottom: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+              <li key={r.id} style={{ marginBottom: 10, background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
                 <strong>{r.property_address || 'Address not given'}</strong>
                 {r.city ? ` — ${r.city}, ${r.state || ''}` : ''} · {MANAGED_DISPO_STATUS_LABELS[r.status || 'requested']}
                 {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}

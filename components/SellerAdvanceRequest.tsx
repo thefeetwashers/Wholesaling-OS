@@ -74,7 +74,7 @@ export default function SellerAdvanceRequest({
   };
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', marginTop: 12 }}>
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', color: '#0f172a', marginTop: 12 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Request Seller Moving Advance (${ADVANCE_MIN.toLocaleString()}–${ADVANCE_MAX.toLocaleString()}, Escrow-Backed)</h3>
       <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
         Some sellers need moving money before closing day. This is a <strong>request for operator review only</strong> — no advance is

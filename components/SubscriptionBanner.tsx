@@ -110,6 +110,7 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
         background: isActive ? '#ecfdf5' : isTrial ? '#eff6ff' : '#fffbeb',
         border: `1px solid ${isActive ? '#a7f3d0' : isTrial ? '#bfdbfe' : '#fde68a'}`,
         borderRadius: 8,
+        color: '#0f172a',
         padding: '12px 16px',
         marginBottom: 16,
         display: 'flex',

@@ -24,9 +24,13 @@
 //   * pof_verified is the WHOLESALER's own attestation — the
 //     checkbox reads "I verified proof of funds", never platform
 //     verification.
-//   * County filter uses the full 67-county Florida list
-//     (lib/vendor-marketplace.ts), matched against each buyer's
-//     own target counties — not a 4-county list.
+//   * County filters are STATE-LINKED (Slice 133): pick a state
+//     and the county list follows it (real Census county data,
+//     lib/us-counties.ts) — no longer Florida-only. The deal
+//     county and each buyer's target counties both follow their
+//     state picker; "All markets" stays the default when nothing
+//     is picked. The add-buyer states picker only narrows the
+//     county list — the counties picked are what is saved.
 //   * The BCC mailto is a CONVENIENCE ONLY. The app never
 //     auto-sends email (no email service is wired). Copy to
 //     clipboard is the primary action; the mailto opens the user's
@@ -40,7 +44,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { loadMyStorefront, type StorefrontProfile } from '../lib/storefront';
-import { FLORIDA_COUNTIES } from '../lib/vendor-marketplace';
+import StateCountyFilter from './StateCountyFilter';
+import BuyerInviteLink from './BuyerInviteLink';
 import BuyerNetworks from './BuyerNetworks';
 
 export interface DealBlastPrefill {
@@ -91,6 +96,9 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [counties, setCounties] = useState<string[]>([]);
+  // Slice 133 — states picker that narrows the target-counties
+  // list only; it is NOT saved (the counties picked are saved).
+  const [targetStates, setTargetStates] = useState<string[]>([]);
   const [maxBudget, setMaxBudget] = useState('');
   const [minBeds, setMinBeds] = useState('');
   const [propTypes, setPropTypes] = useState<string[]>([]);
@@ -101,6 +109,8 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
   // Deal blast fields — empty by default, always.
   const [dealAddress, setDealAddress] = useState('');
   const [dealCounty, setDealCounty] = useState('');
+  // Slice 133 — the deal state drives the deal-county list.
+  const [dealState, setDealState] = useState('');
   const [wholesalePrice, setWholesalePrice] = useState('');
   const [arv, setArv] = useState('');
   const [repairs, setRepairs] = useState('');
@@ -190,7 +200,7 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
         .select('id');
       if (error) throw new Error(error.message || 'Could not save this buyer.');
       if (!data || data.length === 0) throw new Error('The buyer was not saved — nothing was written.');
-      setName(''); setCompany(''); setEmail(''); setPhone(''); setCounties([]);
+      setName(''); setCompany(''); setEmail(''); setPhone(''); setCounties([]); setTargetStates([]);
       setMaxBudget(''); setMinBeds(''); setPropTypes([]); setPof(false); setNotes('');
       setBanner('Buyer added.');
       await load();
@@ -241,6 +251,7 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
     lines.push('');
     if (dealAddress) lines.push(`Property: ${dealAddress}`);
     if (dealCounty) lines.push(`County: ${dealCounty}`);
+    if (dealState) lines.push(`State: ${dealState}`);
     if (specs) lines.push(`Details: ${specs}`);
     lines.push('');
     lines.push('Pricing:');
@@ -281,19 +292,19 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
   return (
     <div>
       <h2 style={{ fontSize: 20, margin: '0 0 4px' }}>💵 Cash Buyers — CRM &amp; Deal Blast</h2>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 16px' }}>
         Your cash buyers, and a deal blast built only from numbers you entered (or carried in from a
         real locked-up deal). The app never sends email itself — copy the blast, or open your own mail
         client with BCC. Large lists may exceed mailto limits — send big blasts from your email directly.
       </p>
       {!profile && (
-        <p style={{ fontSize: 13, color: '#b45309', margin: '0 0 12px' }}>
+        <p style={{ fontSize: 13, color: '#fcd34d', margin: '0 0 12px' }}>
           Fill in Storefront Settings to add your name, company, and number to the blast signature —
           this leaves them blank rather than using anyone else&apos;s details.
         </p>
       )}
-      {banner && <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>{banner}</div>}
-      {copied && <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>Blast copied to clipboard.</div>}
+      {banner && <div style={{ background: '#fef3c7', color: '#0f172a', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>{banner}</div>}
+      {copied && <div style={{ background: '#ecfdf5', color: '#0f172a', border: '1px solid #10b981', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>Blast copied to clipboard.</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
@@ -302,12 +313,18 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
           <label style={labelStyle}>Buying entity / LLC<input style={inputStyle} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Buying entity / LLC" /></label>
           <label style={labelStyle}>Email *<input style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="buyer@email.com" /></label>
           <label style={labelStyle}>Phone<input style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone (optional)" /></label>
-          <label style={labelStyle}>Target counties
-            <select multiple value={counties} onChange={(e) => setCounties(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
-              {FLORIDA_COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <span style={{ fontSize: 12, color: '#64748b' }}>Hold Ctrl/Cmd to pick several. Empty means any county.</span>
-          </label>
+          {/* Slice 133 — state-linked target counties: the county
+              list follows the picked state(s). The states picker
+              only narrows this list; the counties are what is saved. */}
+          <StateCountyFilter
+            states={targetStates}
+            onStatesChange={setTargetStates}
+            markets={counties}
+            onMarketsChange={setCounties}
+            marketLabel="Target counties"
+            inputStyle={inputStyle}
+            labelStyle={labelStyle}
+          />
           <label style={labelStyle}>Max budget<input style={inputStyle} value={maxBudget} onChange={(e) => setMaxBudget(e.target.value)} placeholder="Max budget (optional)" inputMode="decimal" /></label>
           <label style={labelStyle}>Min beds<input style={inputStyle} value={minBeds} onChange={(e) => setMinBeds(e.target.value)} placeholder="Min beds (optional)" inputMode="numeric" /></label>
           <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
@@ -331,12 +348,22 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
           <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>Deal blast — numbers you enter only</h3>
           <label style={labelStyle}>Property address<input style={inputStyle} value={dealAddress} onChange={(e) => setDealAddress(e.target.value)} placeholder="Deal property address" /></label>
-          <label style={labelStyle}>County
-            <select style={inputStyle} value={dealCounty} onChange={(e) => setDealCounty(e.target.value)}>
-              <option value="">Select a county…</option>
-              {FLORIDA_COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
+          {/* Slice 133 — state-linked deal county: pick the deal
+              state and the county list follows it. A prefilled
+              county from a real deal stays visible even before a
+              state is picked. */}
+          <StateCountyFilter
+            single
+            states={dealState ? [dealState] : []}
+            onStatesChange={(s) => setDealState(s[0] || '')}
+            markets={dealCounty ? [dealCounty] : []}
+            onMarketsChange={(m) => setDealCounty(m[0] || '')}
+            marketLabel="County"
+            stateLabel="Deal state"
+            marketEmptyLabel="No county filter"
+            inputStyle={inputStyle}
+            labelStyle={labelStyle}
+          />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <label style={labelStyle}>Wholesale price<input style={inputStyle} value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} placeholder="Wholesale price" inputMode="decimal" /></label>
             <label style={labelStyle}>ARV<input style={inputStyle} value={arv} onChange={(e) => setArv(e.target.value)} placeholder="ARV from comps" inputMode="decimal" /></label>
@@ -347,7 +374,7 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
             <label style={labelStyle}>Sq ft<input style={inputStyle} value={sqft} onChange={(e) => setSqft(e.target.value)} placeholder="Square feet" inputMode="numeric" /></label>
           </div>
           {spread != null && (
-            <p style={{ fontSize: 13, color: '#475569' }}>
+            <p style={{ fontSize: 13, color: '#cbd5e1' }}>
               Potential Gross Spread: ${spread.toLocaleString()} — estimated from your own figures
               (ARV − price − repairs). An estimate, never a guaranteed return.
             </p>
@@ -356,7 +383,7 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
             Matched buyers for this deal: <strong>{matched.length}</strong> of {buyers.length}
             {dealCounty ? ` (county: ${dealCounty})` : ' (pick a county to narrow the match)'}.
           </p>
-          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: 12 }}>{blastText}</pre>
+          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.6, background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 6, padding: 12 }}>{blastText}</pre>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" onClick={copyBlast} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer' }}>
               Copy blast (primary)
@@ -366,10 +393,10 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
                 Open in my email (BCC {matched.length})
               </a>
             ) : (
-              <span style={{ fontSize: 13, color: '#64748b', alignSelf: 'center' }}>No matched buyers yet — add buyers or widen the deal county.</span>
+              <span style={{ fontSize: 13, color: '#cbd5e1', alignSelf: 'center' }}>No matched buyers yet — add buyers or widen the deal county.</span>
             )}
           </div>
-          <p style={{ fontSize: 12, color: '#64748b' }}>
+          <p style={{ fontSize: 12, color: '#cbd5e1' }}>
             The mailto link is a convenience only — the app never sends email itself. Large lists may
             exceed mailto limits; send big blasts from your email directly.
           </p>
@@ -378,11 +405,11 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
 
       <h3 style={{ fontSize: 15, margin: '16px 0 8px' }}>Your cash buyers ({buyers.length})</h3>
       {loading ? (
-        <p style={{ fontSize: 14, color: '#64748b' }}>Loading cash buyers…</p>
+        <p style={{ fontSize: 14, color: '#cbd5e1' }}>Loading cash buyers…</p>
       ) : loadError ? (
-        <p style={{ fontSize: 14, color: '#b91c1c' }}>{loadError}</p>
+        <p style={{ fontSize: 14, color: '#fca5a5' }}>{loadError}</p>
       ) : buyers.length === 0 ? (
-        <p style={{ fontSize: 14, color: '#64748b' }}>No cash buyers yet — add your first buyer above. No buyers are seeded.</p>
+        <p style={{ fontSize: 14, color: '#cbd5e1' }}>No cash buyers yet — add your first buyer above. No buyers are seeded.</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {buyers.map((b) => (
@@ -394,14 +421,17 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
               {b.min_beds != null ? ` · Min ${b.min_beds} beds` : ''}
               {b.property_types.length > 0 ? ` · ${b.property_types.join(', ')}` : ''}
               {b.pof_verified ? ' · ✓ POF verified by me' : ' · POF not verified'}
-              {b.notes ? <div style={{ color: '#64748b', marginTop: 2 }}>{b.notes}</div> : ''}
-              <button type="button" onClick={() => deleteBuyer(b.id, b.name)} style={{ marginTop: 6, fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>
+              {b.notes ? <div style={{ color: '#cbd5e1', marginTop: 2 }}>{b.notes}</div> : ''}
+              <button type="button" onClick={() => deleteBuyer(b.id, b.name)} style={{ marginTop: 6, fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>
                 Delete
               </button>
             </li>
           ))}
         </ul>
       )}
+      {/* Slice 133 — one-click buyer invite link (the
+          wholesaler's own link; buyers register themselves). */}
+      <BuyerInviteLink userId={userId} publicSlug={profile?.public_slug ?? null} />
       {/* Slice 131 — Buyer Networks (OpenBuyersList links + my buy box). */}
       <BuyerNetworks userId={userId} />
     </div>

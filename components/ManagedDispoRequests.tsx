@@ -74,7 +74,7 @@ export default function ManagedDispoRequests({ operatorEmail }: { operatorEmail:
     }
   }
 
-  if (loading) return <p style={{ fontSize: 13, color: '#64748b' }}>Loading managed disposition requests…</p>;
+  if (loading) return <p style={{ fontSize: 13, color: '#cbd5e1' }}>Loading managed disposition requests…</p>;
   if (missing) {
     return (
       <p style={{ fontSize: 13 }}>
@@ -88,8 +88,8 @@ export default function ManagedDispoRequests({ operatorEmail }: { operatorEmail:
   return (
     <div>
       <h4 style={{ marginTop: 20 }}>Managed disposition requests ({open.length} open)</h4>
-      {msg && <p style={{ fontSize: 13, color: '#b91c1c' }}>{msg}</p>}
-      {error && <p style={{ fontSize: 13, color: '#b91c1c' }}>{error}</p>}
+      {msg && <p style={{ fontSize: 13, color: '#fca5a5' }}>{msg}</p>}
+      {error && <p style={{ fontSize: 13, color: '#fca5a5' }}>{error}</p>}
       {rows.length === 0 ? (
         <p style={{ fontSize: 13 }}>No managed disposition requests yet.</p>
       ) : (

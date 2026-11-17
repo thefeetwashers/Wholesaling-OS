@@ -17,6 +17,7 @@ import RollCheck from './RollCheck';
 import LeadOfferTracker from './LeadOfferTracker';
 import GoogleSkipTraceModal from './GoogleSkipTraceModal';
 import PublishDealButton from './PublishDealButton';
+import MyPublishedDeals from './MyPublishedDeals';
 
 const EMPTY: Lead = { property_address: '', status: 'new' };
 
@@ -174,6 +175,10 @@ export default function Leads({ userId, userEmail, onLeads, onDraftContract }: {
         Mode: {mode === 'synced' ? 'Synced to Supabase (your rows only, RLS)' : 'Local only — Supabase not configured or not signed in, so these leads live in this browser session only and will NOT sync yet.'}
         {' '}No leads are seeded. CSV export includes only leads you entered.
       </p>
+      {/* Slice 133 — the wholesaler's own published deals live
+          here, in the Leads view where deals are published from:
+          status badge + changer + Copy Deal & Open OBL per deal. */}
+      {userId && <MyPublishedDeals userId={userId} />}
       <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
         <input placeholder="Property address *" value={form.property_address} onChange={(e) => setForm({ ...form, property_address: e.target.value })} />
         <input placeholder="City" value={form.city || ''} onChange={(e) => setForm({ ...form, city: e.target.value })} />

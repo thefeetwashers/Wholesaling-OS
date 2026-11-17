@@ -168,7 +168,7 @@ export default function ProbateDirectMailPrintModal({ lead, decisionMaker, userI
           #printable-probate-letter { position: absolute; left: 0; top: 0; width: 100%; }
         }
       `}</style>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 760, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', color: '#0f172a', borderRadius: 12, padding: 20, maxWidth: 760, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>Print Letter — {lead.case_number}</h3>
         <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
           To: {fullName || decisionMaker.name} ({decisionMaker.role})

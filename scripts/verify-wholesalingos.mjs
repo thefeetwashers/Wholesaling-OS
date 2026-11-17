@@ -1,8 +1,8 @@
-// Slice 132 — pre-flight verification script.
+// Slice 133 — pre-flight verification script.
 //
 // What it checks, honestly:
 //   (1) The REAL files this repo actually has (the files Slices
-//       126–131 created + the existing key files). It does NOT
+//       126–133 created + the existing key files). It does NOT
 //       check for the paste-listed files that do not exist and must
 //       never be created (app/dashboard/page.tsx,
 //       components/WholesalingOSDashboard.tsx,
@@ -64,6 +64,7 @@ const EXPECTED_FILES = [
   'app/api/parcel-boundary/route.ts',
   'app/api/broward-record/route.ts',
   'app/api/corporate-buyers/route.ts',
+  'app/api/deal-view/route.ts',
   // Components — desks, modals, calculators, admin.
   'components/ProbateLeads.tsx',
   'components/ProbateOutreachModal.tsx',
@@ -82,6 +83,15 @@ const EXPECTED_FILES = [
   'components/PublishDealButton.tsx',
   'components/PropertyMap.tsx',
   'components/ManagedDispoRequests.tsx',
+  'components/BuyerInviteLink.tsx',
+  'components/BuyerPofStatus.tsx',
+  'components/CopyDealToOblButton.tsx',
+  'components/DealAttentionStats.tsx',
+  'components/DealStatusBadge.tsx',
+  'components/MyPublishedDeals.tsx',
+  'components/ProofOfFundsReview.tsx',
+  'components/ProofOfFundsUpload.tsx',
+  'components/StateCountyFilter.tsx',
   // Libraries.
   'lib/floridaCountyPresets.ts',
   'lib/probate-import.ts',
@@ -93,6 +103,13 @@ const EXPECTED_FILES = [
   'lib/published-deals.ts',
   'lib/managed-dispo.ts',
   'lib/marketplace-stats.ts',
+  'lib/deal-cross-post.ts',
+  'lib/deal-offers.ts',
+  'lib/deal-status.ts',
+  'lib/invite-link.ts',
+  'lib/proof-of-funds.ts',
+  'lib/saved-searches.ts',
+  'lib/us-counties.ts',
   'lib/demographics.ts',
   'lib/fmr.ts',
   'lib/flood-zone.ts',
@@ -119,6 +136,12 @@ const EXPECTED_FILES = [
   'supabase/migrations/20261117130000_slice132_marketplace_tables.sql',
   'supabase/migrations/20261117131000_slice132_buy_box_published.sql',
   'supabase/migrations/20261117133000_slice132_buyer_contact_profiles.sql',
+  'supabase/migrations/20261117140000_slice133_deal_offers.sql',
+  'supabase/migrations/20261117141000_slice133_proof_of_funds.sql',
+  'supabase/migrations/20261117142000_slice133_deal_stats.sql',
+  'supabase/migrations/20261117143000_slice133_saved_searches.sql',
+  'supabase/migrations/20261117144000_slice133_deal_status.sql',
+  'supabase/migrations/20261117145000_slice133_buy_box_criteria.sql',
 ];
 
 // --- (2) Real tables --------------------------------------------------------
@@ -144,6 +167,11 @@ const EXPECTED_TABLES = [
   'published_deals',
   'deal_responses',
   'managed_dispo_requests',
+  'deal_offers',
+  'buyer_pof_documents',
+  'deal_views',
+  'deal_price_history',
+  'buyer_saved_searches',
 ];
 
 // --- (3) Edge Functions (files only, NOT deployed yet) ---------------------

@@ -44,7 +44,7 @@ export default function SchoolPage() {
     <main style={{ maxWidth: 760, margin: '0 auto', padding: '32px 16px 64px' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(courseJsonLd) }} />
       <h1 style={{ margin: '0 0 6px', fontSize: 28 }}>WholesalingOS School — Free 7-Day Deal Launch Bootcamp</h1>
-      <p style={{ fontSize: 15, color: '#475569', margin: '0 0 20px' }}>
+      <p style={{ fontSize: 15, color: '#cbd5e1', margin: '0 0 20px' }}>
         Seven days, one deal at a time. Every lesson is drawn from what this platform already teaches — the lists, the scripts, the
         calculators, the escrow desk. Read them free, track your progress when you sign in, and pass the Day 7 check to earn the Verified
         Operator badge on your Wholesaler profile.

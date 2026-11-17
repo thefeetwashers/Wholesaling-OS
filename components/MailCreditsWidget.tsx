@@ -24,7 +24,7 @@ export default function MailCreditsWidget({ userId }: { userId: string }) {
   const lettersAffordable = balance != null ? Math.floor(balance / MAIL_PRICE_PER_LETTER) : 0;
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', marginTop: 12 }}>
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', color: '#0f172a', marginTop: 12 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Send via Direct Mail ($0.85/letter)</h3>
       {err ? (
         <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>

@@ -64,8 +64,8 @@ function Photos({ paths }: { paths: string[] }) {
     };
   }, [paths]);
   if (!paths || paths.length === 0) return null;
-  if (err) return <p style={{ fontSize: 13, color: '#b91c1c', margin: '6px 0' }}>Photos could not be loaded: {err}</p>;
-  if (!urls) return <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0' }}>Loading photos…</p>;
+  if (err) return <p style={{ fontSize: 13, color: '#fca5a5', margin: '6px 0' }}>Photos could not be loaded: {err}</p>;
+  if (!urls) return <p style={{ fontSize: 13, color: '#cbd5e1', margin: '6px 0' }}>Loading photos…</p>;
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
       {urls.map((u, i) => (
@@ -77,7 +77,7 @@ function Photos({ paths }: { paths: string[] }) {
 
 function Tracker({ status }: { status: ScoutLeadStatus }) {
   if (status === 'passed') {
-    return <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0' }}>Passed — the wholesaler passed on this property. No fee is owed for a passed lead.</p>;
+    return <p style={{ fontSize: 13, color: '#cbd5e1', margin: '6px 0' }}>Passed — the wholesaler passed on this property. No fee is owed for a passed lead.</p>;
   }
   const idx = STEP_INDEX[status];
   return (
@@ -165,7 +165,7 @@ function ScoutAgreementForm({
     </label>
   );
   return (
-    <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', borderRadius: 10, padding: 12, marginTop: 10 }}>
+    <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f172a', borderRadius: 10, padding: 12, marginTop: 10 }}>
       <h4 style={{ margin: '0 0 4px', fontSize: 15 }}>Generate Scout Finder&apos;s Fee Agreement</h4>
       <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
         Fill in the missing parties — the agreement is generated as a template with an attorney-review flag. Generating it is not signing it,
@@ -312,7 +312,7 @@ function ScoutSubmitForm({ userId, onSubmitted }: { userId: string; onSubmitted:
   return (
     <form onSubmit={submit} style={{ marginTop: 10 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Snap &amp; Submit Distressed Property</h3>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
         Snap a photo from your phone, track it live, and earn {fmt(SCOUT_PAYOUT)} at the title company closing table — only when the deal closes
         and funds. You never contact the owner, negotiate, or market the property: that is the wholesaler&apos;s job. Your role is information
         only.
@@ -349,21 +349,21 @@ function ScoutSubmitForm({ userId, onSubmitted }: { userId: string; onSubmitted:
             {t.label}
           </label>
         ))}
-        <p style={{ fontSize: 12, color: '#64748b', margin: '6px 0 0' }}>
+        <p style={{ fontSize: 12, color: '#cbd5e1', margin: '6px 0 0' }}>
           Only check what you actually saw, from public view. Do not enter the property or contact the owner.
         </p>
       </fieldset>
       <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>
         Photos (up to 6, 5 MB each, from public view)
         <input type="file" accept="image/*" multiple onChange={onFiles} style={{ display: 'block', marginTop: 4, fontSize: 13 }} />
-        {files.length > 0 && <span style={{ fontSize: 12, color: '#475569' }}>{files.length} photo(s) selected: {files.map((f) => f.name).join(', ')}</span>}
+        {files.length > 0 && <span style={{ fontSize: 12, color: '#cbd5e1' }}>{files.length} photo(s) selected: {files.map((f) => f.name).join(', ')}</span>}
       </label>
       <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>
         Notes (what you saw, in your own words)
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={inputStyle} />
       </label>
-      {err && <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>}
-      {msg && <p style={{ color: '#0f766e', fontSize: 13 }}>{msg}</p>}
+      {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
+      {msg && <p style={{ color: '#6ee7b7', fontSize: 13 }}>{msg}</p>}
       <button
         type="submit"
         disabled={busy}
@@ -371,7 +371,7 @@ function ScoutSubmitForm({ userId, onSubmitted }: { userId: string; onSubmitted:
       >
         {busy ? 'Submitting…' : 'Submit this property'}
       </button>
-      <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>
+      <p style={{ fontSize: 12, color: '#cbd5e1', margin: '8px 0 0' }}>
         No fee is owed for a submission alone. The {fmt(SCOUT_PAYOUT)} is paid only if an unclaimed, actionable lead results in a closed
         acquisition or assignment within 180 days — $0 if it does not close. See the Scout Finder&apos;s Fee Agreement for the full terms.
       </p>
@@ -400,10 +400,10 @@ function MyScoutLeads({ userId, myEmail, myCompany, refreshKey }: { userId: stri
       live = false;
     };
   }, [userId, refreshKey]);
-  if (err) return <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>;
+  if (err) return <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>;
   if (!leads.length) {
     return (
-      <p style={{ fontSize: 13, color: '#64748b', margin: '10px 0' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '10px 0' }}>
         You have not submitted any properties yet. When you do, their live status appears here — Submitted → Claimed → Under Contract → In Escrow
         → Closed &amp; {fmt(SCOUT_PAYOUT)} Paid.
       </p>
@@ -413,7 +413,7 @@ function MyScoutLeads({ userId, myEmail, myCompany, refreshKey }: { userId: stri
     <div style={{ marginTop: 10 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>My submitted properties</h3>
       {leads.map((l) => (
-        <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff' }}>
+        <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff', color: '#0f172a' }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>
             {l.property_address}
             {l.city ? `, ${l.city}` : ''}
@@ -487,18 +487,18 @@ export function ScoutClaimBoard({ userId, onClaimed }: { userId: string; onClaim
   return (
     <div>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Scout leads — unclaimed</h3>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
         Properties spotted by scouts, waiting for a wholesaler to claim them. Claiming moves the lead into your sealed office — the scout can
         still see it, nobody else can — and you own the owner outreach from there.
       </p>
-      {err && <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>}
+      {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
       {leads.length === 0 ? (
-        <p style={{ fontSize: 13, color: '#64748b' }}>
+        <p style={{ fontSize: 13, color: '#cbd5e1' }}>
           No unclaimed scout leads right now. When a scout submits one, it appears here.
         </p>
       ) : (
         leads.map((l) => (
-          <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff' }}>
+          <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff', color: '#0f172a' }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               {l.property_address}
               {l.city ? `, ${l.city}` : ''}
@@ -603,7 +603,7 @@ export function MyClaimedLeads({
 
   if (!leads.length) {
     return (
-      <p style={{ fontSize: 13, color: '#64748b', margin: '10px 0' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '10px 0' }}>
         You have not claimed any scout leads yet. Claim one from the board above and it appears here, with its status tracker and the
         finder&apos;s fee agreement.
       </p>
@@ -620,9 +620,9 @@ export function MyClaimedLeads({
   return (
     <div style={{ marginTop: 12 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>My claimed scout leads</h3>
-      {err && <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>}
+      {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
       {leads.map((l) => (
-        <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff' }}>
+        <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff', color: '#0f172a' }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>
             {l.property_address}
             {l.city ? `, ${l.city}` : ''}
@@ -669,7 +669,7 @@ export function MyClaimedLeads({
             {l.w9_received && l.w9_received_at ? ` (marked ${new Date(l.w9_received_at).toLocaleDateString()})` : ''}
           </label>
           {l.status === 'in_escrow' && !l.w9_received && (
-            <p style={{ fontSize: 12, color: '#b45309', margin: '6px 0 0' }}>
+            <p style={{ fontSize: 12, color: '#fcd34d', margin: '6px 0 0' }}>
               W-9 needed before payout — mark W-9 received first.
             </p>
           )}
@@ -725,7 +725,7 @@ export default function ScoutPortal({
   return (
     <div>
       <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>Scout &amp; Referrer Door</h2>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
         Free. Spot a vacant or distressed property? Snap a photo from your phone, track it live, and earn {fmt(SCOUT_PAYOUT)} at the title
         company closing table. Or, if you know a seller directly, refer them below — the same {fmt(SCOUT_PAYOUT)} on a closed deal.
       </p>
@@ -739,7 +739,7 @@ export default function ScoutPortal({
       )}
       <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Know a seller?</h3>
-        <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+        <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
           If you know the seller personally, refer them directly instead — the same {fmt(SCOUT_PAYOUT)} when the deal closes and funds.
         </p>
         <ReferrerPortal userId={userId} />

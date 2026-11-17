@@ -22,10 +22,28 @@
 // needed. Multi-role is never promised.
 // Stored role value 'seller' is untouched — only the display label
 // "Property owner" is used here.
+//
+// Slice 133 — the role also reads from the URL query
+// (?role=buyer), not only from localStorage, so a shared invite
+// link pre-selects Buyer. One canonical link: /join?role=buyer.
+// ?ref=<slug> (the inviter's public_slug) is stashed as
+// 'ws_invite_ref' for later attribution — nothing reads it yet,
+// and no attribution is claimed.
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+// Query ?role= value -> card key + stored role. 'agent' maps to
+// the stored 'referrer' role, same as the card. An unknown value
+// reads as no preselection — never a guessed role.
+const ROLE_FROM_QUERY: Record<string, { key: string; role: string }> = {
+  buyer: { key: 'buyer', role: 'buyer' },
+  wholesaler: { key: 'wholesaler', role: 'wholesaler' },
+  agent: { key: 'agent', role: 'referrer' },
+  referrer: { key: 'agent', role: 'referrer' },
+  seller: { key: 'seller', role: 'seller' },
+};
 
 type JoinCard = {
   key: string;
@@ -87,6 +105,23 @@ const CARDS: JoinCard[] = [
 
 export default function JoinPage() {
   const [going, setGoing] = useState('');
+  const [preselected, setPreselected] = useState('');
+  // Slice 133 — ?role=buyer (or another role) pre-selects its
+  // card; ?ref= is stashed for later attribution. Reading the
+  // query on mount (window.location) needs no Suspense boundary.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const hit = ROLE_FROM_QUERY[(q.get('role') || '').trim().toLowerCase()];
+      if (hit) {
+        setPreselected(hit.key);
+        localStorage.setItem('ws_pending_role', hit.role);
+      }
+      const ref = (q.get('ref') || '').trim();
+      if (ref) localStorage.setItem('ws_invite_ref', ref);
+    } catch { /* no storage / no query — cards still work */ }
+  }, []);
+
   function go(card: JoinCard) {
     setGoing(card.key);
     try {
@@ -111,12 +146,27 @@ export default function JoinPage() {
         <p style={{ fontSize: 13.5 }}>
           Already have an account? <a href="/#signin" style={{ color: '#7dd3fc' }}>Sign in</a>
         </p>
+        {preselected && (
+          <p style={{ fontSize: 13.5, background: '#064e3b', border: '1px solid #059669', borderRadius: 8, padding: '8px 12px' }}>
+            You were invited as a {CARDS.find((c) => c.key === preselected)?.title || 'buyer'} — that
+            role is pre-selected below. Tap its card to register; you register yourself, one tap
+            at a time.
+          </p>
+        )}
       </section>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 16 }}>
+      {/* Slice 133 — min(260px, 100%): the card column shrinks
+          to the viewport at phone width instead of forcing a
+          260px track that overflows below ~300px. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 12, marginTop: 16 }}>
         {CARDS.map((card) => (
-          <article key={card.key} style={{ background: '#16213a', border: '1px solid rgba(148,163,184,0.28)', borderRadius: 12, padding: '16px 18px' }}>
+          <article key={card.key} style={{ background: '#16213a', border: preselected === card.key ? '2px solid #059669' : '1px solid rgba(148,163,184,0.28)', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 22 }}>{card.icon}</div>
-            <h2 style={{ fontSize: 16.5, margin: '6px 0' }}>{card.title}</h2>
+            <h2 style={{ fontSize: 16.5, margin: '6px 0' }}>
+              {card.title}
+              {preselected === card.key && (
+                <span style={{ fontSize: 12, color: '#6ee7b7', marginLeft: 8 }}>Pre-selected for you</span>
+              )}
+            </h2>
             <p style={{ fontSize: 13.5, color: '#cbd5e1', lineHeight: 1.55, margin: '0 0 8px' }}>{card.body}</p>
             {card.note && <p style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.5, margin: '0 0 10px' }}>{card.note}</p>}
             <button

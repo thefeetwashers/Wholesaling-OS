@@ -76,6 +76,8 @@ import WebhookPanel from '../components/WebhookPanel';
 import ListingParser from '../components/ListingParser';
 import Sidebar from '../components/Sidebar';
 import { fetchMarketplaceCounts } from '../lib/marketplace-stats';
+import { fetchMyPublishedDealById } from '../lib/published-deals';
+import { CONTRACT_PREFILL_HANDOFF_KEY } from '../lib/deal-offers';
 import { getProfileAccess, hasAccess, type ProfileAccess } from '../lib/access';
 import { loadMyProfile } from '../lib/portals';
 
@@ -292,6 +294,56 @@ export default function Home() {
     setContractPrefill(prefill);
     setView('contracts');
   };
+  // Slice 133, item 5 — consume an accepted-offer assignment
+  // handoff left by the deal detail page (/deals/[id]) in
+  // localStorage. The deal page is a separate route from this
+  // dashboard, which has no cross-page prefill channel, so the
+  // handoff is the bridge — the same localStorage pattern the app
+  // already uses for ws_pending_role and ws_prefill_lead. The key
+  // is consumed (removed) on read so it opens once. Before opening
+  // anything, the signed-in user must still own the deal the
+  // handoff names — a tampered or stale value opens nothing. The
+  // generator itself still blocks printing until the wholesaler
+  // enters the assignment fee, seller name, and property address.
+  useEffect(() => {
+    if (!userId) return;
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(CONTRACT_PREFILL_HANDOFF_KEY);
+      if (!raw) return;
+      localStorage.removeItem(CONTRACT_PREFILL_HANDOFF_KEY);
+    } catch {
+      return;
+    }
+    try {
+      const h = JSON.parse(raw) as Record<string, unknown>;
+      const price = typeof h.purchasePrice === 'number' ? h.purchasePrice : null;
+      const dealId = typeof h.dealId === 'string' ? h.dealId : '';
+      const offerId = typeof h.offerId === 'string' ? h.offerId : '';
+      if (price == null || !Number.isFinite(price) || price <= 0 || !dealId || !offerId) return;
+      fetchMyPublishedDealById(dealId)
+        .then((deal) => {
+          if (!deal || deal.user_id !== userId) return;
+          const prefill: ContractPrefill = {
+            doc: h.doc === 'assignment' ? 'assignment' : undefined,
+            purchasePrice: price,
+            closingDate: typeof h.closingDate === 'string' ? h.closingDate : undefined,
+            assignmentEmdAmount: typeof h.assignmentEmdAmount === 'number' ? h.assignmentEmdAmount : null,
+            endBuyerName: typeof h.endBuyerName === 'string' ? h.endBuyerName : undefined,
+            endBuyerEntity: typeof h.endBuyerEntity === 'string' ? h.endBuyerEntity : undefined,
+            city: typeof h.city === 'string' ? h.city : undefined,
+            county: typeof h.county === 'string' ? h.county : undefined,
+          };
+          openContractDraft(prefill);
+        })
+        .catch(() => {});
+    } catch {
+      // A malformed handoff opens nothing.
+    }
+    // Runs when the signed-in user is known; openContractDraft is
+    // a stable local setter pair.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
   const [access, setAccess] = useState<ProfileAccess | null>(null);
   // Slice 130 — Report a Problem modal. The button lives at the
   // foot of the sidebar; the report records the view open at the
@@ -338,7 +390,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 132</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 133</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,

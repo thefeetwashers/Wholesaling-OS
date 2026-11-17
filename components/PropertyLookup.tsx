@@ -13,6 +13,8 @@ import {
 } from '../lib/property-lookup';
 import PropertyMap from './PropertyMap';
 import type { CorporateBuyerRow } from '../lib/corporate-buyers';
+import { loadMyStorefront } from '../lib/storefront';
+import { buildBuyerInviteLink } from '../lib/invite-link';
 
 // Slice 123 — Property lookup bar. Two modes, both through the
 // server route /api/property-lookup (the Census geocoder sends no
@@ -67,6 +69,37 @@ export default function PropertyLookup({ userId, onResult }: { userId: string | 
   const [researchBusy, setResearchBusy] = useState(false);
   const [researchError, setResearchError] = useState('');
   const [researchMsg, setResearchMsg] = useState('');
+  // Slice 133 — the wholesaler's own invite link, for the
+  // per-row "Copy invite link" action on research results. The
+  // slug loads once here (not per row). Nothing about the parcel
+  // lookup or its county list changes: this file stays FL-only
+  // for parcels.
+  const [inviteSlug, setInviteSlug] = useState<string | null>(null);
+  const [copiedResearchRow, setCopiedResearchRow] = useState<number | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let on = true;
+    loadMyStorefront(userId)
+      .then((p) => { if (on) setInviteSlug(p?.public_slug?.trim() || null); })
+      .catch(() => { if (on) setInviteSlug(null); });
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  function copyResearchInvite(rowIndex: number) {
+    const link = buildBuyerInviteLink(inviteSlug);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(
+        () => {
+          setCopiedResearchRow(rowIndex);
+          setTimeout(() => setCopiedResearchRow((cur) => (cur === rowIndex ? null : cur)), 3000);
+        },
+        () => setResearchMsg('Copy failed — the invite link is on the Cash Buyers view; copy it there.'),
+      );
+    } else {
+      setResearchMsg('Copy is not available in this browser — the invite link is on the Cash Buyers view.');
+    }
+  }
 
   if (!userId) return null;
 
@@ -380,6 +413,22 @@ export default function PropertyLookup({ userId, onResult }: { userId: string | 
                 >
                   Check this owner on Sunbiz (manual search — type the name) ↗
                 </a>
+                <br />
+                {/* Slice 133 — copy YOUR invite link to paste into
+                    your own outreach to this owner. They register
+                    themselves; nothing is auto-emailed (roll data
+                    has no email addresses, no email provider is
+                    connected, and there is no consent). */}
+                <button
+                  type="button"
+                  onClick={() => copyResearchInvite(i)}
+                  style={{ marginTop: 6, fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#7dd3fc', cursor: 'pointer' }}
+                >
+                  {copiedResearchRow === i ? 'Invite link copied' : 'Copy invite link'}
+                </button>
+                <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>
+                  Paste it into your own outreach — they register themselves.
+                </span>
               </div>
             ))}
           </div>

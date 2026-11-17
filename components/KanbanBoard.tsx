@@ -82,7 +82,7 @@ export default function KanbanBoard({ userId }: { userId: string }) {
               }}
             >
               <strong style={{ fontSize: 13.5 }}>{LABEL[status]} · {cards.length}</strong>
-              {cards.length === 0 && <p style={{ fontSize: 12.5, color: '#64748b', marginTop: 8 }}>No leads here.</p>}
+              {cards.length === 0 && <p style={{ fontSize: 12.5, color: '#cbd5e1', marginTop: 8 }}>No leads here.</p>}
               {cards.map((lead) => (
                 <div
                   key={lead.id}

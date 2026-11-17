@@ -190,7 +190,7 @@ export default function ProbateOutreachModal({ lead, decisionMaker, userId, prof
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 620, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', color: '#0f172a', borderRadius: 12, padding: 20, maxWidth: 620, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>Draft Outreach — {lead.case_number}</h3>
         <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>
           To: {fullName || decisionMaker.name} ({decisionMaker.role})

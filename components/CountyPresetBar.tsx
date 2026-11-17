@@ -22,7 +22,7 @@ export default function CountyPresetBar({
   onSelectCounty: (preset: FloridaCountyPreset) => void;
 }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+    <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 20 }}>📍</span>
@@ -37,7 +37,7 @@ export default function CountyPresetBar({
                 const found = FLORIDA_COUNTY_PRESETS.find((c) => c.id === e.target.value);
                 if (found) onSelectCounty(found);
               }}
-              style={{ fontSize: 14, fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 0' }}
+              style={{ fontSize: 14, fontWeight: 700, border: 'none', background: 'transparent', color: '#0f172a', cursor: 'pointer', padding: '2px 0' }}
             >
               {FLORIDA_COUNTY_PRESETS.map((preset) => (
                 <option key={preset.id} value={preset.id}>
@@ -73,7 +73,7 @@ export default function CountyPresetBar({
         {selectedCounty.probateCaseCheckboxes.map((box) => (
           <span
             key={box}
-            style={{ display: 'inline-block', fontSize: 11, background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 999, padding: '2px 8px', margin: '2px 4px 2px 0' }}
+            style={{ display: 'inline-block', fontSize: 11, background: '#ecfdf5', color: '#166534', border: '1px solid #a7f3d0', borderRadius: 999, padding: '2px 8px', margin: '2px 4px 2px 0' }}
           >
             ✓ {box}
           </span>

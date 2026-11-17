@@ -135,7 +135,7 @@ function DebouncedField(props: {
       ) : (
         <input {...shared} type="text" />
       )}
-      <div style={{ fontSize: 11, color: state === 'failed' ? '#b91c1c' : '#64748b', marginTop: 2 }}>
+      <div style={{ fontSize: 11, color: state === 'failed' ? '#fca5a5' : '#cbd5e1', marginTop: 2 }}>
         {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved.' : state === 'failed' ? 'Save failed — try again.' : ''}
       </div>
     </div>
@@ -467,7 +467,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
   return (
     <div>
       <h2 style={{ fontSize: 20, margin: '0 0 4px' }}>⚖️ Probate Leads</h2>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 16px' }}>
         Import a court docket CSV from any of the seven Florida county presets below and work the
         priority list: pro se cases first — no attorney on the other side. CLOSED cases import as
         archived; they stay callable, they just never appear in the priority tabs. No skip-trace
@@ -475,17 +475,17 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
       </p>
 
       {banner && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>
+        <div style={{ background: '#fef3c7', color: '#0f172a', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>
           {banner}
         </div>
       )}
       {importResult && (
-        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>
+        <div style={{ background: '#ecfdf5', color: '#0f172a', border: '1px solid #10b981', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>
           {importResult}
         </div>
       )}
       {copied && (
-        <div style={{ background: '#eff6ff', border: '1px solid #3b82f6', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>
+        <div style={{ background: '#eff6ff', color: '#0f172a', border: '1px solid #3b82f6', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>
           {copied}
         </div>
       )}
@@ -498,7 +498,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
           onChange={(e) => handleFile(e.target.files?.[0])}
           disabled={importBusy}
         />
-        {fileName && <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>{fileName}</span>}
+        {fileName && <span style={{ fontSize: 12, color: '#cbd5e1', marginLeft: 8 }}>{fileName}</span>}
         <textarea
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
@@ -551,18 +551,18 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
           type="button"
           onClick={downloadCsv}
           disabled={visible.length === 0}
-          style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: visible.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, opacity: visible.length === 0 ? 0.5 : 1 }}
+          style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: visible.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, opacity: visible.length === 0 ? 0.5 : 1 }}
         >
           Download CSV ({visible.length})
         </button>
       </div>
 
       {isLoading ? (
-        <p style={{ fontSize: 14, color: '#64748b' }}>Loading probate leads…</p>
+        <p style={{ fontSize: 14, color: '#cbd5e1' }}>Loading probate leads…</p>
       ) : loadError ? (
-        <p style={{ fontSize: 14, color: '#b91c1c' }}>{loadError}</p>
+        <p style={{ fontSize: 14, color: '#fca5a5' }}>{loadError}</p>
       ) : visible.length === 0 ? (
-        <div style={{ border: '1px dashed #cbd5e1', borderRadius: 8, padding: 24, textAlign: 'center', fontSize: 14, color: '#64748b' }}>
+        <div style={{ border: '1px dashed #cbd5e1', borderRadius: 8, padding: 24, textAlign: 'center', fontSize: 14, color: '#cbd5e1' }}>
           {tab === 'proSe' && 'No pro se leads yet — import a docket CSV.'}
           {tab === 'creditor' && 'No leads with hospital or creditor claims yet — import a docket CSV.'}
           {tab === 'all' && (q ? 'No matching open probate leads found.' : 'No open probate leads yet — import a docket CSV.')}
@@ -603,9 +603,9 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                       >
                         {lead.is_pro_se ? 'PRO SE • NO ATTORNEY' : 'ATTORNEY REPRESENTED'}
                       </span>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{lead.case_status} • {lead.county}</div>
+                      <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}>{lead.case_status} • {lead.county}</div>
                       {linkedLoaded && (
-                        <div style={{ fontSize: 12, marginTop: 6, color: linkedByCase[lead.case_number] ? '#166534' : '#64748b' }}>
+                        <div style={{ fontSize: 12, marginTop: 6, color: linkedByCase[lead.case_number] ? '#86efac' : '#cbd5e1' }}>
                           {linkedByCase[lead.case_number]
                             ? `✓ Seller submitted — ${linkedByCase[lead.case_number].seller_status || 'received'}`
                             : 'No submission yet'}
@@ -628,7 +628,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                             // wholesaler enters the agreed price in
                             // the generator. MAO is never prefilled.
                           })}
-                          style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', marginTop: 6 }}
+                          style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', marginTop: 6 }}
                         >
                           Draft Contract
                         </button>
@@ -637,7 +637,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                     <td style={{ padding: 8, minWidth: 220 }}>
                       <div style={{ fontWeight: 600 }}>{lead.decedent_name || 'No decedent listed'}</div>
                       {lead.decedent_aliases.length > 0 && (
-                        <div style={{ fontSize: 12, color: '#64748b' }}>Also listed as: {lead.decedent_aliases.join('; ')}</div>
+                        <div style={{ fontSize: 12, color: '#cbd5e1' }}>Also listed as: {lead.decedent_aliases.join('; ')}</div>
                       )}
                       <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         {(() => {
@@ -653,11 +653,11 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                               Search Property Appraiser ↗
                             </a>
                           ) : (
-                            <span style={{ fontSize: 12, color: '#64748b' }}>No appraiser link for this county yet.</span>
+                            <span style={{ fontSize: 12, color: '#cbd5e1' }}>No appraiser link for this county yet.</span>
                           );
                         })()}
                         {lastName && (
-                          <button type="button" onClick={() => copyText(lastName, `Last name “${lastName}” copied — paste it into the appraiser search.`)} style={{ fontSize: 12, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0 }}>
+                          <button type="button" onClick={() => copyText(lastName, `Last name “${lastName}” copied — paste it into the appraiser search.`)} style={{ fontSize: 12, background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0 }}>
                             Copy last name
                           </button>
                         )}
@@ -674,14 +674,14 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                     </td>
                     <td style={{ padding: 8, minWidth: 260 }}>
                       {lead.decision_makers.length === 0 && (
-                        <div style={{ fontSize: 12, color: '#b91c1c' }}>No decision-maker listed — open the docket / petition.</div>
+                        <div style={{ fontSize: 12, color: '#fca5a5' }}>No decision-maker listed — open the docket / petition.</div>
                       )}
                       {lead.decision_makers.map((dm, i) => (
                         <div key={`${dm.name}-${dm.role}`} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
                           <div style={{ fontWeight: 600 }}>{dm.name}</div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>{dm.role}</div>
+                          <div style={{ fontSize: 12, color: '#cbd5e1' }}>{dm.role}</div>
                           {dm.skip_trace_status !== 'pending' && (
-                            <div style={{ fontSize: 11, marginTop: 2, color: dm.skip_trace_status === 'found' ? '#166534' : '#991b1b' }}>
+                            <div style={{ fontSize: 11, marginTop: 2, color: dm.skip_trace_status === 'found' ? '#86efac' : '#fca5a5' }}>
                               {dm.skip_trace_status === 'found' ? '✓ Contact found' : '✕ Contact not found'}
                             </div>
                           )}
@@ -693,36 +693,36 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                               </>
                             )}
                             {dm.email && <a href={`mailto:${dm.email}`}>✉️ {dm.email}</a>}
-                            {!dm.phone && !dm.email && <span style={{ color: '#64748b' }}>No contact info yet.</span>}
+                            {!dm.phone && !dm.email && <span style={{ color: '#cbd5e1' }}>No contact info yet.</span>}
                           </div>
-                          {dm.mailing_address && <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{dm.mailing_address}</div>}
+                          {dm.mailing_address && <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>{dm.mailing_address}</div>}
                           <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button
                               type="button"
                               onClick={() => handleSkipTrace(lead, i)}
                               disabled={skipTraceBusy}
-                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
                             >
                               Skip Trace / Find Contact
                             </button>
                             <button
                               type="button"
                               onClick={() => setGoogleTarget({ lead, dmIndex: i })}
-                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #bfdbfe', background: '#eff6ff', cursor: 'pointer' }}
+                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#0f172a', cursor: 'pointer' }}
                             >
                               🔎 Google Lookup
                             </button>
                             <button
                               type="button"
                               onClick={() => setOutreachTarget({ lead, dmIndex: i })}
-                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
                             >
                               Draft Outreach
                             </button>
                             <button
                               type="button"
                               onClick={() => setPrintTarget({ lead, dmIndex: i })}
-                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
                             >
                               Print Letter
                             </button>
@@ -733,7 +733,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                     <td style={{ padding: 8, minWidth: 220 }}>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
                         {flags.map((f) => (
-                          <span key={f} style={{ fontSize: 11, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 999, padding: '2px 8px' }}>
+                          <span key={f} style={{ fontSize: 11, background: '#f1f5f9', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 999, padding: '2px 8px' }}>
                             {f}
                           </span>
                         ))}
@@ -751,12 +751,12 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                           <button
                             type="button"
                             onClick={() => copyText(storefrontLink(slug, lead.case_number), `Storefront link copied: ${storefrontLink(slug, lead.case_number)}`)}
-                            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
                           >
                             Copy Storefront Link
                           </button>
                         ) : (
-                          <span style={{ fontSize: 12, color: '#64748b' }}>Save Storefront Settings first to copy your storefront link.</span>
+                          <span style={{ fontSize: 12, color: '#cbd5e1' }}>Save Storefront Settings first to copy your storefront link.</span>
                         )}
                       </div>
                     </td>
@@ -772,7 +772,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
                         ))}
                       </select>
                       {lastContactByLead[lead.id] && (
-                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                        <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 6 }}>
                           Last contact: {new Date(lastContactByLead[lead.id].created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} via {lastContactByLead[lead.id].activity_type}
                         </div>
                       )}
@@ -786,14 +786,14 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
       )}
 
       {skipTraceNote && (
-        <div style={{ background: '#eff6ff', border: '1px solid #3b82f6', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginTop: 12 }}>
+        <div style={{ background: '#eff6ff', color: '#0f172a', border: '1px solid #3b82f6', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginTop: 12 }}>
           {skipTraceNote}
         </div>
       )}
 
       {manual && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 480, width: '100%' }}>
+          <div style={{ background: '#fff', color: '#0f172a', borderRadius: 12, padding: 20, maxWidth: 480, width: '100%' }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>Enter contact details manually</h3>
             <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
               No skip-trace provider connected yet — enter contact details manually. Only enter details
@@ -816,7 +816,7 @@ export default function ProbateLeads({ userId, onDraftContract }: { userId: stri
               I found contact details (uncheck if you looked and found nothing)
             </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => { setManual(null); setSkipTraceNote(''); }} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>
+              <button type="button" onClick={() => { setManual(null); setSkipTraceNote(''); }} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button type="button" onClick={saveManual} disabled={manualBusy} style={{ padding: '8px 14px', borderRadius: 6, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer' }}>

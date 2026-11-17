@@ -27,6 +27,7 @@ import {
   type ProblemStatus,
 } from '../lib/problem-reports';
 import ManagedDispoRequests from './ManagedDispoRequests';
+import ProofOfFundsReview from './ProofOfFundsReview';
 
 function countBy<T extends string>(values: (T | null | undefined)[]): Record<string, number> {
   const out: Record<string, number> = {};
@@ -232,7 +233,7 @@ export default function OperatorStats({ userEmail }: { userEmail: string | null 
   }
 
   const kpiCard = (label: string, value: string, sub: string) => (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
+    <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#64748b' }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{value}</div>
       <div style={{ fontSize: 12, color: '#64748b' }}>{sub}</div>
@@ -248,8 +249,8 @@ export default function OperatorStats({ userEmail }: { userEmail: string | null 
   };
 
   if (!isOperator) return <p style={{ fontSize: 14 }}>Operator only.</p>;
-  if (loading) return <p style={{ fontSize: 14, color: '#64748b' }}>Loading operator stats…</p>;
-  if (loadError) return <p style={{ fontSize: 14, color: '#b91c1c' }}>{loadError}</p>;
+  if (loading) return <p style={{ fontSize: 14, color: '#cbd5e1' }}>Loading operator stats…</p>;
+  if (loadError) return <p style={{ fontSize: 14, color: '#fca5a5' }}>{loadError}</p>;
 
   const openReports = reports.filter((r) => r.status === 'open');
   const reviewingReports = reports.filter((r) => r.status === 'reviewing');
@@ -285,14 +286,14 @@ export default function OperatorStats({ userEmail }: { userEmail: string | null 
       </p>
 
       {missingNotes.length > 0 && (
-        <p style={{ fontSize: 13, color: '#b45309' }}>
+        <p style={{ fontSize: 13, color: '#fcd34d' }}>
           Some tables are not in the database yet: {missingNotes.join('; ')}. See DEPLOYMENT_README.md §3 for the migration order.
         </p>
       )}
 
       <h4 style={{ marginTop: 20 }}>Problem reports ({openReports.length} open · {reviewingReports.length} reviewing)</h4>
-      {reportMsg && <p style={{ fontSize: 13, color: '#b91c1c' }}>{reportMsg}</p>}
-      {reportsError && <p style={{ fontSize: 13, color: '#b91c1c' }}>{reportsError}</p>}
+      {reportMsg && <p style={{ fontSize: 13, color: '#fca5a5' }}>{reportMsg}</p>}
+      {reportsError && <p style={{ fontSize: 13, color: '#fca5a5' }}>{reportsError}</p>}
       {reportsMissing ? (
         <p style={{ fontSize: 13 }}>The problem_reports table does not exist yet — run migration 20261117090000_slice130_operator_visibility.sql first.</p>
       ) : reports.length === 0 ? (
@@ -324,6 +325,9 @@ export default function OperatorStats({ userEmail }: { userEmail: string | null 
 
       <h4 style={{ marginTop: 20 }}>Managed disposition requests</h4>
       <ManagedDispoRequests operatorEmail={userEmail} />
+
+      <h4 style={{ marginTop: 20 }}>Proof-of-funds verification</h4>
+      <ProofOfFundsReview />
     </div>
   );
 }

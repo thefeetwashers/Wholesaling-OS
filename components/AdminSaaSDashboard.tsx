@@ -109,24 +109,24 @@ export default function AdminSaaSDashboard() {
   }
 
   const kpiCard = (label: string, value: string, sub: string) => (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
+    <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#64748b' }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{value}</div>
       <div style={{ fontSize: 12, color: '#64748b' }}>{sub}</div>
     </div>
   );
 
-  if (loading) return <p style={{ fontSize: 14, color: '#64748b' }}>Loading subscriptions…</p>;
+  if (loading) return <p style={{ fontSize: 14, color: '#cbd5e1' }}>Loading subscriptions…</p>;
 
   return (
     <div>
-      <p style={{ fontSize: 13, color: '#475569', marginTop: 0 }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 0 }}>
         Every wholesaler on the platform, their trial, and their plan. All numbers below come from real
         subscription rows — there are no sample accounts. Billing itself is not live yet: no Stripe account
         exists, and no money is collected here.
       </p>
       {errorMessage && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 16 }}>
+        <div style={{ background: '#fef2f2', color: '#0f172a', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 16 }}>
           {errorMessage}
         </div>
       )}
@@ -140,7 +140,7 @@ export default function AdminSaaSDashboard() {
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 24, textAlign: 'center' }}>
+        <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, padding: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>No wholesalers yet</div>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 0 }}>
             No subscription rows exist. The first row appears automatically when a wholesaler signs up (the
@@ -148,7 +148,7 @@ export default function AdminSaaSDashboard() {
           </p>
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, overflowX: 'auto' }}>
+        <div style={{ background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f8fafc', textAlign: 'left' }}>

@@ -49,7 +49,7 @@ export default function PlatformHealth({ userEmail }: { userEmail: string | null
                 </span>
               </div>
               <div style={{ fontSize: 13, color: '#cbd5e1', marginTop: 2 }}>{c.detail}</div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Recorded {c.asOf}</div>
+              <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>Recorded {c.asOf}</div>
             </div>
           );
         })}
@@ -63,7 +63,7 @@ export default function PlatformHealth({ userEmail }: { userEmail: string | null
           >
             <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>{s.label}</div>
             <div style={{ fontSize: 13, color: '#cbd5e1', marginTop: 2 }}>{s.detail}</div>
-            <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Recorded {s.asOf}</div>
+            <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>Recorded {s.asOf}</div>
           </div>
         ))}
       </div>

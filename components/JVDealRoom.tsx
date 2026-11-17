@@ -132,7 +132,7 @@ function JvAgreementForm({
     </label>
   );
   return (
-    <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', borderRadius: 10, padding: 12, marginTop: 10 }}>
+    <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f172a', borderRadius: 10, padding: 12, marginTop: 10 }}>
       <h4 style={{ margin: '0 0 4px', fontSize: 15 }}>Generate JV Split Agreement</h4>
       <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
         Both sides opted in, so the split can now be written down. Party A (originator) keeps {100 - proposed}% and Party B (partner) keeps{' '}
@@ -358,16 +358,16 @@ export default function JVDealRoom({ userId }: { userId: string }) {
   return (
     <div>
       <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>JV Deal Room — Joint Venture &amp; Co-Wholesaling</h2>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 12px' }}>
         Split the work, split the fee. Post a deal you need a partner on, or browse open deals from other wholesalers. Listings show city,
         state, type, prices, and split only — never a street address or seller contact. Partnering is a mutual opt-in: your email is shared
         with the originator when you express interest, and theirs is shared with you only when they accept. The JV split agreement is
         generated after a match; it is not signed in-app. The platform takes 0% of any JV split.
       </p>
-      {err && <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>}
-      {msg && <p style={{ color: '#0f766e', fontSize: 13 }}>{msg}</p>}
+      {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
+      {msg && <p style={{ color: '#6ee7b7', fontSize: 13 }}>{msg}</p>}
 
-      <form onSubmit={post} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', marginBottom: 16 }}>
+      <form onSubmit={post} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', color: '#0f172a', marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Post a JV deal</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <label style={{ display: 'block', fontSize: 13 }}>
@@ -424,14 +424,14 @@ export default function JVDealRoom({ userId }: { userId: string }) {
 
       <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Open JV deals</h3>
       {open.length === 0 ? (
-        <p style={{ fontSize: 13, color: '#64748b' }}>No open JV deals right now. Post the first one above.</p>
+        <p style={{ fontSize: 13, color: '#cbd5e1' }}>No open JV deals right now. Post the first one above.</p>
       ) : (
         open.map((l) => {
           const isMine = l.originating_wholesaler_id === userId;
           const interest = myInterestFor(l.id!);
           const badge = l.originating_wholesaler_id ? badges[l.originating_wholesaler_id] : false;
           return (
-            <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff' }}>
+            <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff', color: '#0f172a' }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 {l.property_city || 'City not given'}
                 {l.property_state ? `, ${l.property_state}` : ''}
@@ -489,13 +489,13 @@ export default function JVDealRoom({ userId }: { userId: string }) {
 
       <h3 style={{ margin: '16px 0 8px', fontSize: 16 }}>My JV listings</h3>
       {mine.length === 0 ? (
-        <p style={{ fontSize: 13, color: '#64748b' }}>You have not posted a JV listing yet.</p>
+        <p style={{ fontSize: 13, color: '#cbd5e1' }}>You have not posted a JV listing yet.</p>
       ) : (
         mine.map((l) => {
           const ints = interestsByListing[l.id!] || [];
           const accepted = ints.find((i) => i.status === 'accepted');
           return (
-            <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff' }}>
+            <div key={l.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#fff', color: '#0f172a' }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 {l.property_city || 'City not given'}
                 {l.property_state ? `, ${l.property_state}` : ''} · Partner keeps {l.proposed_jv_split_percent}% · Status: {l.status}

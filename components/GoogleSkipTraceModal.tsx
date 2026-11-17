@@ -167,7 +167,7 @@ export default function GoogleSkipTraceModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 640, width: '100%', margin: 'auto' }}>
+      <div style={{ background: '#fff', color: '#0f172a', borderRadius: 12, maxWidth: 640, width: '100%', margin: 'auto' }}>
         <div style={{ background: '#0f172a', color: '#fff', padding: '14px 20px', borderRadius: '12px 12px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>🔎 Google Skip-Trace Lookup</div>

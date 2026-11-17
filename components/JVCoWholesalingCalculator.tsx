@@ -52,7 +52,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 12,
   fontWeight: 700,
-  color: '#334155',
+  color: '#cbd5e1',
   marginBottom: 4,
 };
 
@@ -167,7 +167,7 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
       <style>{`@media print { .jvcalc-no-print { display: none !important; } .jvcalc-print { display: block !important; } body { background: #fff !important; } }`}</style>
 
       <div className="jvcalc-no-print">
-        <p style={{ fontSize: 13, color: '#475569', marginTop: 0 }}>
+        <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 0 }}>
           Work out the split before you print the agreement. The numbers below are live — change a price or
           the slider and both payouts update. The agreement itself is the existing JV Co-Wholesaling Split
           Agreement template (0% platform fee, 24-month non-circumvention both ways) — it must be reviewed
@@ -205,8 +205,8 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
           </div>
         </div>
 
-        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <label style={{ ...labelStyle, marginBottom: 8 }} htmlFor="jv-split">
+        <div style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <label style={{ ...labelStyle, marginBottom: 8, color: '#334155' }} htmlFor="jv-split">
             Split — Partner A {splitA}% / Partner B {100 - splitA}%
           </label>
           <input
@@ -226,7 +226,7 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 16 }}>
             <div><div style={{ fontSize: 11, color: '#64748b' }}>Gross spread</div><div style={{ fontSize: 18, fontWeight: 700 }}>{money(calc.gross)}</div></div>
             <div><div style={{ fontSize: 11, color: '#64748b' }}>Net JV profit</div><div style={{ fontSize: 18, fontWeight: 700 }}>{money(calc.net)}</div></div>
-            <div><div style={{ fontSize: 11, color: '#64748b' }}>Partner A gets ({splitA}%)</div><div style={{ fontSize: 18, fontWeight: 700, color: '#059669' }}>{money(calc.payoutA)}</div></div>
+            <div><div style={{ fontSize: 11, color: '#64748b' }}>Partner A gets ({splitA}%)</div><div style={{ fontSize: 18, fontWeight: 700, color: '#047857' }}>{money(calc.payoutA)}</div></div>
             <div><div style={{ fontSize: 11, color: '#64748b' }}>Partner B gets ({100 - splitA}%)</div><div style={{ fontSize: 18, fontWeight: 700, color: '#7c3aed' }}>{money(calc.payoutB)}</div></div>
           </div>
           <p style={{ fontSize: 12, color: '#64748b', marginBottom: 0 }}>
@@ -239,7 +239,7 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Partner A — Acquisitions (contract holder)</div>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 0 }}>
+            <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 0 }}>
               {profileLoaded
                 ? hasProfile
                   ? 'Loaded from your own storefront profile — edit it in Storefront Settings if it is wrong.'
@@ -259,7 +259,7 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
           </div>
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Partner B — Dispositions (buyer side)</div>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 0 }}>
+            <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 0 }}>
               The other wholesaler&apos;s own details — type them in. Nothing is pre-filled.
             </p>
             <label style={labelStyle}>Company / entity</label>
@@ -290,7 +290,7 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
             Preview the JV agreement
           </button>
           {!readyToPrint && (
-            <span style={{ fontSize: 12, color: '#64748b', alignSelf: 'center' }}>
+            <span style={{ fontSize: 12, color: '#cbd5e1', alignSelf: 'center' }}>
               Fill in the property address, both prices, and both partner companies to preview the agreement.
             </span>
           )}
@@ -310,12 +310,12 @@ export default function JVCoWholesalingCalculator({ userId }: { userId: string }
             <button
               type="button"
               onClick={() => setShowAgreement(false)}
-              style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer' }}
             >
               Back to the calculator
             </button>
           </div>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 20, background: '#fff' }}>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 20, background: '#fff', color: '#0f172a' }}>
             <h3 style={{ marginTop: 0 }}>Deal summary — the numbers this agreement is built on</h3>
             <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
               <tbody>

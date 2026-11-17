@@ -25,8 +25,10 @@
 // their own acquisition teams, not from a shared list.
 
 import { useEffect, useState } from 'react';
-import { loadMyBuyBox, saveMyBuyBox, type BuyBox } from '../lib/buy-box';
-import { FLORIDA_COUNTIES } from '../lib/vendor-marketplace';
+import { loadMyBuyBox, saveMyBuyBox, CONDITION_OPTIONS, STRATEGY_OPTIONS, CLOSING_TIMELINE_OPTIONS, type BuyBox } from '../lib/buy-box';
+import StateCountyFilter from './StateCountyFilter';
+import BuyerInviteLink from './BuyerInviteLink';
+import BuyerPofStatus from './BuyerPofStatus';
 
 const OBL_HOME_URL = 'https://openbuyerslist.com/';
 const OBL_BROWSE_URL = 'https://openbuyerslist.com/off-market-deals';
@@ -34,11 +36,6 @@ const OBL_BROWSE_URL = 'https://openbuyerslist.com/off-market-deals';
 // Same property-type options as the cash-buyer form in
 // CashBuyersDealBlast.tsx — one list, not two.
 const PROPERTY_TYPES = ['Single Family', 'Multi-Family', 'Condo / Townhouse', 'Land', 'Mobile Home', 'Commercial'];
-
-// Slice 132 follow-up (D) — the standard 50 U.S. state codes +
-// DC, for the buy-box states multi-select. Empty by default: no
-// state picked means no state constraint.
-const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
 
 const REHAB_OPTIONS = [
   { value: '', label: 'No preference' },
@@ -75,6 +72,13 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
   const [zipCodes, setZipCodes] = useState('');
   const [rehab, setRehab] = useState('');
   const [states, setStates] = useState<string[]>([]);
+  // Slice 133 criteria — all empty by default; empty = no
+  // constraint. (Field names only — no buyer data from anywhere.)
+  const [maxArvPct, setMaxArvPct] = useState('');
+  const [minProfit, setMinProfit] = useState('');
+  const [condPrefs, setCondPrefs] = useState<string[]>([]);
+  const [stratPrefs, setStratPrefs] = useState<string[]>([]);
+  const [closingTimeline, setClosingTimeline] = useState('');
   const [hasSaved, setHasSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -97,6 +101,11 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
           setZipCodes((box.zip_codes || []).join(', '));
           setRehab(box.rehab_tolerance || '');
           setStates(box.states || []);
+          setMaxArvPct(box.max_arv_pct != null ? String(box.max_arv_pct) : '');
+          setMinProfit(box.min_profit != null ? String(box.min_profit) : '');
+          setCondPrefs(box.condition_preferences || []);
+          setStratPrefs(box.strategy_preferences || []);
+          setClosingTimeline(box.closing_timeline || '');
           setHasSaved(true);
         }
       })
@@ -120,6 +129,11 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
         zip_codes: zipCodes.split(',').map((z) => z.trim()).filter(Boolean),
         rehab_tolerance: rehab || null,
         states,
+        max_arv_pct: numOrNull(maxArvPct),
+        min_profit: numOrNull(minProfit),
+        condition_preferences: condPrefs,
+        strategy_preferences: stratPrefs,
+        closing_timeline: closingTimeline || null,
       });
       setHasSaved(true);
       setSavedPublished(published);
@@ -140,6 +154,11 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
     lines.push(`Property types: ${propTypes.length > 0 ? propTypes.join(', ') : 'not set'}`);
     lines.push(`Min price: ${money(numOrNull(minPrice))}`);
     lines.push(`Max price: ${money(numOrNull(maxPrice))}`);
+    lines.push(`Max ARV %: ${maxArvPct.trim() ? `${maxArvPct.trim()}%` : 'not set'}`);
+    lines.push(`Min profit: ${money(numOrNull(minProfit))}`);
+    lines.push(`Condition preferences: ${condPrefs.length > 0 ? condPrefs.join(', ') : 'not set'}`);
+    lines.push(`Strategy preferences: ${stratPrefs.length > 0 ? stratPrefs.join(', ') : 'not set'}`);
+    lines.push(`Closing timeline: ${closingTimeline || 'not set'}`);
     lines.push(`Rehab tolerance: ${rehab || 'no preference'}`);
     if (notes.trim()) lines.push(`Notes: ${notes.trim()}`);
     return lines.join('\n');
@@ -166,7 +185,7 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginTop: 16 }}>
       <h3 style={{ fontSize: 15, margin: '0 0 8px' }}>Buyer Networks — find more buyers</h3>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 8px' }}>
         OpenBuyersList is a free network where cash buyers publish what they buy — their markets,
         property types, and price range — and wholesalers send off-market deals to the buyers who
         match. Browse buyers there and connect there. WholesalingOS does not copy their buyer list:
@@ -181,39 +200,45 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
           Join or post on OpenBuyersList
         </a>
       </div>
-      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 12px' }}>
         Institutional buyers (hedge funds) don&apos;t take deal blasts — they buy through their own
         acquisition teams, not from a shared list.
       </p>
+      {/* Slice 133 — one-click buyer invite link (buyers register
+          themselves; the link is the one click). */}
+      <BuyerInviteLink userId={userId} />
 
       <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
         <h4 style={{ fontSize: 14, margin: '0 0 8px' }}>My buy box — what we buy</h4>
         {loading ? (
-          <p style={{ fontSize: 13, color: '#64748b' }}>Loading your buy box…</p>
+          <p style={{ fontSize: 13, color: '#cbd5e1' }}>Loading your buy box…</p>
         ) : (
           <>
             {!hasSaved && !loadError && (
-              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 10px' }}>
+              <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
                 No buy box saved yet. Fill in what you buy — it stays empty until you save it.
               </p>
             )}
             {loadError && (
-              <p style={{ fontSize: 13, color: '#b91c1c', margin: '0 0 10px' }}>{loadError}</p>
+              <p style={{ fontSize: 13, color: '#fca5a5', margin: '0 0 10px' }}>{loadError}</p>
             )}
-            <label style={labelStyle}>Markets (Florida counties)
-              <select multiple value={markets} onChange={(e) => setMarkets(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
-                {FLORIDA_COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Hold Ctrl/Cmd to pick several. Empty means no markets set.</span>
-            </label>
-            <label style={labelStyle}>States
-              <select multiple value={states} onChange={(e) => setStates(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
-                {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Hold Ctrl/Cmd to pick several. Empty means no state constraint. Florida is the only state with live parcel data today — other states join only after their real service is verified.</span>
-            </label>
+            {/* Slice 133 — state-linked markets: the Market list
+                follows the picked State(s) (Census county data,
+                lib/us-counties.ts). No longer Florida-only. */}
+            <StateCountyFilter
+              states={states}
+              onStatesChange={setStates}
+              markets={markets}
+              onMarketsChange={setMarkets}
+              inputStyle={inputStyle}
+              labelStyle={labelStyle}
+            />
+            <p style={{ fontSize: 12, color: '#cbd5e1', margin: '0 0 10px' }}>
+              Florida is the only state with live parcel data today — other states join only after
+              their real service is verified.
+            </p>
             <label style={labelStyle}>Target ZIP codes<input style={inputStyle} value={zipCodes} onChange={(e) => setZipCodes(e.target.value)} placeholder="e.g. 34950, 33313 (comma-separated, optional)" inputMode="numeric" />
-              <span style={{ fontSize: 12, color: '#64748b' }}>Empty means no ZIP constraint.</span>
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>Empty means no ZIP constraint.</span>
             </label>
             <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
               <legend style={{ fontSize: 13 }}>Property types</legend>
@@ -227,12 +252,47 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
               <label style={labelStyle}>Min price<input style={inputStyle} value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="Min price (optional)" inputMode="decimal" /></label>
               <label style={labelStyle}>Max price<input style={inputStyle} value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Max price (optional)" inputMode="decimal" /></label>
             </div>
+            {/* Slice 133 criteria — field names only, all empty by
+                default. Empty = no constraint in matching. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={labelStyle}>Max ARV %<input style={inputStyle} value={maxArvPct} onChange={(e) => setMaxArvPct(e.target.value)} placeholder="e.g. 70 (optional)" inputMode="decimal" />
+                <span style={{ fontSize: 12, color: '#cbd5e1' }}>The most you will pay, as a % of ARV. Empty means no cap.</span>
+              </label>
+              <label style={labelStyle}>Min profit $<input style={inputStyle} value={minProfit} onChange={(e) => setMinProfit(e.target.value)} placeholder="e.g. 20000 (optional)" inputMode="decimal" />
+                <span style={{ fontSize: 12, color: '#cbd5e1' }}>The least profit you need (ARV − price − repairs). Empty means no minimum.</span>
+              </label>
+            </div>
+            <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
+              <legend style={{ fontSize: 13 }}>Condition preferences</legend>
+              {CONDITION_OPTIONS.map((t) => (
+                <label key={t} style={{ display: 'inline-block', fontSize: 13, marginRight: 12 }}>
+                  <input type="checkbox" checked={condPrefs.includes(t)} onChange={(e) => setCondPrefs(e.target.checked ? [...condPrefs, t] : condPrefs.filter((x) => x !== t))} /> {t}
+                </label>
+              ))}
+              <div style={{ fontSize: 12, color: '#cbd5e1' }}>Empty means any condition.</div>
+            </fieldset>
+            <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
+              <legend style={{ fontSize: 13 }}>Strategy preferences</legend>
+              {STRATEGY_OPTIONS.map((t) => (
+                <label key={t} style={{ display: 'inline-block', fontSize: 13, marginRight: 12 }}>
+                  <input type="checkbox" checked={stratPrefs.includes(t)} onChange={(e) => setStratPrefs(e.target.checked ? [...stratPrefs, t] : stratPrefs.filter((x) => x !== t))} /> {t}
+                </label>
+              ))}
+              <div style={{ fontSize: 12, color: '#cbd5e1' }}>Empty means any strategy.</div>
+            </fieldset>
+            <label style={labelStyle}>Closing timeline
+              <select style={inputStyle} value={closingTimeline} onChange={(e) => setClosingTimeline(e.target.value)}>
+                <option value="">No preference</option>
+                {CLOSING_TIMELINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>How fast you can close. Empty means no preference.</span>
+            </label>
             <label style={labelStyle}>Notes<textarea style={inputStyle} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything else about what you buy…" rows={2} /></label>
             <label style={labelStyle}>Rehab tolerance
               <select style={inputStyle} value={rehab} onChange={(e) => setRehab(e.target.value)}>
                 {REHAB_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Empty means no preference — any condition matches.</span>
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>Empty means no preference — any condition matches.</span>
             </label>
             <label style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 10, alignItems: 'center' }}>
               <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
@@ -243,21 +303,26 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
               <span>
                 Email me when a published deal matches my buy box
                 <br />
-                <span style={{ fontSize: 12, color: '#64748b' }}>
+                <span style={{ fontSize: 12, color: '#cbd5e1' }}>
                   Email alerts only happen if the founder ever connects an email provider — nothing
                   is sent today, and matching deals are shown in the app.
                 </span>
               </span>
             </label>
             {hasSaved && (
-              <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+              <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
                 {savedPublished
                   ? 'Your buy box is published — it now appears in the public Cash Buyers directory with no contact details.'
                   : 'Your buy box is private — it does not appear in the public Cash Buyers directory.'}
               </p>
             )}
-            {banner && <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>{banner}</div>}
-            {copied && <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>Buy box copied to clipboard.</div>}
+            {/* Slice 133 — the owner's own proof-of-funds status.
+                Renders "POF verified — <date>" only when the
+                operator has actually verified a document; renders
+                nothing otherwise. */}
+            <BuyerPofStatus userId={userId} />
+            {banner && <div style={{ background: '#fef3c7', color: '#0f172a', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>{banner}</div>}
+            {copied && <div style={{ background: '#ecfdf5', color: '#0f172a', border: '1px solid #10b981', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>Buy box copied to clipboard.</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer' }}>
                 {saving ? 'Saving…' : 'Save my buy box'}
@@ -267,7 +332,7 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
               </button>
             </div>
             {!hasSaved && (
-              <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>
+              <p style={{ fontSize: 12, color: '#cbd5e1', margin: '8px 0 0' }}>
                 Copy is available once you save a buy box — paste it into OpenBuyersList when you post there.
               </p>
             )}

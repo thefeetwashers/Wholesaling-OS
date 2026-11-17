@@ -36,11 +36,11 @@
 import { useEffect, useState } from 'react';
 import { supabase, supabaseConfigured } from '../../lib/supabase';
 import { loadMyBuyerProfile, saveMyBuyerProfile } from '../../lib/buyer-profile';
-import { loadMyBuyBox, saveMyBuyBox } from '../../lib/buy-box';
+import { loadMyBuyBox, saveMyBuyBox, CONDITION_OPTIONS, STRATEGY_OPTIONS, CLOSING_TIMELINE_OPTIONS } from '../../lib/buy-box';
 import { findMatchingDeals, type DealSummary, type BuyBoxForMatching } from '../../lib/match-buy-box';
-import { FLORIDA_COUNTIES } from '../../lib/vendor-marketplace';
+import StateCountyFilter from '../../components/StateCountyFilter';
+import ProofOfFundsUpload from '../../components/ProofOfFundsUpload';
 
-const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
 const PROPERTY_TYPES = ['Single Family', 'Multi-Family', 'Condo / Townhouse', 'Land', 'Mobile Home', 'Commercial'];
 const REHAB_OPTIONS = [
   { value: '', label: 'No preference' },
@@ -70,6 +70,13 @@ export default function VipPortal() {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [rehab, setRehab] = useState('');
+  // Slice 133 criteria — all empty by default; empty = no
+  // constraint. Same fields as the buy-box form, same table.
+  const [maxArvPct, setMaxArvPct] = useState('');
+  const [minProfit, setMinProfit] = useState('');
+  const [condPrefs, setCondPrefs] = useState<string[]>([]);
+  const [stratPrefs, setStratPrefs] = useState<string[]>([]);
+  const [closingTimeline, setClosingTimeline] = useState('');
   const [notes, setNotes] = useState('');
   const [published, setPublished] = useState(false);
   const [savedPublished, setSavedPublished] = useState(false);
@@ -108,6 +115,11 @@ export default function VipPortal() {
             setPublished(box.published === true);
             setSavedPublished(box.published === true);
             setEmailAlerts(box.email_alerts_opt_in === true);
+            setMaxArvPct(box.max_arv_pct != null ? String(box.max_arv_pct) : '');
+            setMinProfit(box.min_profit != null ? String(box.min_profit) : '');
+            setCondPrefs(box.condition_preferences || []);
+            setStratPrefs(box.strategy_preferences || []);
+            setClosingTimeline(box.closing_timeline || '');
             setHasSaved(true);
             const forMatching: BuyBoxForMatching = {
               user_id: id,
@@ -118,6 +130,11 @@ export default function VipPortal() {
               max_price: box.max_price ?? null,
               rehab_tolerance: box.rehab_tolerance || null,
               states: box.states || [],
+              max_arv_pct: box.max_arv_pct ?? null,
+              min_profit: box.min_profit ?? null,
+              condition_preferences: box.condition_preferences || [],
+              strategy_preferences: box.strategy_preferences || [],
+              closing_timeline: box.closing_timeline || null,
             };
             findMatchingDeals(forMatching).then(setMatches).catch(() => setMatches([]));
           } else {
@@ -152,6 +169,11 @@ export default function VipPortal() {
         zip_codes: zipCodes.split(',').map((z) => z.trim()).filter(Boolean),
         rehab_tolerance: rehab || null,
         states,
+        max_arv_pct: numOrNull(maxArvPct),
+        min_profit: numOrNull(minProfit),
+        condition_preferences: condPrefs,
+        strategy_preferences: stratPrefs,
+        closing_timeline: closingTimeline || null,
       });
       setHasSaved(true);
       setSavedPublished(box.published === true);
@@ -165,6 +187,11 @@ export default function VipPortal() {
         max_price: box.max_price ?? null,
         rehab_tolerance: box.rehab_tolerance || null,
         states: box.states || [],
+        max_arv_pct: box.max_arv_pct ?? null,
+        min_profit: box.min_profit ?? null,
+        condition_preferences: box.condition_preferences || [],
+        strategy_preferences: box.strategy_preferences || [],
+        closing_timeline: box.closing_timeline || null,
       };
       findMatchingDeals(forMatching).then(setMatches).catch(() => setMatches([]));
     } catch (e) {
@@ -224,18 +251,21 @@ export default function VipPortal() {
           </label>
 
           <h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Your buy box — what you buy</h2>
-          <label style={labelStyle}>Markets (Florida counties)
-            <select multiple value={markets} onChange={(e) => setMarkets(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
-              {FLORIDA_COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Hold Ctrl/Cmd to pick several. Empty means no markets set.</span>
-          </label>
-          <label style={labelStyle}>States
-            <select multiple value={states} onChange={(e) => setStates(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...inputStyle, height: 110 }}>
-              {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Hold Ctrl/Cmd to pick several. Empty means no state constraint. Florida is the only state with live parcel data today.</span>
-          </label>
+          {/* Slice 133 — state-linked markets: the Market list
+              follows the picked State(s) (Census county data,
+              lib/us-counties.ts). No longer Florida-only. */}
+          <StateCountyFilter
+            states={states}
+            onStatesChange={setStates}
+            markets={markets}
+            onMarketsChange={setMarkets}
+            inputStyle={inputStyle}
+            labelStyle={labelStyle}
+            hintStyle={{ fontSize: 12, color: '#94a3b8' }}
+          />
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 10px' }}>
+            Florida is the only state with live parcel data today.
+          </p>
           <label style={labelStyle}>Target ZIP codes<input style={inputStyle} value={zipCodes} onChange={(e) => setZipCodes(e.target.value)} placeholder="e.g. 34950, 33313 (comma-separated, optional)" inputMode="numeric" />
             <span style={{ fontSize: 12, color: '#94a3b8' }}>Empty means no ZIP constraint.</span>
           </label>
@@ -251,6 +281,40 @@ export default function VipPortal() {
             <label style={labelStyle}>Min price<input style={inputStyle} value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="Min price (optional)" inputMode="decimal" /></label>
             <label style={labelStyle}>Max price<input style={inputStyle} value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Max price (optional)" inputMode="decimal" /></label>
           </div>
+          {/* Slice 133 criteria — same fields as the buy-box form. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label style={labelStyle}>Max ARV %<input style={inputStyle} value={maxArvPct} onChange={(e) => setMaxArvPct(e.target.value)} placeholder="e.g. 70 (optional)" inputMode="decimal" />
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>The most you will pay, as a % of ARV. Empty means no cap.</span>
+            </label>
+            <label style={labelStyle}>Min profit $<input style={inputStyle} value={minProfit} onChange={(e) => setMinProfit(e.target.value)} placeholder="e.g. 20000 (optional)" inputMode="decimal" />
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>The least profit you need (ARV − price − repairs). Empty means no minimum.</span>
+            </label>
+          </div>
+          <fieldset style={{ border: '1px solid #334155', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
+            <legend style={{ fontSize: 13 }}>Condition preferences</legend>
+            {CONDITION_OPTIONS.map((t) => (
+              <label key={t} style={{ display: 'inline-block', fontSize: 13, marginRight: 12 }}>
+                <input type="checkbox" checked={condPrefs.includes(t)} onChange={(e) => setCondPrefs(e.target.checked ? [...condPrefs, t] : condPrefs.filter((x) => x !== t))} /> {t}
+              </label>
+            ))}
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Empty means any condition.</div>
+          </fieldset>
+          <fieldset style={{ border: '1px solid #334155', borderRadius: 6, margin: '0 0 10px', padding: '8px 10px' }}>
+            <legend style={{ fontSize: 13 }}>Strategy preferences</legend>
+            {STRATEGY_OPTIONS.map((t) => (
+              <label key={t} style={{ display: 'inline-block', fontSize: 13, marginRight: 12 }}>
+                <input type="checkbox" checked={stratPrefs.includes(t)} onChange={(e) => setStratPrefs(e.target.checked ? [...stratPrefs, t] : stratPrefs.filter((x) => x !== t))} /> {t}
+              </label>
+            ))}
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Empty means any strategy.</div>
+          </fieldset>
+          <label style={labelStyle}>Closing timeline
+            <select style={inputStyle} value={closingTimeline} onChange={(e) => setClosingTimeline(e.target.value)}>
+              <option value="">No preference</option>
+              {CLOSING_TIMELINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>How fast you can close. Empty means no preference.</span>
+          </label>
           <label style={labelStyle}>Rehab tolerance
             <select style={inputStyle} value={rehab} onChange={(e) => setRehab(e.target.value)}>
               {REHAB_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -284,6 +348,13 @@ export default function VipPortal() {
           <button type="button" onClick={save} disabled={saving} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
             {saving ? 'Saving…' : 'Save my VIP profile'}
           </button>
+
+          {/* Slice 133 — proof of funds. The document is private;
+              the operator verifies it; the public buy box then
+              shows "POF verified" with the date. No bank account
+              numbers are ever displayed. */}
+          <h2 style={{ fontSize: 16, margin: '20px 0 8px' }}>Proof of funds — verify you can close</h2>
+          {userId && <ProofOfFundsUpload userId={userId} />}
 
           <h2 style={{ fontSize: 16, margin: '20px 0 8px' }}>Published deals matching your buy box</h2>
           {matches === null ? (

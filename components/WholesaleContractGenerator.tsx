@@ -55,6 +55,19 @@ export interface ContractPrefill {
   purchasePrice?: number | null;
   assignmentFee?: number | null;
   maoReference?: number | null;
+  // Slice 133 — drafting the assignment from an ACCEPTED offer on
+  // a published deal. The deal page hands the offer's real terms
+  // here: the accepted price (purchasePrice), the offer's closing
+  // date and EMD, and the offering buyer's public name/company as
+  // the assignee. The assignment fee is NEVER carried in — the
+  // wholesaler types it in the generator (see the deal page).
+  // doc selects which document opens: 'assignment' for the
+  // offer draft, unset for the existing purchase default.
+  doc?: 'purchase' | 'assignment';
+  endBuyerName?: string;
+  endBuyerEntity?: string;
+  closingDate?: string;
+  assignmentEmdAmount?: number | null;
 }
 
 function emptyFields(): WholesaleContractFields {
@@ -138,8 +151,19 @@ export default function WholesaleContractGenerator({ userId, prefill }: { userId
       purchase_price: prefill.purchasePrice != null ? prefill.purchasePrice : prev.purchase_price,
       assignment_fee: prefill.assignmentFee != null ? prefill.assignmentFee : prev.assignment_fee,
       mao_reference: prefill.maoReference != null ? prefill.maoReference : prev.mao_reference,
+      // Slice 133 — accepted-offer draft: the assignee is the buyer
+      // who made the accepted offer, the closing date and the
+      // assignment EMD are the offer's own terms. The assignment
+      // fee is deliberately NOT set here — the wholesaler enters
+      // it, and the form will not print without it.
+      end_buyer_name: prefill.endBuyerName || prev.end_buyer_name,
+      end_buyer_entity: prefill.endBuyerEntity || prev.end_buyer_entity,
+      closing_date: prefill.closingDate || prev.closing_date,
+      assignment_emd_amount:
+        prefill.assignmentEmdAmount != null ? prefill.assignmentEmdAmount : prev.assignment_emd_amount,
     }));
     if (prefill.isProbate) setDoc('purchase');
+    if (prefill.doc) setDoc(prefill.doc);
   }, [prefill]);
 
   const set = <K extends keyof WholesaleContractFields>(key: K, value: WholesaleContractFields[K]) =>
@@ -203,7 +227,7 @@ export default function WholesaleContractGenerator({ userId, prefill }: { userId
         }
       `}</style>
       <h2 style={{ fontSize: 20, margin: '0 0 4px' }}>📝 Wholesale Contract Generator</h2>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>
+      <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 4px' }}>
         A-to-B purchase agreement + B-to-C assignment. Templates only — have licensed real estate
         counsel in your state review and approve them before signing or submitting to title.
         Nothing here files, sends, or signs anything.
@@ -212,7 +236,7 @@ export default function WholesaleContractGenerator({ userId, prefill }: { userId
         {ATTORNEY_REVIEW_BANNER}
       </p>
       {!profile && (
-        <p style={{ fontSize: 13, color: '#b45309', margin: '0 0 12px' }}>
+        <p style={{ fontSize: 13, color: '#fcd34d', margin: '0 0 12px' }}>
           Fill in Storefront Settings to add your name, company, and number — this form leaves them
           blank rather than using anyone else&apos;s details.
         </p>
@@ -274,7 +298,7 @@ export default function WholesaleContractGenerator({ userId, prefill }: { userId
           <label style={labelStyle}>ARV (for the MAO reference)<input style={inputStyle} value={arv} onChange={(e) => setArv(e.target.value)} placeholder="ARV from comps" inputMode="decimal" /></label>
           <label style={labelStyle}>Estimated repairs<input style={inputStyle} value={repairs} onChange={(e) => setRepairs(e.target.value)} placeholder="Estimated repair costs" inputMode="decimal" /></label>
           {maoReference != null && (
-            <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px' }}>
+            <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 8px' }}>
               MAO reference: ${maoReference.toLocaleString()} — a ceiling from your own numbers, shown
               for reference only. It is never the purchase price.
             </p>
@@ -289,22 +313,22 @@ export default function WholesaleContractGenerator({ userId, prefill }: { userId
         </div>
       </div>
 
-      {printMsg && <p style={{ fontSize: 13, color: '#b91c1c', margin: '0 0 8px' }}>{printMsg}</p>}
+      {printMsg && <p style={{ fontSize: 13, color: '#fca5a5', margin: '0 0 8px' }}>{printMsg}</p>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button type="button" onClick={printDoc} disabled={missing.length > 0} title={missing.length > 0 ? `Enter ${missing.join(', ')} first` : 'Print this document'} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#0f172a', color: '#fff', cursor: missing.length > 0 ? 'not-allowed' : 'pointer', opacity: missing.length > 0 ? 0.5 : 1 }}>
           Print
         </button>
-        <button type="button" onClick={downloadTxt} disabled={missing.length > 0} title={missing.length > 0 ? `Enter ${missing.join(', ')} first` : 'Download as .txt'} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: missing.length > 0 ? 'not-allowed' : 'pointer', opacity: missing.length > 0 ? 0.5 : 1 }}>
+        <button type="button" onClick={downloadTxt} disabled={missing.length > 0} title={missing.length > 0 ? `Enter ${missing.join(', ')} first` : 'Download as .txt'} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: missing.length > 0 ? 'not-allowed' : 'pointer', opacity: missing.length > 0 ? 0.5 : 1 }}>
           Download .txt
         </button>
         {missing.length > 0 && (
-          <span style={{ fontSize: 13, color: '#64748b', alignSelf: 'center' }}>
+          <span style={{ fontSize: 13, color: '#cbd5e1', alignSelf: 'center' }}>
             Enter {missing.join(', ')} before printing.
           </span>
         )}
       </div>
 
-      <div id="printable-contract" style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 20, background: '#fff' }}>
+      <div id="printable-contract" style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 20, background: '#fff', color: '#0f172a' }}>
         <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{docText}</pre>
       </div>
     </div>

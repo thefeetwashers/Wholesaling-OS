@@ -297,6 +297,139 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   sender domain — neither exists; Resend setup is a FOUNDER task
   for later).
 
+### Slice 133 — Buyer offers, POF verification, saved searches, deal attention stats, assignment from a match, SEO, phone check, state-linked counties (3,229), Copy Deal & Open OBL, buy-box criteria, buyer invite link
+
+- `supabase/migrations/20261117140000_slice133_deal_offers.sql` —
+  `deal_offers` (deal_id, buyer_id, offer_price > 0, emd_amount ≥ 0
+  nullable, closing_date nullable, status pending/accepted/declined/
+  withdrawn; buyer INSERT own + SELECT own-or-owner-or-operator,
+  owner decide, buyer withdraw, no DELETE policy, no anon access;
+  GRANTs in-file).
+- `supabase/migrations/20261117141000_slice133_proof_of_funds.sql` —
+  private bucket `buyer-pof-documents` (buyer insert/select/delete
+  own, operator select all) + `buyer_pof_documents` (one row per
+  buyer, status pending/verified/rejected; a buyer can never
+  self-verify — the decide policy forces verified rows to carry
+  `verified_at` + `verified_by`) + public view `verified_buyer_pof`
+  (verified rows only, user_id + verified_at; anon SELECT on the
+  view only, no anon access to table or bucket).
+- `supabase/migrations/20261117142000_slice133_deal_stats.sql` —
+  `deal_views` (RLS enabled, zero anon/authenticated policies — the
+  service-role route is the only writer/reader) + `deal_price_history`
+  (deal_id, old_price, new_price, changed_at; owner-insert only,
+  public read restricted to published deals, operator read).
+- `supabase/migrations/20261117143000_slice133_saved_searches.sql` —
+  `buyer_saved_searches` (user_id, states/markets/property_types
+  text[], min_price, max_price; owner CRUD + operator read, no anon).
+- `supabase/migrations/20261117144000_slice133_deal_status.sql` —
+  `published_deals.status` (CHECK Active/Under Contract/Sold,
+  default Active, idempotent ALTER) + an owner SELECT policy for
+  their own rows published or not (coordinator addition — Slice 132
+  gave the owner INSERT/UPDATE/DELETE but no SELECT, so an owner who
+  unpublished a deal could no longer read their own row to re-publish
+  or change its status) + a DB trigger rejecting offer INSERTs on
+  deals that are not Active-and-published (coordinator addition —
+  the UI block alone cannot stop a direct API caller; depends on
+  `deal_offers` from 20261117140000, which runs first).
+- `supabase/migrations/20261117145000_slice133_buy_box_criteria.sql` —
+  idempotent ALTERs adding `max_arv_pct`, `min_profit`,
+  `condition_preferences`, `strategy_preferences`,
+  `closing_timeline` to `wholesaler_buy_boxes` (grants already exist;
+  no new policies).
+- Offers + assignment: `lib/deal-offers.ts` (submit/decide/withdraw,
+  verified writes, role checks) + `app/deals/[id]/page.tsx` (offer
+  form, money EMPTY by default, "Sign in to make an offer" when
+  signed out; owner Accept/Decline; offering buyer Withdraw;
+  offers blocked when the deal is not Active — UI + submit handler
+  + DB trigger; deal fetches select `status` first and retry
+  without it when the migration has not been applied yet, so the
+  pages keep working pre-migration). `components/WholesaleContractGenerator.tsx`
+  + `app/page.tsx` (localStorage `ws_contract_prefill` handoff,
+  consumed once, ownership re-checked, opens the contracts view on
+  the assignment tab with the existing `buildAssignmentContract()` —
+  no second template; fee never carried, seller name + street
+  address never carried — a published deal holds neither).
+- POF: `lib/proof-of-funds.ts` + `components/ProofOfFundsUpload.tsx`
+  (PDF/PNG/JPG ≤ 10 MB; re-upload returns the row to pending and
+  clears any old verification) + `components/ProofOfFundsReview.tsx`
+  (wired into `OperatorStats`; Verify/Reject, 1-hour signed URLs
+  minted with the operator's own session) + `components/BuyerPofStatus.tsx`
+  ("POF verified — <date>" only when verified, nothing otherwise;
+  wired into `BuyerNetworks`, `/vip` upload, and `/buyers` cards
+  with preloaded verified dates). No bank account numbers displayed.
+- Saved searches: `lib/saved-searches.ts` + `/buyers` ("Save this
+  search" + Apply/Delete; matching deals shown in the app only, no
+  email alerts promised or sent). `/buyers` price filter is now a
+  Min/Max range pair so saved criteria match.
+- Stats: `app/api/deal-view/route.ts` (service-role GET + POST; one
+  counted view per browser session per deal) + `components/DealAttentionStats.tsx`
+  (days on market from real `created_at`, responses counted live
+  from `deal_responses`, price drops only from recorded history;
+  `publishDeal` records the initial price, best-effort; no edit flow
+  exists for a published deal's asking price, so drops stay dormant
+  until an edit flow calls `recordDealPriceHistory` — never an
+  invented prior price). Mounted on `/deals/[id]` before Property
+  facts.
+- SEO: `/deals` + `/buyers` added to `app/sitemap.ts` (same pattern
+  as `/school`); dynamic `/deals/[id]` deliberately not enumerated.
+- Phone check (code inspection only — no live render claimed):
+  real breakage fixed on `/deals` (300px card grid inside padded
+  containers overflowed at 320px → `minmax(min(300px, 100%), 1fr)`),
+  same class hardened on `/buyers` + `/join`; `/managed-dispo` and
+  `/deals/[id]` fit; long unbroken strings in highlights/notes/comp
+  addresses got `overflow-wrap`.
+- Counties: `lib/us-counties.ts` is a static module (no runtime
+  network call) — 56 codes, 3,229 county-equivalent names (3,235 raw
+  rows minus 6 same-named independent cities in VA/MD/MO); Census
+  Gazetteer 2024 (3,222 rows: 50 states + DC + PR 78 municipios) +
+  Census TIGERweb for GU 1 / VI 3 / AS 5 / MP 4; FL cross-check PASS
+  exact 67/67 against the repo's `FLORIDA_COUNTIES`, and Florida
+  keeps the repo's verified list (imported, not copied); CO 64 / CA
+  58 / TX 254 / PR 78 all match TIGERweb; no county name invented,
+  no count adjusted by hand. The five territory codes (PR/GU/VI/AS/MP)
+  are selectable in the shared state list. `components/StateCountyFilter.tsx`
+  (shared state-linked Market filter) drives the buy box, `/buyers`
+  filters, `/vip`, both deal-blast county filters, and the
+  cash-buyer form's `target_counties`; multi-state → union; "All
+  markets" stays the default; a state with no loaded list shows
+  "counties not loaded yet". Known limitation (pre-existing model):
+  markets are bare county names with no state attached, so a name
+  shared by two states is one entry in a multi-state union.
+  `PropertyLookup` stays FL-only (untouched except the research-row
+  invite button). The `match-buy-box.ts` `storefront_profiles`
+  select was FIXED (it read `user_id`; the real key per Slice 124
+  is `wholesaler_id` — matched buyers' names had silently stayed
+  null).
+- Buy-box criteria: `lib/buy-box.ts` (`CONDITION_OPTIONS` 5 pinned,
+  `STRATEGY_OPTIONS` 7, `CLOSING_TIMELINE_OPTIONS` 4; all empty by
+  default) + `lib/match-buy-box.ts` (each field applies only when
+  set; empty = no constraint) + form inputs in `BuyerNetworks` and
+  `/vip` + criteria shown on `/buyers` cards ("not provided" when
+  blank). "Broadcast to My BYOK Buyers" + send-invite-blast were NOT
+  built (broken paste code; Slice 134 builds the provider store +
+  dispatcher first).
+- Buyer invite: `/join` reads `?role=buyer` from the URL query
+  (plus `?ref=` stashed as `ws_invite_ref`, nothing reads it yet, no
+  attribution claimed); `lib/invite-link.ts` + `components/BuyerInviteLink.tsx`
+  (Copy invite link + QR in the verified goqr.me format, link shown
+  as text, `?ref=<own public_slug>` when saved); "Copy invite link"
+  in the Cash Buyers view, `BuyerNetworks`, and each corporate-buyer
+  research row (no auto-email — roll data has no emails, no provider,
+  no consent); "Get deals like this — register your buy box" CTAs on
+  `/deals`, `/deals/[id]`, `/buyers`; honest label "They register
+  themselves — one tap on your link."
+- Cross-post + status: `lib/deal-cross-post.ts` (pure formatter from
+  real `published_deals` columns only — never a street address;
+  blanks "not provided") + `components/CopyDealToOblButton.tsx`
+  (copies the summary, then opens openbuyerslist.com for hand
+  cross-posting, labeled "does not auto-post"; owner-only) +
+  `components/DealStatusBadge.tsx` + `lib/deal-status.ts` +
+  `components/MyPublishedDeals.tsx` (new table in the Leads view,
+  where deals are published from; status dropdown + copy button +
+  detail link). The paste's standalone index.html + SQL were
+  rejected: no `public.deals` table, no anon SELECT `USING(true)`
+  policy. Build tag reads Slice 133.
+
 ### Other
 
 - `lib/ledger.ts` — the slice ledger (code-only verified vs live proof
@@ -322,7 +455,7 @@ Already applied (Nov 15–16, 2026 — do not re-run unless the database was res
 | `20261115170000_saas_subscriptions.sql` | Slice 129 |
 | `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (Slices 130–132 — apply after the deploy):
+New in this push (Slices 130–133 — apply after the deploy):
 
 | File | Contents |
 | --- | --- |
@@ -331,6 +464,12 @@ New in this push (Slices 130–132 — apply after the deploy):
 | `20261117130000_slice132_marketplace_tables.sql` | `published_deals` + `deal_responses` + `managed_dispo_requests` tables + RLS + GRANTs (incl. anon SELECT on published deals only) in the same file |
 | `20261117131000_slice132_buy_box_published.sql` | `wholesaler_buy_boxes.published` + `zip_codes` + `rehab_tolerance` + `states` + `email_alerts_opt_in`; minimal public read policy + anon SELECT grant |
 | `20261117133000_slice132_buyer_contact_profiles.sql` | `profiles.contact_name` + `contact_phone` + `contact_private` (ALTER only) + mutual-opt-in RPC `get_buyer_contact_for_response(uuid)` |
+| `20261117140000_slice133_deal_offers.sql` | `deal_offers` table (price/EMD/closing date, status pending/accepted/declined/withdrawn) + RLS + GRANTs in the same file |
+| `20261117141000_slice133_proof_of_funds.sql` | Private bucket `buyer-pof-documents` + `buyer_pof_documents` table + public view `verified_buyer_pof` (verified rows only) + RLS + GRANTs in the same file |
+| `20261117142000_slice133_deal_stats.sql` | `deal_views` (service-role route is the only writer/reader) + `deal_price_history` tables + RLS + GRANTs in the same file |
+| `20261117143000_slice133_saved_searches.sql` | `buyer_saved_searches` table (owner CRUD + operator read, no anon) + GRANTs in the same file |
+| `20261117144000_slice133_deal_status.sql` | `published_deals.status` (Active/Under Contract/Sold, default Active) + owner SELECT policy for own rows + DB trigger rejecting offer INSERTs on non-Active deals |
+| `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 

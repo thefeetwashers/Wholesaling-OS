@@ -107,7 +107,7 @@ export default function SchoolBootcamp() {
         </p>
       )}
       {!userId && (
-        <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px' }}>
+        <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 12px' }}>
           The lessons below are free to read. Sign in to track your progress and earn the Verified Operator badge.
         </p>
       )}
@@ -116,13 +116,13 @@ export default function SchoolBootcamp() {
         <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>
           {current.icon} Day {current.day} — {current.title}
         </h2>
-        <p style={{ fontSize: 14, color: '#475569', margin: '0 0 4px' }}>{current.dek}</p>
-        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>About {current.minutes} minutes to read.</p>
+        <p style={{ fontSize: 14, color: '#cbd5e1', margin: '0 0 4px' }}>{current.dek}</p>
+        <p style={{ fontSize: 12, color: '#cbd5e1', margin: '0 0 16px' }}>About {current.minutes} minutes to read.</p>
         {current.steps.map((s, i) => (
           <section key={i} style={{ marginBottom: 16 }}>
             <h3 style={{ margin: '0 0 6px', fontSize: 17 }}>{s.h}</h3>
             {s.body.map((p, j) => (
-              <p key={j} style={{ fontSize: 14, color: '#334155', lineHeight: 1.6, margin: '0 0 8px' }}>
+              <p key={j} style={{ fontSize: 14, color: '#cbd5e1', lineHeight: 1.6, margin: '0 0 8px' }}>
                 {p}
               </p>
             ))}
@@ -133,13 +133,13 @@ export default function SchoolBootcamp() {
             <a
               key={l.href + l.label}
               href={l.href}
-              style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', textDecoration: 'underline' }}
+              style={{ fontSize: 13, fontWeight: 600, color: '#6ee7b7', textDecoration: 'underline' }}
             >
               {l.label} →
             </a>
           ))}
         </div>
-        <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', borderRadius: 10, padding: 14, marginTop: 12 }}>
+        <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f172a', borderRadius: 10, padding: 14, marginTop: 12 }}>
           <p style={{ fontSize: 14, margin: '0 0 8px' }}>
             <strong>Put it to work:</strong> the calculators, the lists, and the office are waiting.
           </p>
@@ -152,8 +152,8 @@ export default function SchoolBootcamp() {
         </div>
         {day < 7 ? (
           <div style={{ marginTop: 16 }}>
-            {err && <p style={{ color: '#b91c1c', fontSize: 13 }}>{err}</p>}
-            {msg && <p style={{ color: '#0f766e', fontSize: 13 }}>{msg}</p>}
+            {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
+            {msg && <p style={{ color: '#6ee7b7', fontSize: 13 }}>{msg}</p>}
             <button
               onClick={markComplete}
               disabled={busy || isDone}
@@ -164,7 +164,7 @@ export default function SchoolBootcamp() {
             {day < 7 && (
               <button
                 onClick={() => setDay(day + 1)}
-                style={{ marginLeft: 8, padding: '10px 18px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                style={{ marginLeft: 8, padding: '10px 18px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', fontWeight: 600, cursor: 'pointer' }}
               >
                 Next: Day {day + 1} →
               </button>
@@ -211,7 +211,7 @@ function Day7Quiz({
 
   if (alreadyPassed && !submitted) {
     return (
-      <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', borderRadius: 10, padding: 14, marginTop: 16 }}>
+      <div style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f172a', borderRadius: 10, padding: 14, marginTop: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>✓ Day 7 check passed</h3>
         <p style={{ fontSize: 14, color: '#475569', margin: 0 }}>
           You completed the 7-day bootcamp and passed the Day 7 check. Your Wholesaler profile and your JV Deal Room listings now show the
@@ -246,7 +246,7 @@ function Day7Quiz({
   };
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', marginTop: 16 }}>
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, background: '#fff', color: '#0f172a', marginTop: 16 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Day 7 check — 5 questions</h3>
       <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px' }}>
         Answer {DAY7_PASS_MARK} of 5 correctly to pass. Passing marks Day 7 complete and earns the ✓ Verified Operator badge on your

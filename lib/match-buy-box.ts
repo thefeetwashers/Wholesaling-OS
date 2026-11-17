@@ -34,6 +34,24 @@
 //     'moderate' passes Turnkey + Light rehab + Moderate rehab;
 //     'heavy' passes all conditions. A null deal condition passes.
 //     Any other tolerance value is treated as no preference.
+//   * Slice 133 criteria — each used ONLY when the buyer set it;
+//     empty is no constraint, and a deal missing the compared
+//     value passes that check (never excluded on unknown data):
+//     - Condition preferences: deal condition must be in the
+//       buyer's list (empty list = no preference).
+//     - Strategy preferences: the deal's free-text strategy must
+//       match one of the buyer's list, case-insensitively.
+//     - Max ARV %: asking_price must be <= pct% of the deal ARV.
+//     - Min profit $: deal ARV − asking_price − repair_estimate
+//       (repairs 0 when unknown — the same spread the deal blast
+//       computes) must be >= min_profit.
+//       Deal ARV for both = arv_high when set, else arv_low; a
+//       deal with no ARV at all passes both ARV checks.
+//     - Closing timeline: the buyer must be able to close by the
+//       deal's close_by date — days from today until close_by
+//       must be >= the timeline's max days (7 / 14 / 30;
+//       '30+ days' has no max and always passes). A deal with no
+//       close_by passes; an unparseable close_by passes.
 // Comparisons are trimmed and case-insensitive throughout, so a
 // 'st. lucie' county or 'fl' state still matches.
 //
@@ -52,6 +70,14 @@ export interface DealForMatching {
   asking_price: number | null;
   condition: string | null;
   state: string | null;
+  // Slice 133 — optional deal-side values for the new criteria.
+  // Absent (undefined) reads as "not known" and passes the
+  // check it feeds, same as null.
+  arv_low?: number | null;
+  arv_high?: number | null;
+  repair_estimate?: number | null;
+  strategy?: string | null;
+  close_by?: string | null;
 }
 
 export interface BuyBoxForMatching {
@@ -70,6 +96,14 @@ export interface BuyBoxForMatching {
   max_price: number | null;
   rehab_tolerance: string | null;
   states: string[];
+  // Slice 133 criteria — all optional; undefined/null/empty is
+  // no constraint. Added as optional fields so existing callers
+  // constructing this interface keep compiling (pinned contract).
+  max_arv_pct?: number | null;
+  min_profit?: number | null;
+  condition_preferences?: string[];
+  strategy_preferences?: string[];
+  closing_timeline?: string | null;
 }
 
 export interface DealSummary {
@@ -81,6 +115,13 @@ export interface DealSummary {
   property_type: string | null;
   asking_price: number | null;
   condition: string | null;
+  // Slice 133 — carried so findMatchingDeals can apply the new
+  // criteria without a second read.
+  arv_low: number | null;
+  arv_high: number | null;
+  repair_estimate: number | null;
+  strategy: string | null;
+  close_by: string | null;
 }
 
 const norm = (v: string | null | undefined): string =>
@@ -135,11 +176,63 @@ export function dealMatchesBuyBox(deal: DealForMatching, box: BuyBoxForMatching)
   // Rehab tolerance.
   if (!rehabPasses(deal.condition, box.rehab_tolerance)) return false;
 
+  // Slice 133 criteria — each only when the buyer set it.
+  // Condition preferences: a stated deal condition must be one
+  // the buyer picked; an unstated condition passes.
+  const condPrefs = normList(box.condition_preferences);
+  if (condPrefs.length > 0 && norm(deal.condition) !== '' && !condPrefs.includes(norm(deal.condition))) return false;
+
+  // Strategy preferences: a stated deal strategy must match one
+  // the buyer picked (case-insensitive); unstated passes.
+  const stratPrefs = normList(box.strategy_preferences);
+  if (stratPrefs.length > 0 && norm(deal.strategy) !== '' && !stratPrefs.includes(norm(deal.strategy))) return false;
+
+  // Max ARV % and min profit: both need a deal ARV (arv_high
+  // when set, else arv_low) and an asking price; a deal missing
+  // either passes both checks.
+  const dealArv = deal.arv_high != null ? deal.arv_high : deal.arv_low;
+  if (dealArv != null && deal.asking_price != null) {
+    if (box.max_arv_pct != null && deal.asking_price > (dealArv * box.max_arv_pct) / 100) return false;
+    if (box.min_profit != null) {
+      const repairs = deal.repair_estimate != null ? deal.repair_estimate : 0;
+      if (dealArv - deal.asking_price - repairs < box.min_profit) return false;
+    }
+  }
+
+  // Closing timeline: the buyer must be able to close by the
+  // deal's close_by date. '30+ days' has no max and always
+  // passes; a deal with no (or unparseable) close_by passes.
+  if (!closingTimelinePasses(deal.close_by, box.closing_timeline)) return false;
+
   return true;
 }
 
+// Max days to close for a timeline label ('30+ days' = no max).
+// Unknown/empty timeline reads as no preference.
+function closingTimelineMaxDays(timeline: string | null | undefined): number | null {
+  const t = norm(timeline);
+  if (t === '7 days or less') return 7;
+  if (t === '8-14 days') return 14;
+  if (t === '15-30 days') return 30;
+  return null;
+}
+
+function closingTimelinePasses(closeBy: string | null | undefined, timeline: string | null | undefined): boolean {
+  const maxDays = closingTimelineMaxDays(timeline);
+  if (maxDays == null) return true;
+  if (closeBy == null || norm(closeBy) === '') return true;
+  // close_by is a date (YYYY-MM-DD). Whole days from today
+  // (midnight) until that date; an unparseable value passes.
+  const close = new Date(`${closeBy.trim().slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(close.getTime())) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round((close.getTime() - today.getTime()) / 86400000);
+  return daysUntil >= maxDays;
+}
+
 const BUY_BOX_MATCH_SELECT =
-  'user_id, markets, zip_codes, property_types, min_price, max_price, rehab_tolerance, states';
+  'user_id, markets, zip_codes, property_types, min_price, max_price, rehab_tolerance, states, max_arv_pct, min_profit, condition_preferences, strategy_preferences, closing_timeline';
 
 function rowToBox(row: Record<string, unknown>): BuyBoxForMatching {
   const list = (v: unknown): string[] =>
@@ -155,6 +248,15 @@ function rowToBox(row: Record<string, unknown>): BuyBoxForMatching {
     max_price: num(row.max_price),
     rehab_tolerance: typeof row.rehab_tolerance === 'string' ? row.rehab_tolerance : null,
     states: list(row.states),
+    // Slice 133 criteria. A row from before migration
+    // 20261117145000 has no such columns — but the select above
+    // would already have failed then, and the caller degrades
+    // to no matches (same as the existing missing-table path).
+    max_arv_pct: num(row.max_arv_pct),
+    min_profit: num(row.min_profit),
+    condition_preferences: list(row.condition_preferences),
+    strategy_preferences: list(row.strategy_preferences),
+    closing_timeline: typeof row.closing_timeline === 'string' ? row.closing_timeline : null,
   };
 }
 
@@ -176,17 +278,22 @@ export async function findMatchingBuyers(deal: DealForMatching): Promise<BuyBoxF
     // the public /buyers directory shows). A missing profile or a
     // failed lookup leaves the fields null — never invented, and
     // never a reason to drop a real match.
+    // Slice 133 fix (Nov 17, 2026): the key is wholesaler_id,
+    // not user_id — migration 20261115130000 (Slice 124) defines
+    // storefront_profiles.wholesaler_id as the primary key. The
+    // old select on user_id errored, so names silently stayed
+    // null; matches themselves were never affected.
     try {
       const ids = [...new Set(matched.map((b) => b.user_id).filter(Boolean))];
       if (ids.length > 0) {
         const { data: profiles } = await supabase
           .from('storefront_profiles')
-          .select('user_id, display_name, company_name')
-          .in('user_id', ids);
+          .select('wholesaler_id, display_name, company_name')
+          .in('wholesaler_id', ids);
         const byUser = new Map<string, { display_name: string | null; company_name: string | null }>();
         for (const p of (profiles || []) as Record<string, unknown>[]) {
-          if (typeof p.user_id === 'string') {
-            byUser.set(p.user_id, {
+          if (typeof p.wholesaler_id === 'string') {
+            byUser.set(p.wholesaler_id, {
               display_name: typeof p.display_name === 'string' ? p.display_name : null,
               company_name: typeof p.company_name === 'string' ? p.company_name : null,
             });
@@ -207,7 +314,7 @@ export async function findMatchingBuyers(deal: DealForMatching): Promise<BuyBoxF
   }
 }
 
-const DEAL_SUMMARY_SELECT = 'id, city, state, county, zip, property_type, asking_price, condition';
+const DEAL_SUMMARY_SELECT = 'id, city, state, county, zip, property_type, asking_price, condition, arv_low, arv_high, repair_estimate, strategy, close_by';
 
 // Published deals that match this buy box. Same graceful [] on a
 // missing table or error. The deal county is carried in
@@ -230,6 +337,11 @@ export async function findMatchingDeals(box: BuyBoxForMatching): Promise<DealSum
       property_type: typeof row.property_type === 'string' ? row.property_type : null,
       asking_price: typeof row.asking_price === 'number' ? row.asking_price : null,
       condition: typeof row.condition === 'string' ? row.condition : null,
+      arv_low: typeof row.arv_low === 'number' ? row.arv_low : null,
+      arv_high: typeof row.arv_high === 'number' ? row.arv_high : null,
+      repair_estimate: typeof row.repair_estimate === 'number' ? row.repair_estimate : null,
+      strategy: typeof row.strategy === 'string' ? row.strategy : null,
+      close_by: typeof row.close_by === 'string' ? row.close_by : null,
     })) as DealSummary[];
     return summaries.filter((d) =>
       dealMatchesBuyBox(
@@ -240,6 +352,11 @@ export async function findMatchingDeals(box: BuyBoxForMatching): Promise<DealSum
           asking_price: d.asking_price,
           condition: d.condition,
           state: d.state,
+          arv_low: d.arv_low,
+          arv_high: d.arv_high,
+          repair_estimate: d.repair_estimate,
+          strategy: d.strategy,
+          close_by: d.close_by,
         },
         box,
       ),

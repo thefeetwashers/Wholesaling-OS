@@ -38,12 +38,36 @@ export interface BuyBox {
   // match-and-email Edge Function. False by default: the function
   // only emails published buy boxes with this flag true.
   email_alerts_opt_in: boolean;
+  // Slice 133 — OBL-style criteria FIELDS only (field names, never
+  // OBL buyer data). All empty by default; empty = no constraint.
+  // max_arv_pct: max % of ARV the buyer will pay (number or null).
+  // min_profit: min profit $ the buyer needs (number or null).
+  // condition_preferences / strategy_preferences: multi-selects
+  // from the pinned lists below (empty = no preference).
+  // closing_timeline: one of CLOSING_TIMELINE_OPTIONS, or null.
+  max_arv_pct: number | null;
+  min_profit: number | null;
+  condition_preferences: string[];
+  strategy_preferences: string[];
+  closing_timeline: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
+// The 5 pinned deal conditions — the same five the deal publish
+// form and matching use (lib/match-buy-box.ts). Never varied.
+export const CONDITION_OPTIONS = ['Turnkey', 'Light rehab', 'Moderate rehab', 'Heavy rehab', 'Gut rehab'];
+
+// Strategy preferences for the buy box (free-form deal strategy
+// is matched case-insensitively against these).
+export const STRATEGY_OPTIONS = ['Fix & Flip', 'Rental', 'BRRRR', 'Wholesale', 'New Build', 'Creative Finance', 'Other'];
+
+// Closing-timeline options. The value is the whole label, stored
+// as-is; matching reads the max days from it (30+ days = no max).
+export const CLOSING_TIMELINE_OPTIONS = ['7 days or less', '8-14 days', '15-30 days', '30+ days'];
+
 const BUY_BOX_SELECT =
-  'id, user_id, markets, property_types, min_price, max_price, notes, published, zip_codes, rehab_tolerance, states, email_alerts_opt_in, created_at, updated_at';
+  'id, user_id, markets, property_types, min_price, max_price, notes, published, zip_codes, rehab_tolerance, states, email_alerts_opt_in, max_arv_pct, min_profit, condition_preferences, strategy_preferences, closing_timeline, created_at, updated_at';
 
 export async function loadMyBuyBox(userId: string): Promise<BuyBox | null> {
   if (!supabaseConfigured || !supabase) return null;
@@ -85,6 +109,14 @@ export async function saveMyBuyBox(
           : null,
         states: (box.states || []).map((s) => s.trim().toUpperCase()).filter(Boolean),
         email_alerts_opt_in: box.email_alerts_opt_in === true,
+        // Slice 133 criteria — stored only when set; a non-finite
+        // number reads as empty, and a preference outside the
+        // pinned lists is dropped, never stored as junk.
+        max_arv_pct: typeof box.max_arv_pct === 'number' && Number.isFinite(box.max_arv_pct) ? box.max_arv_pct : null,
+        min_profit: typeof box.min_profit === 'number' && Number.isFinite(box.min_profit) ? box.min_profit : null,
+        condition_preferences: (box.condition_preferences || []).filter((c) => CONDITION_OPTIONS.includes(c)),
+        strategy_preferences: (box.strategy_preferences || []).filter((s) => STRATEGY_OPTIONS.includes(s)),
+        closing_timeline: CLOSING_TIMELINE_OPTIONS.includes(box.closing_timeline || '') ? (box.closing_timeline as string) : null,
       },
       { onConflict: 'user_id' },
     )
