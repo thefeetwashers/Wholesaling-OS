@@ -14,6 +14,12 @@ import { mailProvider, sendMail } from './server-mail';
 // environment this function quietly does nothing (the lead is still
 // created; the alert is dark, never faked). A failed send never
 // fails the lead: alerts are best-effort by contract.
+//
+// Slice 141 (audit #13) — this is the ONLY caller of sendMail:
+// one fixed-template alert to the lead's owner, with the recipient
+// and body fixed here. No user input reaches the mail provider, so
+// the shared platform mail key cannot be spent on mail of a
+// non-operator's choosing through this path.
 
 export async function alertLeadOwner(
   sb: SupabaseClient,

@@ -190,7 +190,7 @@ export default function Counties({ userId }: { userId: string | null }) {
       <h3 style={{ marginBottom: 6 }}>3 · Your own county links — saved to your office</h3>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
         Work a county the platform set doesn’t cover yet? Find its offices through your state directory above,
-        paste the links here, and they’re saved to YOUR office only — labeled unverified, never shown to anyone else.
+        paste the links here, and they’re saved to YOUR office only — labeled unverified, never shown to any other wholesaler.
         When many wholesalers save the same county, it moves up the platform’s verification list.
       </p>
       {!userId ? (

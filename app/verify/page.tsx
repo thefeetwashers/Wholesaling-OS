@@ -70,11 +70,12 @@ export default function VerifyPage() {
           and the machinery to break them was never built.
         </p>
 
-        <h3>6. Your workspace is sealed — including from us</h3>
+        <h3>6. Your workspace is sealed from every other wholesaler</h3>
         <p style={p}>
           Every account’s leads, buyers, and deals sit behind database row-level security:
-          your rows are readable only by your sign-in. The platform owner’s own screens show
-          billing status and anonymized totals — never your lists. List and deal screens
+          your rows are readable by your sign-in and by the platform owner — and by no other
+          account. The platform owner can open your lists for support and oversight, and never
+          shares, sells, or contacts your leads, buyers, or sellers. List and deal screens
           carry a viewer watermark, and worker roles get no export. If your trial lapses,
           your office is sealed, not deleted, and reopens exactly as you left it.
         </p>

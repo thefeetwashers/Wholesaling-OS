@@ -616,7 +616,7 @@ function BuyerPortal({ userId }: { userId: string }) {
         closing_timeline: closingTimeline || null,
       });
       setBox(saved);
-      setNote(`Buy box saved — last updated ${todayISO}. Save again any time to refresh it.${published ? ' It is published, so wholesalers can match you.' : ' It is not published, so only you can see it.'}`);
+      setNote(`Buy box saved — last updated ${todayISO}. Save again any time to refresh it.${published ? ' It is published, so wholesalers can match you.' : ' It is not published, so no wholesaler can see it.'}`);
     } catch (e) { setErr(e instanceof Error ? e.message : 'Save failed'); }
   };
 

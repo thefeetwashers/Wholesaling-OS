@@ -39,7 +39,7 @@ const FORGOTTEN: { title: string; body: string }[] = [
 
 export const FAQS: { q: string; a: string }[] = [
   { q: 'What does it cost?', a: 'One subscription: 90 days free, then $150/month per wholesaler. There is no per-deal cut, no percentage of your assignment fees, and no second platform fee hiding anywhere. Your assignment fees are your money.' },
-  { q: 'Who can see my leads and my buyer list?', a: 'Only you. Your workspace is sealed — the platform owner cannot open your leads, your buyers, or your deals. Ownership sees billing status and anonymous counts, never your business.' },
+  { q: 'Who can see my leads and my buyer list?', a: 'You and the platform owner. Your workspace is sealed from every other wholesaler by database row-level security — no other account can open your leads, your buyers, or your deals. The platform owner can open them for support and oversight, and never shares, sells, or contacts your leads, buyers, or sellers. Your data exports with you any time.' },
   { q: 'Does the platform find leads for me automatically?', a: 'It hands you the doors and the routines, not a scraped database: official county playbooks, a government-auction radar and live feed, and a seller page that brings motivated sellers to you. Lists you build or lawfully buy import in one drop. Anyone promising you free nationwide probate lists "while you sleep" is selling you a terms-of-service violation with your name on the account.' },
   { q: 'Will it call or text sellers for me?', a: 'No — and that is deliberate. Federal law treats AI and bulk outreach to people who never consented as illegal telemarketing, with fines per message. The platform is your call desk: your queue, your scripts, one tap to send from your own accounts, every send consent-checked and logged.' },
   { q: 'Which states and counties does it cover?', a: 'All 50 states and U.S. territories — you can run a wholesaling business anywhere in the U.S. from this office. Florida is the deepest today (all 67 counties with verified clerk and appraiser doors; code enforcement is usually city-level and is marked not covered where no city page is in the set); every other state is reachable through its official state directory and the nationwide NETR county portal, and counties deepen as wholesalers work them.' },
@@ -58,7 +58,7 @@ const ROLES: { key: string; icon: string; title: string; body: string; cta: stri
 ];
 
 const ONLY_HERE: { tag: string; proof: string }[] = [
-  { tag: '🔒 Your leads are sealed — even from us', proof: 'The platform owner sees billing status and anonymous counts. Never your leads, buyers, or deals.' },
+  { tag: '🔒 Your leads are sealed from every other wholesaler', proof: 'Row-level security blocks every other account. The platform owner can open your lists for support and oversight — and never shares, sells, or contacts them.' },
   { tag: '🙈 Sellers never see your fee', proof: 'Seller views show their price only. Your assignment fee exists in your office and at the closing table — nowhere else.' },
   { tag: '✅ Every number is a real record', proof: 'No seeded buyers, no invented stats, no fake "live" counters. If it is on your dashboard, it happened in your database.' },
   { tag: '🏆 Buyer tiers from their closing record', proof: 'A buyer\'s tier is worked out from the closing record the platform holds — closed deals and escrows that fell through. The tier rules read those counts only.' },
@@ -121,7 +121,7 @@ export default function Landing({ onPickRole, userId, onOpenJvRoom }: { onPickRo
           </div>
           <div style={{ background: '#0b1526', border: '1px solid #1f3350', borderRadius: 10, padding: 14 }}>
             <strong>✅ Nothing to hide</strong>
-            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>Your leads stay sealed — even from us. Your data exports with you any time. Judge us the way you&rsquo;d judge any partner: by what survives inspection.</p>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>Your leads stay sealed from every other wholesaler. The platform owner can see them for support — and never shares, sells, or contacts them. Your data exports with you any time. Judge us the way you&rsquo;d judge any partner: by what survives inspection.</p>
           </div>
         </div>
       </section>

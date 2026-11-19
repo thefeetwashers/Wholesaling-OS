@@ -6,13 +6,15 @@ import type { ProfileAccess } from '../lib/access';
 
 // Slice 75 — Sealed-Office Win-Back. When a wholesaler's trial or
 // subscription lapses, the app locks — but nothing is deleted and
-// nothing is shown to anyone else: the same row-level security that
-// sealed the office while they worked keeps sealing it while they
-// are gone. This panel states that covenant where the lapsed user
-// actually lands, with their own waiting counts read from their own
-// rows (RLS lets an owner read their own records; the billing lock
-// is app-layer only), and the one-click way back: subscribe, and
-// the office reopens exactly as it was left.
+// nothing is shown to any other wholesaler: the same row-level
+// security that sealed the office from other accounts while they
+// worked keeps sealing it while they are gone. (The platform owner
+// can still open it for support, and never shares, sells, or
+// contacts the lists inside.) This panel states that covenant where
+// the lapsed user actually lands, with their own waiting counts read
+// from their own rows (RLS lets an owner read their own records; the
+// billing lock is app-layer only), and the one-click way back:
+// subscribe, and the office reopens exactly as it was left.
 
 interface Counts { leads: number; buyers: number; deals: number }
 
@@ -63,8 +65,8 @@ export default function SealedOffice({ userId, access }: { userId: string; acces
       )}
       <p style={{ fontSize: 13.5, color: '#94a3b8' }}>
         We keep a sealed office for at least 12 months after it lapses. Nothing is sold, shared, or shown to
-        anyone — the seal is the same row-level security that protected your office while you worked, and it
-        does not lift until you are back.
+        any other wholesaler — the seal is the same row-level security that protected your office while you worked, and it
+        does not lift until you are back. The platform owner can still open it for support, and never shares, sells, or contacts your leads, buyers, or sellers.
       </p>
       <p style={{ fontSize: 14 }}>
         Reopening takes one step: subscribe above, and your office comes back exactly as you left it —

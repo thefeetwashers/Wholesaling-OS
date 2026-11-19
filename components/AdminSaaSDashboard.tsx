@@ -10,7 +10,10 @@
 // each wholesaler reads only their own row).
 //
 // Status changes write through a verified update (the row's id +
-// the new plan_status only). Billing itself is NOT done here —
+// the new plan_status only). Slice 141: the operator UPDATE
+// policy (migration 20261119090300) is what lets this write land,
+// and changeStatus refuses a founder-exempt row ("Founder —
+// exempt, cannot change"). Billing itself is NOT done here —
 // Stripe is not configured yet (founder researching providers);
 // the "billing" note in the README lists the owner steps.
 
@@ -93,6 +96,14 @@ export default function AdminSaaSDashboard() {
   }, [rows]);
 
   async function changeStatus(row: SaaSRow, nextStatus: string) {
+    // Slice 141 (audit #9): the founder's row is exempt — refuse
+    // before any write is attempted. App-level only: the DB
+    // trigger guard still allows operator writes, so this stops
+    // the accidental dashboard click, not a direct API call.
+    if (row.is_founder_exempt === true) {
+      setErrorMessage('Founder — exempt, cannot change.');
+      return;
+    }
     setSavingId(row.id);
     try {
       if (!supabase) throw new Error('Supabase is not configured on this deployment.');

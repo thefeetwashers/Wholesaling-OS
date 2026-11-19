@@ -115,7 +115,7 @@ export default function AdminConsole({ userId, userEmail }: { userId: string | n
       ) : null}
       <p style={{ fontSize: 12, color: '#d8b4fe' }}>
         The roster shows account and billing information only. Individual users' buyer lists, leads, and deal details are never shown here —
-        a buyer list is a wholesaler's moat.
+        a buyer list is a wholesaler's moat. The owner can open a wholesaler's lists for support and oversight, and never shares, sells, or contacts them.
       </p>
       <h3 style={{ marginTop: 16 }}>County Verify Queue — where wholesalers are asking for coverage</h3>
       <p style={{ fontSize: 13 }}>

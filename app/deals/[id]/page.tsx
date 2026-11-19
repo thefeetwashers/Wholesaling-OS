@@ -104,7 +104,7 @@ import DealAttentionStats from '../../../components/DealAttentionStats';
 import DealStatusBadge from '../../../components/DealStatusBadge';
 import CopyDealToOblButton from '../../../components/CopyDealToOblButton';
 import { updateDealStatus, normalizeDealStatus, DEAL_STATUSES, type DealStatus } from '../../../lib/deal-status';
-import { openCopilot } from '../../../lib/ai-copilot';
+import { openCopilot, redactPhoneNumbers } from '../../../lib/ai-copilot';
 
 const money = (n: number | null | undefined): string =>
   n == null ? 'not provided' : `$${Math.round(n).toLocaleString()}`;
@@ -630,7 +630,11 @@ export default function DealDetailPage() {
     if (deal.property_type) parts.push(deal.property_type);
     if (deal.condition) parts.push(`condition ${deal.condition}`);
     if (deal.repair_estimate != null) parts.push(`rehab budget ${money(deal.repair_estimate)}`);
-    if (deal.notes) parts.push(`notes: ${deal.notes}`);
+    // Slice 141 (audit #15) — deal.notes is free text and may
+    // hold a phone number the seller typed in; redact
+    // phone-number-like patterns before it reaches the AI.
+    // openCopilot() redacts again at the choke point.
+    if (deal.notes) parts.push(`notes: ${redactPhoneNumbers(deal.notes)}`);
     openCopilot(parts.join(' — '));
   };
 
@@ -641,7 +645,7 @@ export default function DealDetailPage() {
       </p>
       {deal.published === false && isOwner && (
         <p style={{ fontSize: 14, background: '#fef3c7', color: '#0f172a', border: '1px solid #fbbf24', borderRadius: 8, padding: '10px 12px' }}>
-          This deal is unpublished — only you can see it here.
+          This deal is unpublished — no other wholesaler can see it here.
         </p>
       )}
       <h1 style={{ fontSize: 26, margin: '8px 0 4px' }}>

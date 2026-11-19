@@ -15,6 +15,19 @@ import { createHash, createHmac } from 'crypto';
 // AWS_SES_REGION (default us-east-1), AWS_SES_FROM or SEND_FROM_EMAIL
 // (default WholesalingOS <noreply@wholesalingos.thefeetwashers.com>),
 // RESEND_API_KEY (fallback only).
+//
+// Slice 141 (audit #13) — SHARED-KEY NOTE, stated honestly: the
+// SES keys and the RESEND_API_KEY fallback above are the platform
+// owner's shared keys, not per-wholesaler keys. They are reachable
+// ONLY server-side, and only through lib/lead-alert.ts, which sends
+// one fixed-template alert to the lead's OWNER (a fixed recipient,
+// fixed subject, fixed body — no caller supplies a recipient,
+// subject, or message). There is NO route that lets any user send
+// free-form mail, so no non-operator can spend the shared key on
+// mail of their choosing. Do NOT claim "no shared key anywhere":
+// this shared mail key exists by design, behind that fixed
+// template. (The AI shared key is a different case — see
+// app/api/assistant/route.ts, operator-gated in Slice 141.)
 
 export type MailProvider = 'ses' | 'resend';
 

@@ -35,7 +35,7 @@ const QUESTIONS: { q: string; test: string; answer: React.ReactNode }[] = [
   {
     q: '3. Can the platform’s owner read my leads?',
     test: 'The test: ask exactly which screens the owner sees into your account. “Trust us” is not an architecture.',
-    answer: <>Workspaces are sealed by database row-level security — including from us. The owner’s screens show billing status and anonymized totals, never a user’s lists. It is in <a href="/charter" style={a}>the Charter</a>: never peek.</>,
+    answer: <>Yes — and the honest version of the promise is in <a href="/charter" style={a}>the Charter</a>: your workspace is sealed from every other wholesaler by database row-level security, so no other account can open your lists. The owner can open them for support and oversight, and never shares, sells, or contacts your leads, buyers, or sellers.</>,
   },
   {
     q: '4. Does the seller ever see my assignment fee?',

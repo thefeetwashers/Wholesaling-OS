@@ -49,8 +49,8 @@ export default function PrivacyPage() {
         <p style={{ fontSize: 14 }}>
           The owner’s admin console shows account and billing information (email, role, subscription status, trial
           dates) and anonymized platform totals (counts of accounts, deals, listings, offers), plus county names
-          and counts in the county Verify Queue. It never shows the owner your leads, your buyer list, your deals,
-          or the links you saved. Your data is isolated per account by database Row Level Security.
+          and counts in the county Verify Queue. The owner can also open your leads, your buyer list, your deals,
+          and the links you saved, for support and oversight. Your data is isolated per account by database Row Level Security: no other account can open it. The owner never shares, sells, or contacts your leads, buyers, or sellers.
         </p>
 
         <h3>4. Who processes data for us</h3>

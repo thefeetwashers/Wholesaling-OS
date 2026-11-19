@@ -489,7 +489,7 @@ export function ScoutClaimBoard({ userId, onClaimed }: { userId: string; onClaim
       <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Scout leads — unclaimed</h3>
       <p style={{ fontSize: 13, color: '#cbd5e1', margin: '0 0 10px' }}>
         Properties spotted by scouts, waiting for a wholesaler to claim them. Claiming moves the lead into your sealed office — the scout can
-        still see it, nobody else can — and you own the owner outreach from there.
+        still see it, and no other wholesaler can — and you own the owner outreach from there.
       </p>
       {err && <p style={{ color: '#fca5a5', fontSize: 13 }}>{err}</p>}
       {leads.length === 0 ? (

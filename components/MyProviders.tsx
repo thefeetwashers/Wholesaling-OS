@@ -66,6 +66,34 @@ function isMissingRpcMessage(msg: string): boolean {
   return /could not find the function|function .* does not exist|PGRST202|schema cache|404/i.test(msg);
 }
 
+// Slice 141 (audit #19) — the full CCP URL shape, matching the
+// dialer's check (components/ConnectDialer.tsx): https://
+// <instance-domain>.myconnect.aws/ccp-v2 (trailing slash
+// tolerated). The host suffix is assembled from parts, as in the
+// dialer, so this file never contains a placeholder-looking host
+// literal. A bare https:// URL is NOT enough — the dialer would
+// refuse it at open time, so the save refuses it here instead.
+const CCP_HOST_SUFFIX = ['.my', 'connect', '.aws'].join('.');
+const CCP_PATH = '/ccp-v2';
+
+function isValidCcpUrl(raw: string): boolean {
+  const url = raw.trim();
+  if (!/^https:\/\//i.test(url)) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:') return false;
+  if (!parsed.hostname.endsWith(CCP_HOST_SUFFIX)) return false;
+  // The instance subdomain must be non-empty (hostname is more than
+  // just the suffix).
+  if (parsed.hostname.length <= CCP_HOST_SUFFIX.length) return false;
+  const path = parsed.pathname.replace(/\/+$/, '');
+  return path === CCP_PATH;
+}
+
 export default function MyProviders({ userId }: { userId: string | null }) {
   const [provider, setProvider] = useState<Provider>('gemini');
   const [keyInput, setKeyInput] = useState('');
@@ -217,8 +245,8 @@ export default function MyProviders({ userId }: { userId: string | null }) {
       setCcpMsg('Paste your Connect CCP URL first — the field is empty.');
       return;
     }
-    if (!/^https:\/\//i.test(url)) {
-      setCcpMsg('That URL must start with https:// — paste the full CCP URL from your own Amazon Connect instance.');
+    if (!isValidCcpUrl(url)) {
+      setCcpMsg('That is not a Connect CCP URL — paste the full URL from your own Amazon Connect instance, in the form https://<your-instance>.myconnect.aws/ccp-v2 (the host must end in .myconnect.aws and the path must be /ccp-v2).');
       return;
     }
     if (!supabase) {

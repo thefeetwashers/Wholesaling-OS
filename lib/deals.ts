@@ -1,7 +1,10 @@
 import { supabase, supabaseConfigured } from './supabase';
 import type { DealContract } from './contracts';
 
-// Deal shape matches production/schema.sql public.deals.
+// Deal shape follows the legacy public.deals table as dumped in
+// ~/workspace/legacy-schema-dump-20261117.md ("### deals — 22 columns"),
+// outside this repo — no production/ directory or schema.sql exists
+// in the repo, so do not cite one.
 // documents holds the signature-pipeline record (seller/buyer names and
 // A-B / JV / B-C statuses) — the table has no separate contract-status
 // columns, so the pipeline state lives there, honestly labeled.

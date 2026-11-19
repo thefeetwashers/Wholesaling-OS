@@ -28,7 +28,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabase';
-import { openCopilot } from '../lib/ai-copilot';
+import { openCopilot, redactPhoneNumbers } from '../lib/ai-copilot';
 import { loadLeads, importLeads, type Lead } from '../lib/leads';
 import { buildDistressLeads } from './CsvLeadImporter';
 import {
@@ -83,7 +83,11 @@ function rowKey(feedId: string, index: number): string {
 // invented.
 function distressedSummary(r: DistressedRow): string {
   const place = [r.city, r.state].filter(Boolean).join(', ');
-  const violation = (r.violation || '').trim();
+  // Slice 141 (audit #15) — the violation description is free
+  // text from the feed; redact phone-number-like patterns before
+  // it reaches the AI. openCopilot() redacts again at the choke
+  // point.
+  const violation = redactPhoneNumbers((r.violation || '').trim());
   return violation
     ? `Distressed property, ${place} — active code violation: ${violation}`
     : `Distressed property, ${place}`;

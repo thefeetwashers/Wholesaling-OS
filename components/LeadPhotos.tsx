@@ -65,7 +65,7 @@ export default function LeadPhotos({ userId, lead }: { userId: string; lead: Lea
       <strong style={{ fontSize: 13.5 }}>📷 Photos — private to your account</strong>
       <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '4px 0 8px' }}>
         Walk-through shots, condition photos, paperwork snaps. Images only, 5 MB each, up to {MAX_PHOTOS_PER_LEAD} per
-        lead. Only you can open them — every view is a short-lived signed link. Photos a seller sends through
+        lead. No other wholesaler can open them — every view is a short-lived signed link. Photos a seller sends through
         your seller page land here too, labeled "from seller".
       </p>
       {photos === null ? (

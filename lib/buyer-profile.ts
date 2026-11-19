@@ -138,10 +138,18 @@ export async function saveMyBuyerProfile(
 //       deal_responses row for that response has BOTH
 //       owner_contact_shared AND responder_contact_shared true,
 //       AND the caller is the operator or one of the two parties
-//       to that response. Otherwise it returns no rows. The
-//       buyer's contact_private flag is the floor: private by
-//       default, and the RPC never reveals on a single side's
-//       share alone.
+//       to that response. Otherwise it returns no rows.
+//       contact_private does NOT gate this RPC (corrected Slice
+//       141 — the earlier claim that it was "the floor" was
+//       false: neither RPC references contact_private).
+//       contact_private keeps the contact out of the public
+//       /buyers directory and plain profile reads; the reveal
+//       here is governed solely by the mutual opt-in (BOTH flags
+//       true) plus the caller being a party — and the per-deal
+//       "Share my contact" tap is itself the explicit consent
+//       (the VIP form promises sharing "when we both agree on a
+//       deal"). Gating the RPC on contact_private would break
+//       sharing for every buyer, since it defaults true.
 //
 // Until that function exists this call returns available: false
 // with an honest reason — it never throws into a page and never
@@ -193,7 +201,9 @@ export async function loadBuyerContactForResponse(responseId: string): Promise<C
 // saveMyBuyerProfile above; the email is their account email)
 // ONLY when the same deal_responses row has BOTH
 // owner_contact_shared AND responder_contact_shared true, AND
-// the caller is the operator or one of the two parties. Same
+// the caller is the operator or one of the two parties.
+// contact_private does not gate this RPC either (same correction
+// as the responder direction, Slice 141). Same
 // honest-unavailable shape as the responder direction: it never
 // throws into a page and never falls back to a plain read of
 // profiles (owner-only RLS means another user cannot read the

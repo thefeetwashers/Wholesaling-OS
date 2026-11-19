@@ -32,7 +32,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
-import { openCopilot } from '../lib/ai-copilot';
+import { openCopilot, redactPhoneNumbers } from '../lib/ai-copilot';
 
 export interface RealtorPocketListing {
   id: string;
@@ -61,7 +61,11 @@ const money = (n: number | null | undefined): string =>
 // commission % (or "not stated"), and the notes — NEVER the street
 // address, NEVER agent contact, NEVER a phone number.
 function pocketSummary(r: RealtorPocketListing): string {
-  return `Realtor Pocket Listing, ${r.city}, ${r.state_code} — agent net asking $${Math.round(r.asking_price).toLocaleString()}, commission ${r.commission_percent == null ? 'not stated' : `${r.commission_percent}%`}, notes: ${r.property_notes || 'None'}`;
+  // Slice 141 (audit #15) — property_notes is free text from the
+  // agent and may hold a phone number; redact phone-number-like
+  // patterns before it reaches the AI. openCopilot() redacts
+  // again at the choke point.
+  return `Realtor Pocket Listing, ${r.city}, ${r.state_code} — agent net asking $${Math.round(r.asking_price).toLocaleString()}, commission ${r.commission_percent == null ? 'not stated' : `${r.commission_percent}%`}, notes: ${redactPhoneNumbers(r.property_notes || 'None')}`;
 }
 
 const POCKET_AUTO_QUESTION =
@@ -158,6 +162,19 @@ export default function RealtorPocketListings({ userId, operatorEmail }: { userI
 
   const approveAndPromote = async (row: RealtorPocketListing) => {
     if (!supabase) return;
+    // Slice 141 (audit #16) — only a listing awaiting a decision
+    // (new / reviewed) can be promoted. A DECLINED listing must
+    // never be promoted: the operator has to move it back to
+    // reviewed first if it is to be reconsidered. (A literal
+    // "only when status is approved" gate would deadlock this
+    // button — 'approved' is only ever set BY this promote step,
+    // and the status dropdown offers new / reviewed / declined.)
+    if (row.status !== 'new' && row.status !== 'reviewed') {
+      setError(
+        `This listing is marked ${row.status} — it cannot be promoted. Change its status back to reviewed first if you want to reconsider it.`,
+      );
+      return;
+    }
     const raw = (markups[row.id] || '').trim();
     if (raw === '') {
       setError('Type the assignment markup for this deal first — the markup box starts empty and must be filled in.');

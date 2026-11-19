@@ -510,11 +510,11 @@ this repo: `ProbatePriorityLeads.tsx`, `DistressedOffMarketRadar.tsx`,
   covered + financing type offered, ISO-network track only). GRANT
   EXECUTE on both functions to `authenticated` is in the same file.
   No other policy, table, column, or grant is changed.
-- **Live re-check still needed after the migration is applied:**
-  sign in as a lender, open the Capital & Lending Partner Desk,
-  and confirm the recursion error is gone and the packets load.
-  That check is the proof — do not claim the fix works live until
-  it passes.
+- **Live re-check DONE 16:01–16:02 EST Nov 17, 2026:** signed in as a
+  lender, the Capital & Lending Partner Desk shows no recursion text and
+  loads normally with its honest empty state (Opt-In Deal Packets 0,
+  "No matched packets yet", "No lender boxes registered yet"). The fix is
+  proven live — CLOSED.
 
 ### Slice 139 — Amazon Connect softphone, BYOK (NOT live — no instance exists yet)
 
@@ -642,13 +642,12 @@ Already applied (Nov 15–16, 2026 — do not re-run unless the database was res
 | `20261115170000_saas_subscriptions.sql` | Slice 129 |
 | `20261115180000_leads_owner_contact.sql` | Slice 129 |
 
-New in this push (Slices 130–135 — apply after the deploy, except where noted applied):
+New in this push (Slices 130–140 — status per row):
 
 | File | Contents |
 | --- | --- |
-| `20261117123500_grant_authenticated_app_tables.sql` | Grants fix (Nov 17) — GRANTs to `authenticated` + `service_role` on the Slices 118–130 app tables, incl. `funding_requests` + `lender_boxes`; applied + verified live Nov 17, 2026, 12:40–12:42 EST |
-| `20261117150000_slice135_realtor_pocket_listings.sql` | Slice 135 — `realtor_pocket_listings` table + `submit_realtor_pocket_listing` function; applied + verified live Nov 17, 2026 |
 | `20261117090000_slice130_operator_visibility.sql` | `scout_leads.w9_received` + `w9_received_at` + W-9-before-paid CHECK; `funding_requests.interest_rate` + `loan_term_months`; `problem_reports` table + RLS |
+| `20261117123500_grant_authenticated_app_tables.sql` | Grants fix (Nov 17) — GRANTs to `authenticated` + `service_role` on the Slices 118–130 app tables, incl. `funding_requests` + `lender_boxes`; applied + verified live Nov 17, 2026, 12:40–12:42 EST |
 | `20261117124100_buyer_networks_buy_box.sql` | `wholesaler_buy_boxes` table (one buy box per wholesaler) + owner/operator RLS + GRANTs to `authenticated` and `service_role` in the same file |
 | `20261117130000_slice132_marketplace_tables.sql` | `published_deals` + `deal_responses` + `managed_dispo_requests` tables + RLS + GRANTs (incl. anon SELECT on published deals only) in the same file |
 | `20261117131000_slice132_buy_box_published.sql` | `wholesaler_buy_boxes.published` + `zip_codes` + `rehab_tolerance` + `states` + `email_alerts_opt_in`; minimal public read policy + anon SELECT grant |
@@ -659,11 +658,12 @@ New in this push (Slices 130–135 — apply after the deploy, except where note
 | `20261117143000_slice133_saved_searches.sql` | `buyer_saved_searches` table (owner CRUD + operator read, no anon) + GRANTs in the same file |
 | `20261117144000_slice133_deal_status.sql` | `published_deals.status` (Active/Under Contract/Sold, default Active) + owner SELECT policy for own rows + DB trigger rejecting offer INSERTs on non-Active deals |
 | `20261117145000_slice133_buy_box_criteria.sql` | `wholesaler_buy_boxes.max_arv_pct` + `min_profit` + `condition_preferences` + `strategy_preferences` + `closing_timeline` (idempotent ALTERs) |
-| `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; apply after the Slice 136 deploy |
+| `20261117150000_slice135_realtor_pocket_listings.sql` | Slice 135 — `realtor_pocket_listings` table + `submit_realtor_pocket_listing` function; applied + verified live Nov 17, 2026 |
+| `20261117151000_slice136_owner_contact_reveal.sql` | Slice 136 — mutual-opt-in RPC `get_owner_contact_for_response(uuid)` (mirror of `get_buyer_contact_for_response`, same both-flags + party/operator gate) + GRANT EXECUTE to `authenticated` in the same file; 52 lines; Applied + verified Nov 17, 2026 (15:26–15:28 EST) |
 | `20261117160000_slice137_provider_settings.sql` | Slice 137 (part A) — unified provider store `wholesaler_provider_settings` (AI columns only: `ai_provider`, `gemini_api_key`, `groq_api_key`, plain TEXT) + SECURITY DEFINER RPC `get_ai_key_status()` (masked keys only) + owner-only RLS + GRANTs to `authenticated` + `service_role` in the same file; Applied + verified Nov 17, 2026 (15:46–15:48 EST); skip-trace / email / SMS columns come with Slice 134, on this same table |
-| `20261117170000_slice138_rls_recursion_fix.sql` | Slice 138 — RLS infinite-recursion fix: SECURITY DEFINER helpers `requester_has_matching_iso_request(uuid, text[], text[])` + `lender_has_matching_box(uuid, text, text)` (boolean only, `set search_path = public`) + the three affected policies dropped and re-created to call them (matching semantics unchanged) + GRANT EXECUTE to `authenticated` in the same file; apply after the Slice 138 deploy |
+| `20261117170000_slice138_rls_recursion_fix.sql` | Slice 138 — RLS infinite-recursion fix: SECURITY DEFINER helpers `requester_has_matching_iso_request(uuid, text[], text[])` + `lender_has_matching_box(uuid, text, text)` (boolean only, `set search_path = public`) + the three affected policies dropped and re-created to call them (matching semantics unchanged) + GRANT EXECUTE to `authenticated` in the same file; Applied + verified Nov 17, 2026 (15:59–16:01 EST) |
 | `20261117180000_slice139_connect_ccp_url.sql` | Slice 139 — Amazon Connect softphone (BYOK): `wholesaler_provider_settings.connect_ccp_url` (text, nullable); no new policies/grants/tables; Applied + verified Nov 17, 2026 (16:14–16:16 EST) |
-| `20261117190000_slice140_founder_billing_exemption.sql` | Slice 140 — founder billing exemption: `saas_subscriptions.is_founder_exempt` (boolean, NOT NULL DEFAULT false) + UPDATE setting it true on the founder's row only (profiles email literal matching `is_operator()`); no new policies/grants/tables; apply after the Slice 140 deploy, after the Slice 139 migration, in timestamp order |
+| `20261117190000_slice140_founder_billing_exemption.sql` | Slice 140 — founder billing exemption: `saas_subscriptions.is_founder_exempt` (boolean, NOT NULL DEFAULT false) + UPDATE setting it true on the founder's row only (profiles email literal matching `is_operator()`); no new policies/grants/tables; Applied + verified Nov 17, 2026 (16:23–16:26 EST) |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -834,17 +834,31 @@ Honestly unset (features that stay off until they are set):
 Never write a real key or secret into this README, into chat, or into the
 repo. Do not commit `.env`.
 
-## 8. Go-live checklist (current state: Slice 135 live; Slice 136 audit fixes local only)
+## 8. Go-live checklist (current state: Slices 135–140 live; Slice 141 audit fixes local only)
 
-1. Slice 135 is LIVE on both `wholesalingos.thefeetwashers.com` and
-   `wholesalingos.vercel.app` (commit `f10bab5`, deploy confirmed Nov 17,
-   2026). Confirm the build tag reads **Slice 135** on both domains.
-   Slice 136 audit fixes (homepage wording, sitemap, `/roadmap`, lender-desk
-   error reporting) are local only — not pushed, not deployed.
+1. Slices 135–140 are ALL LIVE on both `wholesalingos.thefeetwashers.com` and
+   `wholesalingos.vercel.app` (deploy confirmed Nov 17, 2026 on both domains
+   for each slice). Confirm the build tag reads **Slice 140** on both domains.
+   Slice 135 (commit `f10bab5`, deploy 14:46 EST) — Distressed Finder,
+   Parcel Enricher, Agent Pocket Listings, API docs. Slice 136 (commit
+   `c26b6a8`, deploy 15:26 EST) — audit fixes. Slice 137 (commit `77e1212`,
+   deploy ~15:46 EST) — AI Copilot. Slice 138 (commit `88a1aa3`, deploy
+   ~15:58 EST) — RLS recursion fix. Slice 139 (commit `e871367`, deploy
+   16:14 EST) — Connect softphone. Slice 140 (commit `e0d487a`, deploy
+   16:23 EST) — founder billing exemption. Slice 141 audit fixes are local
+   only — not pushed, not deployed.
 2. Migrations applied live: Slice 133's six (`20261117140000`–
    `20261117145000`) and Slice 135's (`20261117150000`), verified Nov 17,
-   2026. Still pending: the **legacy-schema dump (not yet received)** — do
-   not invent its contents or apply anything for it until it arrives.
+   2026 — plus Slice 136's (`20261117151000`, 15:26–15:28 EST), Slice 137's
+   (`20261117160000`, 15:46–15:48 EST), Slice 138's (`20261117170000`,
+   15:59–16:01 EST), Slice 139's (`20261117180000`, 16:14–16:16 EST), and
+   Slice 140's (`20261117190000`, 16:23–16:26 EST); see §3 for the full
+   table. The **legacy-schema dump arrived Nov 17, 2026** — both dumps are
+   done, saved at `~/workspace/legacy-schema-dump-20261117.md` (re-dump
+   15:07 EST: 33 policies verbatim, 256 grant rows, 4 function
+   definitions). Do not invent its contents or apply anything for it
+   until the legacy-schema migrations are written from it (a later slice,
+   not this one).
 3. Stripe: **NOT connected** — no Stripe account, no product or price ID,
    no secrets set, and the `stripe-billing` function is NOT deployed.
    Do not claim billing is live. The $150/mo platform price itself is
@@ -861,9 +875,9 @@ repo. Do not commit `.env`.
    code swallowed the database's error behind the generic "Could not load
    packets." Slice 136 surfaces the real error in code (see
    `lib/funding.ts` `postgrestError` + `components/LenderDashboard.tsx`
-   `readableError`). **Live check still needed after the Slice 136
-   deploy:** sign in as a lender, open the desk, and read the surfaced
-   message before guessing a fix. Two often-suspected causes are already
+   `readableError`). **Live check done after the Slice 136
+   deploy:** the desk was opened signed in as a lender and the surfaced
+   message was read before any fix was guessed. Two often-suspected causes are already
    ruled out by the Nov 17 record: the grants migration `20261117123500`
    was applied + verified live 12:40–12:42 EST, and the Slice 130 columns
    migration `20261117090000` was applied + verified live 05:04–05:07 EST —
@@ -871,8 +885,12 @@ repo. Do not commit `.env`.
    Update Nov 17 ~15:45 EST: the surfaced message turned out to be an
    RLS infinite recursion (`funding_requests` [42P17]) — a cross-table
    policy loop between `lender_boxes` and `funding_requests`. Slice 138
-   fixes it with SECURITY DEFINER helpers (see the Slice 138 section
-   above); the live re-check after that migration is the proof.
+   fixed it with SECURITY DEFINER helpers (see the Slice 138 section
+   above), its migration applied + verified 15:59–16:01 EST, and the
+   live re-check PASSED 16:01–16:02 EST: signed in as a lender, the
+   Partner Desk shows no recursion text and loads normally with its
+   honest empty state. CLOSED — do not re-open this item unless the
+   error reappears.
    Confirm in the Supabase SQL editor with:
    `select has_table_privilege('authenticated', 'public.funding_requests', 'SELECT');`
    and `select column_name from information_schema.columns where table_name = 'funding_requests';`

@@ -235,7 +235,7 @@ function MarketplaceLanding() {
             <tr>
               <td style={cell}><strong style={{ color: '#fff' }}>Your leads and buyers</strong></td>
               <td style={cell}>On someone else&apos;s list</td>
-              <td style={cell}>Sealed in your own office — the platform owner cannot open them</td>
+              <td style={cell}>Sealed in your own office from every other wholesaler — the platform owner can open them for support, and never shares, sells, or contacts them</td>
             </tr>
           </tbody>
         </table>
@@ -392,7 +392,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 140</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 141</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,
@@ -426,7 +426,7 @@ export default function Home() {
             <span className="ws-chip">No other platform fee</span>
           </div>
           <ul>
-            <li>Your company office is sealed: your leads and buyer list are yours alone — not even the platform owner can see them.</li>
+            <li>Your company office is sealed from every other wholesaler: your leads and buyer list are yours alone — the platform owner can see them for support and oversight, and never shares, sells, or contacts them.</li>
             <li>Property owners see their price only. Your assignment fee stays yours.</li>
             <li>One pipeline, one deal record: Find → Qualify → Contract → Market → Show → Close → Track.</li>
           </ul>

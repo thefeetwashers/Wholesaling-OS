@@ -18,10 +18,13 @@
 // therefore resolve PER CALLING WHOLESALER (getGoogleKeys below,
 // reading that wholesaler's own settings), never from a single
 // global GOOGLE_SEARCH_API_KEY / GOOGLE_CSE_ID secret. The
-// per-wholesaler settings store (wholesaler_provider_settings
-// table + key encryption) is a FOLLOW-UP slice — it does not exist
-// yet, no provider is chosen yet, nothing is to be set up yet.
-// Until a provider is chosen and the settings store exists, this
+// per-wholesaler settings store (wholesaler_provider_settings)
+// EXISTS since Slice 137 (migration 20261117160000, applied Nov 17,
+// 2026) — but only with its AI key columns; the google_api_key /
+// google_cse_id columns come with Slice 134, which is QUEUED, not
+// built. Keys in that store are plain TEXT, never claimed “encrypted”.
+// No provider is chosen yet, nothing is to be set up yet.
+// Until a provider is chosen and the Slice 134 columns exist, this
 // function returns mode 'not_configured' and writes NOTHING.
 //
 // VERIFICATION STATUS (checked Nov 16, 2026, against Google's own
@@ -79,8 +82,9 @@ const GOOGLE_LIVE_ENABLED = false;
 // BYOK key lookup (founder decision, Nov 16, 2026): the Google API
 // key + CSE ID resolve PER WHOLESALER, from that wholesaler's own
 // settings — never from one global secret shared across offices.
-// The settings store is a FOLLOW-UP slice and does not exist yet,
-// so this returns null until it does. A failed read (including
+// The settings store exists since Slice 137, but the google_api_key /
+// google_cse_id columns do not exist yet (Slice 134, queued),
+// so this returns null until they do. A failed read (including
 // "table does not exist") is a null, not a crash — the caller then
 // gets mode 'not_configured' and nothing is written. The keys
 // belong to the LEAD'S owner (the wholesaler whose account pays for

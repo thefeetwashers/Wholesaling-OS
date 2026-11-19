@@ -24,6 +24,46 @@ import { createClient } from '@supabase/supabase-js';
 //
 // Only published deals are counted: an unpublished or unknown
 // id returns 404 with no detail.
+//
+// Slice 141 (audit #17) — SERVER-SIDE view dedupe. The client
+// dedupes per browser session (sessionStorage), but that never
+// stopped a repeat POST from counting again. This route now keeps
+// a small in-memory map of caller IP + dealId → last counted
+// time, and skips the insert when the same caller re-posts the
+// same deal inside the window. Honest limits, stated plainly:
+//   * the key is the request IP from x-forwarded-for (the
+//     platform sets it) — there is NO fingerprinting, no cookie,
+//     and no new table column (no migration in this slice);
+//   * the map lives per server instance and resets on restart,
+//     so it is a rate guard, not a unique-visitor count — the
+//     component already says the number counts page loads;
+//   * when no IP header is present the view is counted (the
+//     route cannot dedupe what it cannot see).
+// A skipped insert still returns the live stats.
+const VIEW_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
+const recentViews = new Map<string, number>();
+
+function callerIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get('x-forwarded-for') || '';
+  const first = forwarded.split(',')[0]?.trim() || '';
+  if (first) return first;
+  return req.headers.get('x-real-ip')?.trim() || null;
+}
+
+function alreadyCountedRecently(ip: string, dealId: string): boolean {
+  const key = `${ip}|${dealId}`;
+  const now = Date.now();
+  const last = recentViews.get(key);
+  if (last !== undefined && now - last < VIEW_DEDUPE_WINDOW_MS) return true;
+  recentViews.set(key, now);
+  // Prune stale entries so the map cannot grow without bound.
+  if (recentViews.size > 5000) {
+    for (const [k, t] of recentViews) {
+      if (now - t >= VIEW_DEDUPE_WINDOW_MS) recentViews.delete(k);
+    }
+  }
+  return false;
+}
 
 interface PriceHistoryRow {
   old_price: number | null;
@@ -107,7 +147,12 @@ export async function POST(req: NextRequest) {
   if (!deal) return NextResponse.json({ error: 'Deal not found.' }, { status: 404 });
 
   // A failed insert must not hide the stats: the view is
-  // secondary, the counts are the answer.
-  await service.from('deal_views').insert({ deal_id: dealId });
+  // secondary, the counts are the answer. Slice 141 (audit #17):
+  // skip the insert when this caller already counted this deal
+  // inside the dedupe window — the stats below are still live.
+  const ip = callerIp(req);
+  if (!ip || !alreadyCountedRecently(ip, dealId)) {
+    await service.from('deal_views').insert({ deal_id: dealId });
+  }
   return statsForDeal(dealId);
 }

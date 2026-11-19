@@ -37,7 +37,7 @@ export default function Buyers({ userId, userEmail }: { userId: string | null; u
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Buyers — Your Buyer List + Demand Map</h2>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>
-        Your private buyer list only. It is never shared with other users and never shown to the owner as raw rows.
+        Your private buyer list only. It is never shared with other users. The platform owner can open it for support and oversight, and never shares, sells, or contacts your buyers.
         The demand count below is buyers YOU entered, by state — not live corporate orders. The tier saved here is
         your private working label; tiers in Your Portal come from the closing record the platform holds for that buyer.
       </p>

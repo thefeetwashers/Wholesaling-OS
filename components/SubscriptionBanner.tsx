@@ -11,7 +11,10 @@
 // setting up Stripe" and does NOT open a dead checkout. No alert()
 // — the message lives in the banner itself. When the table does
 // not exist yet (migration 20261115170000 not applied), the banner
-// hides itself rather than erroring on the dashboard.
+// hides itself rather than erroring on the dashboard. Slice 141:
+// when only the is_founder_exempt column is missing (migration
+// 20261117190000 not applied), the banner loads the row without
+// the flag and renders normally instead of vanishing.
 
 'use client';
 
@@ -24,7 +27,17 @@ interface SubRow {
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   monthly_rate: number | null;
-  is_founder_exempt: boolean;
+  // Slice 141 (audit #10) — optional: when the
+  // is_founder_exempt column does not exist yet (migration
+  // 20261117190000 not applied) the banner loads the row
+  // without it and treats the account as not exempt, instead
+  // of vanishing for every user.
+  is_founder_exempt?: boolean;
+}
+
+function isMissingColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return /column .* does not exist|PGRST204/i.test(msg);
 }
 
 export default function SubscriptionBanner({ userId }: { userId: string }) {
@@ -43,7 +56,22 @@ export default function SubscriptionBanner({ userId }: { userId: string }) {
           .select('id, plan_status, trial_ends_at, stripe_customer_id, monthly_rate, is_founder_exempt')
           .eq('user_id', userId)
           .maybeSingle();
-        if (error) throw error;
+        if (error) {
+          // Slice 141 (audit #10) — deploy-order hazard: when the
+          // is_founder_exempt column does not exist yet, retry
+          // without it so the banner still renders (without the
+          // exempt flag) instead of vanishing for every user.
+          // Any other error still hides the banner, as before.
+          if (!isMissingColumnError(error)) throw error;
+          const { data: fallback, error: fallbackError } = await supabase
+            .from('saas_subscriptions')
+            .select('id, plan_status, trial_ends_at, stripe_customer_id, monthly_rate')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (fallbackError) throw fallbackError;
+          if (live) setRow(fallback ? ({ ...(fallback as Omit<SubRow, 'is_founder_exempt'>), is_founder_exempt: false } as SubRow) : null);
+          return;
+        }
         if (live) setRow((data as SubRow | null) || null);
       } catch {
         // Table missing (migration not applied yet) or no row —

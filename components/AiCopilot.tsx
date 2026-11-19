@@ -54,12 +54,43 @@ export default function AiCopilot() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Slice 141 (audit #14) — the wholesaler's selected AI provider
+  // (from the same get_ai_key_status() RPC My Providers uses), so
+  // the header warning below can be provider-conditional. null =
+  // unknown (RPC missing or not loaded yet): no provider policy is
+  // claimed for an unknown provider.
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const thinkingRef = useRef(false);
   // Context lives in state for rendering, and mirrored in a ref so
   // ask() — called in the same tick as the open event, before the
   // state update lands — still sends the fresh context.
   const contextRef = useRef<string | null>(null);
+
+  // Slice 141 (audit #14) — load the selected provider once, on
+  // mount, through the RPC only (never select('*') the settings
+  // row). A missing RPC leaves the provider unknown and the
+  // header falls back to the provider-neutral line.
+  useEffect(() => {
+    let live = true;
+    async function loadProvider() {
+      try {
+        if (!supabase) return;
+        const { data, error } = await supabase.rpc('get_ai_key_status');
+        if (!live || error) return;
+        const row = (Array.isArray(data) ? data[0] : data) as { ai_provider?: unknown } | null;
+        if (!live) return;
+        if (row?.ai_provider === 'groq') setAiProvider('groq');
+        else if (row?.ai_provider === 'gemini') setAiProvider('gemini');
+      } catch {
+        // Provider stays unknown — the neutral warning applies.
+      }
+    }
+    loadProvider();
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const ask = useCallback(async (question: string) => {
     const q = question.trim();
@@ -195,9 +226,26 @@ export default function AiCopilot() {
                 ✕
               </button>
             </div>
+            {/* Slice 141 (audit #14 + #15) — the provider warning
+                is conditional on the selected ai_provider: the
+                Google wording appears ONLY for Gemini; Groq (and
+                an unknown provider) get a provider-neutral line
+                that claims nothing about any provider's policy.
+                The second line is the free-text warning: do not
+                paste street addresses or phone numbers in notes —
+                the no-address/no-phone guarantee covers the
+                structured fields the app fills in, not free text
+                you type or paste. */}
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0', lineHeight: 1.45 }}>
-              Free tier — rate-limited, daily ceiling, resets midnight Pacific; free-tier prompts
-              may be used by Google to improve its products — never paste SSNs or seller phone numbers.
+              {aiProvider === 'gemini'
+                ? 'Free tier — rate-limited, daily ceiling, resets midnight Pacific; free-tier prompts may be used by Google to improve its products — never paste SSNs or seller phone numbers.'
+                : aiProvider === 'groq'
+                  ? 'Runs on your own Groq key and your own quota — never paste SSNs or seller phone numbers.'
+                  : 'Runs on your own key and your own quota — never paste SSNs or seller phone numbers.'}
+            </p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0', lineHeight: 1.45 }}>
+              Do not paste street addresses or phone numbers in your notes. The no-address/no-phone
+              guarantee covers the structured fields the app fills in only — not free text you type or paste.
             </p>
           </div>
 

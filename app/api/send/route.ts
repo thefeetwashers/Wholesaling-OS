@@ -6,10 +6,13 @@ import { sha256Hex } from '../../../lib/outreach';
 //
 // Each wholesaler sends through THEIR OWN provider accounts —
 // never through one shared operator account. The per-wholesaler
-// provider store (wholesaler_provider_settings, Slice 134) DOES NOT
-// EXIST YET: no table, no keys, no transport. So this route FAILS
-// CLOSED: GET reports both channels not connected, POST answers
-// 503 "not connected", and NOTHING is ever sent.
+// provider store (wholesaler_provider_settings) EXISTS since Slice 137
+// (migration 20261117160000, applied Nov 17, 2026) — but only with its
+// AI key columns so far. The SMS / email key columns this route
+// selects (twilio_*, ses_*, resend_api_key) come with Slice 134,
+// which is QUEUED, not built. So there is still no transport, and
+// this route FAILS CLOSED: GET reports both channels not connected,
+// POST answers 503 "not connected", and NOTHING is ever sent.
 //
 // The previous version sent through ONE shared operator Twilio /
 // SES / Resend account from hosting env vars. That violated BYOK
@@ -36,8 +39,9 @@ type Channel = 'sms' | 'email';
 // BYOK provider resolution — mirrors the skip-trace /
 // google-skip-trace Edge Functions (getProviderKey): the credential
 // resolves PER CALLING WHOLESALER from their own settings row,
-// never from a shared env var. The store does not exist yet, so
-// every lookup errors today and returns "not configured" — that is
+// never from a shared env var. The store exists since Slice 137, but
+// the SMS / email key columns do not exist yet (Slice 134, queued),
+// so every lookup errors today and returns "not configured" — that is
 // the honest answer, not a bug: no provider is configured for this
 // caller.
 //
@@ -106,7 +110,7 @@ async function verifyUserId(req: Request): Promise<string | null> {
 }
 
 const NOT_CONNECTED_REASON =
-  'Sending runs on your own provider accounts — none are connected for this account yet. The provider settings store is not built yet (Slice 134).';
+  'Sending runs on your own provider accounts — none are connected for this account yet. The SMS / email provider columns are not built yet (Slice 134, queued).';
 
 export async function GET(req: Request) {
   // Per-caller BYOK state: without a signed-in caller there is no

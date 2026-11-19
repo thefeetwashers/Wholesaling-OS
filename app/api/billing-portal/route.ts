@@ -8,10 +8,12 @@ import Stripe from 'stripe';
 // customer's own Stripe record. This route is that server step:
 //   * the caller must be signed in (same /auth/v1/user check the
 //     send route uses — the client is never trusted);
-//   * the caller's profile must carry a stripe_customer_id,
-//     which only the checkout webhook writes after a real
-//     subscription starts — no customer record, no portal, and
-//     the route says so instead of inventing one;
+// Slice 141 (audit #8) — founder-exempt accounts are refused
+// before any Stripe call (see POST below). The flag lives on
+// saas_subscriptions; the portal still requires a Stripe
+// customer record, which only the checkout webhook writes after
+// a real subscription starts — no customer record, no portal,
+// and the route says so instead of inventing one;
 //   * the session is created for that customer only, with the
 //     return address fixed to the app itself.
 // Required server env: STRIPE_SECRET_KEY + SUPABASE_SERVICE_ROLE_KEY
@@ -58,6 +60,20 @@ export async function POST(req: Request) {
 
   const { data, error } = await svc.from('profiles').select('stripe_customer_id').eq('id', userId).single();
   if (error) return Response.json({ error: 'Your account record could not be read.' }, { status: 500 });
+
+  // Slice 141 (audit #8) — founder-exempt refusal, BEFORE any
+  // Stripe call, matching the stripe-billing Edge Function's
+  // create_checkout refusal wording. The flag lives on
+  // saas_subscriptions; when that table/column does not exist
+  // yet (migration not applied) there is no exemption to
+  // enforce, so a read error lets the request continue — the
+  // portal still requires a real Stripe customer below.
+  const { data: sub } = await svc.from('saas_subscriptions').select('is_founder_exempt').eq('user_id', userId).maybeSingle();
+  if ((sub as { is_founder_exempt?: unknown } | null)?.is_founder_exempt === true) {
+    return Response.json({
+      error: 'This account is exempt from billing — no payment is required and no checkout will be created.',
+    }, { status: 403 });
+  }
 
   const customer = (data?.stripe_customer_id as string | null) || null;
   if (!customer) {

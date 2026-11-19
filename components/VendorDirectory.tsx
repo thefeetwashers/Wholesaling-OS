@@ -72,8 +72,8 @@ export default function VendorDirectory({ userId }: { userId: string | null }) {
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Lenders &amp; Vendors — Your Directory</h2>
       <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 0 }}>
-        Your own funding contacts and trades — private to your account, never shared, never shown to the
-        platform owner as raw rows. The platform ships with no entries and verifies none of them: no rates,
+        Your own funding contacts and trades — private to your account, never shared, never shown to any
+        other wholesaler. The platform owner can open them for support and oversight, and never shares, sells, or contacts them. The platform ships with no entries and verifies none of them: no rates,
         approvals, or endorsements are implied by a listing here. This is an address book, not a loan
         application — nothing is packaged or submitted to anyone.
       </p>

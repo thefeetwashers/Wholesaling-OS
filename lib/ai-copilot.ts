@@ -12,8 +12,30 @@
 export function openCopilot(contextSummary: string, autoQuestion?: string): void {
   window.dispatchEvent(
     new CustomEvent('ws:open-copilot', {
-      detail: { context: contextSummary, autoQuestion: autoQuestion ?? null },
+      // Slice 141 (audit #15) — light redaction at the single
+      // choke point: every context string passes through here,
+      // so a phone number typed into a note can never reach the
+      // AI even if a call site forgets to redact. Call sites
+      // redact their free-text fields too (defense in depth).
+      detail: { context: redactPhoneNumbers(contextSummary), autoQuestion: autoQuestion ?? null },
     }),
+  );
+}
+
+// Slice 141 (audit #15) — LIGHT redaction of phone-number-like
+// patterns in free text before it is sent as AI context. Matches
+// US-style 10-digit numbers with optional +1 / country code,
+// parentheses, spaces, dots, or dashes: (772) 971-6129,
+// 772-971-6129, 772.971.6129, +1 772 971 6129, 7729716129. The
+// lookarounds keep longer digit runs (IDs, migration numbers)
+// untouched, and 7-digit runs are left alone — they collide with
+// prices and amounts. This is a best-effort scrub of free text,
+// NOT a guarantee: the drawer copy says the no-address/no-phone
+// guarantee covers structured fields only.
+export function redactPhoneNumbers(text: string): string {
+  return text.replace(
+    /(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-]?)\d{3}[\s.-]?\d{4}(?!\d)/g,
+    '[phone removed]',
   );
 }
 

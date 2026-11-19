@@ -105,7 +105,7 @@ export default function ReferrerPortal({ userId }: { userId: string }) {
           </ul>
         )}
         <p style={{ fontSize: 12, color: '#94a3b8' }}>
-          You see only your own referrals — never anyone else&rsquo;s sellers, and no one sees yours.
+          You see only your own referrals — never anyone else&rsquo;s sellers, and no other referrer or wholesaler sees yours.
         </p>
       </section>
     </div>

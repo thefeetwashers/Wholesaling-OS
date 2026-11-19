@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 // Slice 28 — AI assistant gateway. ONE provider, chosen by the platform
 // owner with server env vars (set in Vercel, never in code):
@@ -7,10 +8,13 @@ import { NextResponse } from 'next/server';
 //   AI_MODEL    = optional override; defaults below apply otherwise.
 // Until those are set, GET reports configured:false and the panel in the
 // app honestly shows "not connected" — there is no fake AI anywhere.
-// Every POST requires a valid signed-in Supabase session (verified
-// against the project's Auth API), so the owner's key can only be spent
-// by signed-in users, on summaries of their OWN office data, which the
-// client builds from rows RLS already restricts to them.
+// Slice 141 (audit #13) — POST is OPERATOR-ONLY: the key above is the
+// owner's shared key, and every signed-in user could previously spend
+// it through this route. Now the caller's JWT is checked against the
+// public.is_operator() RPC (the one place operator identity lives);
+// anyone else gets an honest not-available answer and no provider
+// call is made. GET stays open — it reports only configured/provider,
+// never the key.
 
 // Explicit AI_* settings win. Fallback (added Nov 2, 2026, after the
 // owner had already placed an OPENAI_API_KEY in the hosting
@@ -54,15 +58,27 @@ export async function GET() {
   return NextResponse.json({ configured: isConfigured(), provider: isConfigured() ? PROVIDER : null });
 }
 
-async function verifyUser(req: Request): Promise<boolean> {
+async function verifyOperator(req: Request): Promise<boolean> {
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   if (!token || !SUPA_URL || !SUPA_ANON) return false;
   try {
+    // The token must belong to a real signed-in session first.
     const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: SUPA_ANON },
     });
-    return r.ok;
+    if (!r.ok) return false;
+    // Then the operator check itself: public.is_operator() reads
+    // the caller's own profiles row (SECURITY DEFINER) and is the
+    // one place operator identity lives. Any RPC failure fails
+    // CLOSED — nobody spends the shared key on an error.
+    const authed = createClient(SUPA_URL, SUPA_ANON, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+    const { data, error } = await authed.rpc('is_operator');
+    if (error) return false;
+    return data === true;
   } catch {
     return false;
   }
@@ -109,8 +125,11 @@ export async function POST(req: Request) {
       { status: 503 },
     );
   }
-  if (!(await verifyUser(req))) {
-    return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
+  if (!(await verifyOperator(req))) {
+    return NextResponse.json(
+      { error: 'The AI assistant runs on the platform owner\u2019s own AI key, so it is available to the operator only — it is not available on this account.' },
+      { status: 403 },
+    );
   }
   const body = await req.json().catch(() => ({}));
   const question = String(body.question || '').slice(0, 2000);

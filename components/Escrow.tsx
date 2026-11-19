@@ -30,7 +30,10 @@ const MILESTONES = [
 ];
 
 export default function Escrow({ userId }: { userId: string | null }) {
-  const [price, setPrice] = useState(150000);
+  // Slice 141 audit fix: money fields start blank — no pre-filled price
+  // or fee. A save must use only figures the wholesaler actually typed.
+  const [price, setPrice] = useState('');
+  const num = (v: string) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [dealId, setDealId] = useState('');
   const [files, setFiles] = useState<EscrowFileRow[]>([]);
@@ -57,7 +60,8 @@ export default function Escrow({ userId }: { userId: string | null }) {
   }, [userId, dealId]);
   const saveEscrow = async () => {
     if (!dealId || !userId || !supabaseConfigured) { setSavedMsg('Pick a saved deal and sign in to save escrow.'); return; }
-    const listing = await createListingForDeal(userId, dealId, price + fee).catch(() => null);
+    if (price === '' || fee === '') { setSavedMsg('Enter a contract price and an assignment fee before saving — a blank figure is never saved as a listing price.'); return; }
+    const listing = await createListingForDeal(userId, dealId, num(price) + num(fee)).catch(() => null);
     if (!listing) { setSavedMsg('Save failed — check sign-in and try again.'); return; }
     const selectedDeal = deals.find((d) => d.id === dealId);
     const file = await createEscrowFile(userId, listing.id, selectedDeal?.emd_amount ?? 0, deadline || null).catch(() => null);
@@ -70,25 +74,29 @@ export default function Escrow({ userId }: { userId: string | null }) {
     setMilestones({ ...milestones, [file.id]: recorded });
     setFiles([file, ...files]); setSavedMsg('Escrow file saved to Supabase (listing + file + milestones).');
   };
-  const [fee, setFee] = useState(10000);
-  const [referral, setReferral] = useState(0);
+  const [fee, setFee] = useState('');
+  const [referral, setReferral] = useState('');
   const [deadline, setDeadline] = useState('');
   const [step, setStep] = useState(0);
   const [showFunding, setShowFunding] = useState(false);
-  const net = price + fee - referral;
+  const net = num(price) + num(fee) - num(referral);
   const selectedDeal = deals.find((d) => d.id === dealId);
   const selectedDocs = (selectedDeal?.documents || {}) as { property_address?: string; state?: string };
 
   return (
     <section style={{ background: '#1e293b', padding: 20, borderRadius: 12, marginTop: 24 }}>
       <h2>Title Escrow Tracker</h2>
-      <label>Deal (saved in Supabase): <select value={dealId} onChange={(e) => { const id = e.target.value; setDealId(id); const d = deals.find((x) => x.id === id); if (d?.contract_price != null) setPrice(Number(d.contract_price)); if (d?.assignment_fee != null) setFee(Number(d.assignment_fee)); }}><option value="">— pick a deal —</option>{deals.map((d) => <option key={d.id} value={d.id}>{(d.documents as { property_address?: string } | undefined)?.property_address || d.id} — {d.contract_type}</option>)}</select></label>
+      <label>Deal (saved in Supabase): <select value={dealId} onChange={(e) => { const id = e.target.value; setDealId(id); const d = deals.find((x) => x.id === id); if (d?.contract_price != null) setPrice(String(d.contract_price)); if (d?.assignment_fee != null) setFee(String(d.assignment_fee)); }}><option value="">— pick a deal —</option>{deals.map((d) => <option key={d.id} value={d.id}>{(d.documents as { property_address?: string } | undefined)?.property_address || d.id} — {d.contract_type}</option>)}</select></label>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>{savedMsg || 'Save creates a marketplace listing, then an escrow file, then append-only milestone rows.'}</p>
       <p style={{ fontSize: 13, color: '#94a3b8' }}>Milestones are advanced by you, by hand. Nothing here talks to a title company system. Milestones saved to Supabase are append-only — they are inserted, never edited or deleted.</p>
-      <label>Contract price $ <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} /></label>{' '}
-      <label>Assignment fee $ <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value))} /></label>{' '}
-      <label>Referral $ <input type="number" value={referral} onChange={(e) => setReferral(Number(e.target.value))} /></label>
-      <p><strong>Payout net: ${net.toLocaleString()}</strong> (price + fee − referral)</p>
+      <label>Contract price $ <input type="number" placeholder="Not provided" value={price} onChange={(e) => setPrice(e.target.value)} /></label>{' '}
+      <label>Assignment fee $ <input type="number" placeholder="Not provided" value={fee} onChange={(e) => setFee(e.target.value)} /></label>{' '}
+      <label>Referral $ <input type="number" placeholder="Not provided" value={referral} onChange={(e) => setReferral(e.target.value)} /></label>
+      {price === '' || fee === '' ? (
+        <p>Enter a contract price and an assignment fee to see the payout net — nothing is filled in for you.</p>
+      ) : (
+        <p><strong>Payout net: ${net.toLocaleString()}</strong> (price + fee − referral)</p>
+      )}
       <label>EMD deadline: <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></label>
       <p>EMD countdown: {deadline ? emdCountdownText(deadline) : 'No deadline set yet.'}</p>
       <p style={{ fontSize: 13, color: '#fbbf24' }}>
@@ -113,7 +121,7 @@ export default function Escrow({ userId }: { userId: string | null }) {
             dealId,
             propertyAddress: selectedDocs.property_address,
             propertyState: selectedDocs.state,
-            purchasePrice: price || undefined,
+            purchasePrice: price === '' ? undefined : num(price),
           }}
           onClose={() => setShowFunding(false)}
           onSubmitted={() => setShowFunding(false)}

@@ -1,3 +1,13 @@
+// Slice 141 — DEPLOY-ORDER FIX (audit #10): the authenticated
+// routes below no longer select is_founder_exempt as part of the
+// subscription row. The flag is read separately through
+// isExemptByUserId() (the same fail-closed helper the webhook
+// branches use): when the column does not exist yet the helper
+// logs and returns true instead of the whole row select erroring
+// and the function hard-500ing every authenticated billing call.
+// Webhook branches are untouched — their fail-closed behavior is
+// unchanged.
+//
 // Slice 140 — FOUNDER EXEMPTION: public.saas_subscriptions
 // is_founder_exempt (boolean, NOT NULL DEFAULT false; migration
 // 20261117190000) marks the founder's own account, which does NOT
@@ -390,7 +400,7 @@ serve(async (req: Request) => {
 
     const { data: subRow, error: subError } = await admin
       .from("saas_subscriptions")
-      .select("id, email, company_name, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, is_founder_exempt")
+      .select("id, email, company_name, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id")
       .eq("user_id", caller.id)
       .maybeSingle();
     if (subError) {
@@ -407,8 +417,14 @@ serve(async (req: Request) => {
       trial_ends_at: string | null;
       stripe_customer_id: string | null;
       stripe_subscription_id: string | null;
-      is_founder_exempt: boolean | null;
     };
+
+    // Slice 141 — founder exemption flag, read through the
+    // fail-closed helper (audit #10): a flag-read error (e.g.
+    // the is_founder_exempt column does not exist yet) treats
+    // the caller as exempt, logs, and refuses billing below —
+    // it never hard-500s the authenticated routes.
+    const isFounderExempt = await isExemptByUserId(admin, caller.id);
 
     // Trial days left on the row (0 when expired) — the checkout
     // carries the remainder of the 90-day trial, not a fresh one.
@@ -425,7 +441,7 @@ serve(async (req: Request) => {
       // Stripe call. No Stripe customer and no Checkout session
       // are ever created for the founder; the account does not
       // pay the $150/mo fee.
-      if (row.is_founder_exempt === true) {
+      if (isFounderExempt) {
         return json(
           {
             success: false,
@@ -464,6 +480,18 @@ serve(async (req: Request) => {
     }
 
     if (action === "customer_portal") {
+      // Slice 141 (audit #8) — same founder-exempt refusal as
+      // create_checkout, BEFORE any Stripe call: an exempt
+      // account never opens a billing portal session.
+      if (isFounderExempt) {
+        return json(
+          {
+            success: false,
+            error: "This account is exempt from billing — no payment is required and no checkout will be created.",
+          },
+          403,
+        );
+      }
       if (!row.stripe_customer_id) {
         return json({ success: false, error: "No Stripe customer exists for this account yet — activate the plan first." }, 400);
       }

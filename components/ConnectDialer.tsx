@@ -7,11 +7,12 @@
 //   Dialer button:  fixed right:16, bottom:16 — drawer right:16, bottom:76,
 //     width min(360px, calc(100vw - 32px)).
 // The two buttons can never overlap. The two drawers cannot overlap on
-// viewports 812px wide or wider (16 + 420 + 16 + 360 + 16 = 828 > 812
-// is the no-overlap bound; 16+420 leaves the left drawer ending at
-// x=436, the right drawer starts at vw-376, so vw >= 812 keeps them
-// apart). On a narrow phone both drawers open at once would overlap —
-// that is the honest limit of two fixed drawers, not a hidden one.
+// viewports 812px wide or wider: the left drawer ends at x=436
+// (16 + 420) and the right drawer starts at vw − 376 (vw − 16 − 360),
+// so they touch exactly at vw = 812 and clear each other above it
+// (a 16px gap between the drawers needs vw ≥ 828). On a narrow phone
+// both drawers open at once would overlap — that is the honest limit
+// of two fixed drawers, not a hidden one.
 //
 // The drawer stays mounted (display:none when closed) instead of
 // unmounting, so the CCP iframe and the agent session survive a
@@ -61,9 +62,10 @@ import { supabase } from '../lib/supabase';
 
 // Minimal structural types for the parts of amazon-connect-streams
 // this dialer uses (verified against the installed 2.31.0 bundled
-// types, src/index.d.ts). The library is loaded by dynamic import
-// and read off `window.connect`; these types describe that object
-// without importing the library at module top-level.
+// types, src/index.d.ts). The library is loaded by a <script> tag
+// at runtime from the vendored file (see the header + loadStreamsScript
+// below) and read off `window.connect`; these types describe that
+// object without importing the library at module top-level.
 interface StreamsContact {
   onConnected(cb: (contact: StreamsContact) => void): void;
   onEnded(cb: (contact: StreamsContact) => void): void;

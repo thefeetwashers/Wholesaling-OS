@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { openCopilot } from '../lib/ai-copilot';
+import { openCopilot, redactPhoneNumbers } from '../lib/ai-copilot';
 
 // Slice 139 — Post-Call Seller Summary modal (Amazon Connect softphone,
 // BYOK). It opens ONLY when the softphone (components/ConnectDialer.tsx)
@@ -50,10 +50,14 @@ export default function PostCallModal() {
   function analyze() {
     // Context from the three note fields ONLY — never the phone number,
     // never an address. Empty fields are skipped; nothing is invented.
+    // Slice 141 (audit #15) — the notes are free text and may hold a
+    // phone number the wholesaler typed in; redact phone-number-like
+    // patterns before they reach the AI. openCopilot() redacts again
+    // at the choke point.
     const lines = ['Post-call seller notes:'];
-    if (askingPriceDebt.trim()) lines.push(`Asking price / debt: ${askingPriceDebt.trim()}`);
-    if (arvRepairs.trim()) lines.push(`ARV & repairs: ${arvRepairs.trim()}`);
-    if (motivationNotes.trim()) lines.push(`Motivation / timeline / notes: ${motivationNotes.trim()}`);
+    if (askingPriceDebt.trim()) lines.push(`Asking price / debt: ${redactPhoneNumbers(askingPriceDebt.trim())}`);
+    if (arvRepairs.trim()) lines.push(`ARV & repairs: ${redactPhoneNumbers(arvRepairs.trim())}`);
+    if (motivationNotes.trim()) lines.push(`Motivation / timeline / notes: ${redactPhoneNumbers(motivationNotes.trim())}`);
     setOpen(false);
     openCopilot(lines.join('\n'), AUTO_QUESTION);
   }
