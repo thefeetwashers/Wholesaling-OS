@@ -558,6 +558,9 @@ function BuyerPortal({ userId }: { userId: string }) {
   const [rehab, setRehab] = useState('');
   const [published, setPublished] = useState(false);
   const [emailAlerts, setEmailAlerts] = useState(false);
+  // Slice 134 — no toggle on this page; the loaded SMS preference
+  // is preserved so saving here never silently resets it.
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [maxArvPct, setMaxArvPct] = useState('');
   const [minProfit, setMinProfit] = useState('');
   const [condPrefs, setCondPrefs] = useState<string[]>([]);
@@ -575,6 +578,7 @@ function BuyerPortal({ userId }: { userId: string }) {
     setRehab(b.rehab_tolerance || '');
     setPublished(b.published === true);
     setEmailAlerts(b.email_alerts_opt_in === true);
+    setSmsOptIn(b.sms_opt_in === true);
     setMaxArvPct(b.max_arv_pct != null ? String(b.max_arv_pct) : '');
     setMinProfit(b.min_profit != null ? String(b.min_profit) : '');
     setCondPrefs(b.condition_preferences || []);
@@ -608,6 +612,7 @@ function BuyerPortal({ userId }: { userId: string }) {
         notes,
         published,
         email_alerts_opt_in: emailAlerts,
+        sms_opt_in: smsOptIn,
         rehab_tolerance: rehab || null,
         max_arv_pct: maxArvPct.trim() ? Number(maxArvPct) : null,
         min_profit: minProfit.trim() ? Number(minProfit) : null,

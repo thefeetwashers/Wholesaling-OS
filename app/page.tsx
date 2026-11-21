@@ -392,7 +392,7 @@ export default function Home() {
 
   return (
     <div>
-      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 141</p>
+      <p className="ws-buildtag">WholesalingOS — Production Build, Slice 134</p>
       {/* Slice 132, Part 5 — landing nav. Join goes to /join; Sign in
           goes to #signin, exactly the way the app already reaches
           sign-in (the AuthPanel lives in the #signin block below,

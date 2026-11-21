@@ -81,6 +81,9 @@ export default function VipPortal() {
   const [published, setPublished] = useState(false);
   const [savedPublished, setSavedPublished] = useState(false);
   const [emailAlerts, setEmailAlerts] = useState(false);
+  // Slice 134 — no toggle on this page; the loaded SMS preference
+  // is preserved so saving here never silently resets it.
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -115,6 +118,7 @@ export default function VipPortal() {
             setPublished(box.published === true);
             setSavedPublished(box.published === true);
             setEmailAlerts(box.email_alerts_opt_in === true);
+            setSmsOptIn(box.sms_opt_in === true);
             setMaxArvPct(box.max_arv_pct != null ? String(box.max_arv_pct) : '');
             setMinProfit(box.min_profit != null ? String(box.min_profit) : '');
             setCondPrefs(box.condition_preferences || []);
@@ -166,6 +170,7 @@ export default function VipPortal() {
         notes,
         published,
         email_alerts_opt_in: emailAlerts,
+        sms_opt_in: smsOptIn,
         zip_codes: zipCodes.split(',').map((z) => z.trim()).filter(Boolean),
         rehab_tolerance: rehab || null,
         states,

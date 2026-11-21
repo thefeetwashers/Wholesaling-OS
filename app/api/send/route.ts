@@ -7,12 +7,15 @@ import { sha256Hex } from '../../../lib/outreach';
 // Each wholesaler sends through THEIR OWN provider accounts —
 // never through one shared operator account. The per-wholesaler
 // provider store (wholesaler_provider_settings) EXISTS since Slice 137
-// (migration 20261117160000, applied Nov 17, 2026) — but only with its
-// AI key columns so far. The SMS / email key columns this route
-// selects (twilio_*, ses_*, resend_api_key) come with Slice 134,
-// which is QUEUED, not built. So there is still no transport, and
-// this route FAILS CLOSED: GET reports both channels not connected,
-// POST answers 503 "not connected", and NOTHING is ever sent.
+// (migration 20261117160000, applied Nov 17, 2026) — and the SMS /
+// email key columns this route selects now exist too, added by
+// Slice 134 migration 20261119140000. So resolveProvider below
+// reads REAL columns, and a caller who has entered keys reports
+// configured. But there is still no transport: the per-wholesaler
+// dispatcher Edge Functions (send-buyer-blast / send-invite-blast)
+// are FILE ONLY and NOT deployed, so this route still FAILS
+// CLOSED: GET reports the caller's key state honestly, POST
+// answers 503 "not connected", and NOTHING is ever sent.
 //
 // The previous version sent through ONE shared operator Twilio /
 // SES / Resend account from hosting env vars. That violated BYOK
@@ -25,7 +28,9 @@ import { sha256Hex } from '../../../lib/outreach';
 // ownership, do-not-contact, consent on file, blocklist re-check,
 // phone format — so Slice 134 only has to land the store + the
 // per-wholesaler transport, not rebuild the whole flow. Do NOT wire
-// up real sending in this slice.
+// up real sending in this slice: the dispatcher Edge Functions are
+// file-only and NOT deployed, and this route must not send through
+// any other path.
 //
 // Sending is HUMAN-TAP ONLY: this route sends exactly one message
 // per authenticated request, for one lead, after re-checking every
@@ -39,22 +44,29 @@ type Channel = 'sms' | 'email';
 // BYOK provider resolution — mirrors the skip-trace /
 // google-skip-trace Edge Functions (getProviderKey): the credential
 // resolves PER CALLING WHOLESALER from their own settings row,
-// never from a shared env var. The store exists since Slice 137, but
-// the SMS / email key columns do not exist yet (Slice 134, queued),
-// so every lookup errors today and returns "not configured" — that is
-// the honest answer, not a bug: no provider is configured for this
-// caller.
+// never from a shared env var. The SMS / email key columns exist
+// since Slice 134 (migration 20261119140000), so a lookup now
+// reads the caller's real key state: a caller with no keys gets
+// "not configured" — that is the honest answer, not a bug.
 //
-// PROPOSED Slice 134 contract (confirm against the store migration
-// when it lands — the column names below are the contract this route
-// expects, not existing schema): wholesaler_provider_settings keyed
+// Slice 134 contract (the column names below are the store
+// migration's, not guesses): wholesaler_provider_settings keyed
 // by user_id, with twilio_account_sid / twilio_auth_token /
-// twilio_from_number for texts and ses_access_key_id /
-// ses_secret_access_key / resend_api_key for email. A mismatch fails
-// closed (lookup error -> not configured); it never falls back to a
-// shared account. Only a boolean is returned — credentials are never
-// handed to the caller or logged; the Slice 134 transport resolves
-// them server-side again when it sends.
+// twilio_from_number, telnyx_api_key / telnyx_from_number,
+// textbee_api_key, httpsms_api_key / httpsms_from_number for
+// texts, and resend_api_key / resend_from_email /
+// sendgrid_api_key / sendgrid_from_email / ses_access_key_id /
+// ses_secret_access_key / ses_from_email for email. "Configured"
+// means ANY one provider for the channel is fully keyed — a key
+// WITHOUT its sender identity does not count: Twilio needs all
+// three of its columns; Telnyx needs key + from number; TextBee
+// needs its key; httpSMS needs key + from number; Resend and
+// SendGrid need key + from email; SES needs both its key columns
+// + from email. A mismatch fails closed (lookup error -> not
+// configured); it never falls back to a shared account. Only a
+// boolean is returned — credentials are never handed to the
+// caller or logged; the Slice 134 dispatcher Edge Functions
+// resolve them server-side again when they send.
 async function resolveProvider(
   // Same client type serviceClient() returns (its inferred
   // SupabaseClient<any, "public", ...>); ReturnType<typeof
@@ -67,8 +79,8 @@ async function resolveProvider(
   try {
     const columns =
       channel === 'sms'
-        ? 'twilio_account_sid, twilio_auth_token, twilio_from_number'
-        : 'ses_access_key_id, ses_secret_access_key, resend_api_key';
+        ? 'twilio_account_sid, twilio_auth_token, twilio_from_number, telnyx_api_key, telnyx_from_number, textbee_api_key, httpsms_api_key, httpsms_from_number'
+        : 'resend_api_key, resend_from_email, sendgrid_api_key, sendgrid_from_email, ses_access_key_id, ses_secret_access_key, ses_region, ses_from_email';
     const { data, error } = await sb
       .from('wholesaler_provider_settings')
       .select(columns)
@@ -78,11 +90,16 @@ async function resolveProvider(
     const row = data as Record<string, unknown>;
     const has = (k: string) => typeof row[k] === 'string' && (row[k] as string).trim() !== '';
     if (channel === 'sms') {
-      return { configured: has('twilio_account_sid') && has('twilio_auth_token') && has('twilio_from_number') };
+      const twilioOk = has('twilio_account_sid') && has('twilio_auth_token') && has('twilio_from_number');
+      const telnyxOk = has('telnyx_api_key') && has('telnyx_from_number');
+      const textbeeOk = has('textbee_api_key');
+      const httpsmsOk = has('httpsms_api_key') && has('httpsms_from_number');
+      return { configured: twilioOk || telnyxOk || textbeeOk || httpsmsOk };
     }
-    const sesOk = has('ses_access_key_id') && has('ses_secret_access_key');
-    const resendOk = has('resend_api_key');
-    return { configured: sesOk || resendOk };
+    const sesOk = has('ses_access_key_id') && has('ses_secret_access_key') && has('ses_region') && has('ses_from_email');
+    const resendOk = has('resend_api_key') && has('resend_from_email');
+    const sendgridOk = has('sendgrid_api_key') && has('sendgrid_from_email');
+    return { configured: sesOk || resendOk || sendgridOk };
   } catch {
     return { configured: false };
   }
@@ -110,7 +127,7 @@ async function verifyUserId(req: Request): Promise<string | null> {
 }
 
 const NOT_CONNECTED_REASON =
-  'Sending runs on your own provider accounts — none are connected for this account yet. The SMS / email provider columns are not built yet (Slice 134, queued).';
+  'Sending runs on your own provider accounts — none are connected for this account yet. The provider store exists (Slice 134), but the per-wholesaler transport (the dispatcher Edge Function) is file-only and NOT deployed, so nothing sends from inside the app yet.';
 
 export async function GET(req: Request) {
   // Per-caller BYOK state: without a signed-in caller there is no
@@ -214,10 +231,14 @@ export async function POST(req: Request) {
     }
   }
 
-  // Slice 136 — NO TRANSPORT YET. Even with a provider configured
+  // Slice 134 — NO TRANSPORT YET. Even with a provider configured
   // for this caller, there is no per-wholesaler send implementation
-  // wired in this slice (Slice 134 lands the store + transport).
-  // This is the terminal fail-closed answer: nothing is sent, and
-  // no shared operator account is ever used as a fallback.
-  return Response.json({ error: 'Sending from inside the app is not wired up yet — the per-wholesaler provider transport lands with the provider settings store (Slice 134). Until then, use the tap-to-open channels.' }, { status: 503 });
+  // deployed in this slice: the dispatcher Edge Functions
+  // (send-buyer-blast / send-invite-blast) are file-only and NOT
+  // deployed, so nothing sends from inside the app yet. This is
+  // the terminal fail-closed answer: nothing is sent, and no
+  // shared operator account is ever used as a fallback. That is
+  // deliberate, not a bug — deploying the dispatcher is an owner
+  // step that has not happened.
+  return Response.json({ error: 'Sending from inside the app is not wired up yet — the provider store exists (Slice 134), but the per-wholesaler dispatcher Edge Function is file-only and NOT deployed. Until it is deployed, use the tap-to-open channels.' }, { status: 503 });
 }

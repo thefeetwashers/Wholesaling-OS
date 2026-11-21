@@ -44,6 +44,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { loadMyStorefront, type StorefrontProfile } from '../lib/storefront';
+import { invokeSendBuyerBlast } from '../lib/sms';
 import StateCountyFilter from './StateCountyFilter';
 import BuyerInviteLink from './BuyerInviteLink';
 import BuyerNetworks from './BuyerNetworks';
@@ -72,6 +73,10 @@ interface CashBuyer {
   property_types: string[];
   pof_verified: boolean;
   notes: string;
+  // Slice 134 — STOP sets this (migration in parallel). A buyer
+  // with sms_opt_out = true never receives an SMS broadcast; the
+  // dispatcher re-checks it at send time too.
+  sms_opt_out?: boolean;
 }
 
 const PROPERTY_TYPES = ['Single Family', 'Multi-Family', 'Condo / Townhouse', 'Land', 'Mobile Home', 'Commercial'];
@@ -119,6 +124,14 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
   const [sqft, setSqft] = useState('');
   const [emd, setEmd] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Slice 134 — "Broadcast to My BYOK Buyers" (SMS). Explicit click
+  // only; the dispatcher re-checks opt-out at send time and logs
+  // the send server-side. Nothing is reported sent unless the
+  // dispatcher says so — a not-deployed function or unconnected
+  // provider is reported honestly, never as a success.
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState('');
 
   async function load() {
     setLoading(true);
@@ -286,6 +299,49 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
     dealAddress ? `New wholesale deal — ${dealAddress}` : 'New wholesale deal',
   )}&body=${encodeURIComponent(blastText)}`;
 
+  // Slice 134 — broadcast audience: the deal's matched buyers with
+  // a phone on file, minus anyone opted out. The dispatcher gets
+  // the eligible list AND the audience marker, and re-checks
+  // opt-out at send time before any message goes out.
+  const broadcastWithPhone = matched.filter((b) => (b.phone || '').trim() !== '');
+  const broadcastOptedOut = broadcastWithPhone.filter((b) => b.sms_opt_out === true);
+  const broadcastEligible = broadcastWithPhone.filter((b) => b.sms_opt_out !== true);
+
+  async function sendBroadcast() {
+    if (broadcastSending) return;
+    if (broadcastEligible.length === 0) {
+      setBroadcastResult('No buyers to text — no matched buyer has a phone on file and has not opted out. Nothing was sent.');
+      return;
+    }
+    setBroadcastSending(true);
+    setBroadcastResult('');
+    try {
+      const res = await invokeSendBuyerBlast({
+        channel: 'sms',
+        body: blastText,
+        audience: 'my-buyers',
+        to_numbers: broadcastEligible.map((b) => (b.phone || '').trim()),
+      });
+      if (res.ok) {
+        if (res.sent !== undefined || res.skipped !== undefined || res.failed !== undefined) {
+          setBroadcastResult(
+            `Broadcast sent — sent ${res.sent ?? 0}, skipped ${res.skipped ?? 0}, failed ${res.failed ?? 0}.`,
+          );
+        } else {
+          setBroadcastResult(
+            'The dispatcher accepted the broadcast. No per-recipient counts were returned, so none are shown.',
+          );
+        }
+      } else {
+        setBroadcastResult(res.error || 'Not sent.');
+      }
+    } catch {
+      setBroadcastResult('Not sent: the request did not complete.');
+    } finally {
+      setBroadcastSending(false);
+    }
+  }
+
   const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: 6, boxSizing: 'border-box', fontSize: 13 };
   const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, marginBottom: 10 };
 
@@ -400,6 +456,35 @@ export default function CashBuyersDealBlast({ userId, dealPrefill }: { userId: s
             The mailto link is a convenience only — the app never sends email itself. Large lists may
             exceed mailto limits; send big blasts from your email directly.
           </p>
+          {/* Slice 134 — Broadcast to My BYOK Buyers (SMS). Sends
+              the blast above, by text, only to this wholesaler's
+              own matched buyers with a phone who have not opted
+              out — on explicit click, through the dispatcher. */}
+          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 12, paddingTop: 12 }}>
+            <h4 style={{ fontSize: 14, margin: '0 0 8px' }}>Broadcast to My BYOK Buyers — SMS</h4>
+            <p style={{ fontSize: 13, margin: '0 0 8px' }}>
+              {broadcastWithPhone.length} matched buyers with a phone, {broadcastOptedOut.length} opted out —{' '}
+              {broadcastEligible.length} will receive it
+            </p>
+            <p style={{ fontSize: 12, color: '#cbd5e1', margin: '0 0 8px' }}>
+              Sends the blast above by text from your own SMS provider, only on your click. Opted-out
+              buyers are excluded here and re-checked by the dispatcher at send time.
+            </p>
+            <button
+              type="button"
+              onClick={sendBroadcast}
+              disabled={broadcastSending || broadcastEligible.length === 0}
+              style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer' }}
+            >
+              {broadcastSending ? 'Sending…' : 'Broadcast to My BYOK Buyers'}
+            </button>
+            {broadcastEligible.length === 0 && (
+              <p style={{ fontSize: 13, color: '#cbd5e1', margin: '8px 0 0' }}>
+                No matched buyer has a phone on file and has not opted out.
+              </p>
+            )}
+            {broadcastResult && <p style={{ fontSize: 13, margin: '8px 0 0' }}>{broadcastResult}</p>}
+          </div>
         </div>
       </div>
 

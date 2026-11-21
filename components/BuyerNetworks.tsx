@@ -69,6 +69,10 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
   const [published, setPublished] = useState(false);
   const [savedPublished, setSavedPublished] = useState(false);
   const [emailAlerts, setEmailAlerts] = useState(false);
+  // Slice 134 — SMS-alert opt-in. False by default; the matching
+  // SMS alert path is not built, so this records the preference
+  // only (the note under the checkbox says so).
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [zipCodes, setZipCodes] = useState('');
   const [rehab, setRehab] = useState('');
   const [states, setStates] = useState<string[]>([]);
@@ -98,6 +102,7 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
           setPublished(box.published === true);
           setSavedPublished(box.published === true);
           setEmailAlerts(box.email_alerts_opt_in === true);
+          setSmsOptIn(box.sms_opt_in === true);
           setZipCodes((box.zip_codes || []).join(', '));
           setRehab(box.rehab_tolerance || '');
           setStates(box.states || []);
@@ -126,6 +131,7 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
         notes,
         published,
         email_alerts_opt_in: emailAlerts,
+        sms_opt_in: smsOptIn,
         zip_codes: zipCodes.split(',').map((z) => z.trim()).filter(Boolean),
         rehab_tolerance: rehab || null,
         states,
@@ -306,6 +312,17 @@ export default function BuyerNetworks({ userId }: { userId: string }) {
                 <span style={{ fontSize: 12, color: '#cbd5e1' }}>
                   Email alerts only happen if the founder ever connects an email provider — nothing
                   is sent today, and matching deals are shown in the app.
+                </span>
+              </span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 10, alignItems: 'flex-start' }}>
+              <input type="checkbox" checked={smsOptIn} onChange={(e) => setSmsOptIn(e.target.checked)} style={{ marginTop: 2 }} />
+              <span>
+                Text me when a deal matches this buy box (SMS alerts)
+                <br />
+                <span style={{ fontSize: 12, color: '#cbd5e1' }}>
+                  This records your preference only — the matching SMS alert is not built yet,
+                  so no texts will arrive from this setting today.
                 </span>
               </span>
             </label>

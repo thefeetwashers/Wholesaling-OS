@@ -13,6 +13,7 @@ import {
 import { updateLeadFields, type Lead } from '../lib/leads';
 import { checkPhone } from '../lib/phone';
 import InAppSend from './InAppSend';
+import SmsInbox from './SmsInbox';
 import {
   firstPhone,
   firstEmail,
@@ -308,6 +309,10 @@ export default function CommsCenter({ userId }: { userId: string | null }) {
         WholesalingOS never auto-sends messages, never auto-dials, and never records calls. Florida is two-party
         consent for recording (Fla. Stat. §934.03) — if you record on your own device, get consent first.
       </p>
+      {/* Slice 134 — two-way SMS inbox (BYOK) + batch blaster, at
+          the end of the Comms Center. Existing behavior above is
+          unchanged. */}
+      <SmsInbox userId={userId} />
     </section>
   );
 }

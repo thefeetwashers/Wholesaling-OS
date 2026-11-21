@@ -17,11 +17,11 @@
 // WHOLESALER (getProviderKey below), never from a single global
 // secret. The per-wholesaler settings store (wholesaler_provider_settings)
 // EXISTS since Slice 137 (migration 20261117160000, applied Nov 17, 2026)
-// — but only with its AI key columns; the BatchData key column
-// (batchdata_api_key) comes with Slice 134, which is QUEUED, not built.
+// — and the BatchData key column (batchdata_api_key) now exists
+// too, via Slice 134 migration 20261119140000.
 // Keys in that store are plain TEXT, never claimed “encrypted”. No
 // provider is chosen yet, nothing is to be set up yet. Until a provider
-// is chosen and the Slice 134 column exists, this function
+// is chosen and the lead's owner enters a key, this function
 // returns mode 'not_configured' and writes NOTHING. Do NOT wire a
 // global BATCHDATA_API_KEY secret: a shared key would violate BYOK.
 //
@@ -81,8 +81,9 @@ const BATCHDATA_LIVE_ENABLED = false;
 // key resolves PER WHOLESALER, from that wholesaler's own settings
 // — never from one global secret shared across offices. The
 // settings store (wholesaler_provider_settings) exists since Slice 137,
-// but the batchdata_api_key column does not exist yet (Slice 134,
-// queued), so this returns null until it does. A failed read (including "table does
+// and the batchdata_api_key column exists since Slice 134
+// (migration 20261119140000) — so this returns null only when the
+// lead's owner has not entered a key. A failed read (including "table does
 // not exist") is a null, not a crash — the caller then gets
 // mode 'not_configured' and nothing is written. The key belongs to
 // the LEAD'S owner (the wholesaler whose account pays for the
@@ -207,8 +208,8 @@ serve(async (req: Request) => {
     if (!dm) return json({ success: false, error: "That decision-maker is no longer on this lead." }, 400);
 
     // BYOK: resolve the provider key for the LEAD'S owner. No
-    // global secret exists — until the founder picks providers and
-    // the per-wholesaler settings store is built, this is null and
+    // global secret exists — until the lead's owner enters their
+    // BatchData key in My Providers, this is null and
     // the function answers 'not_configured' and writes NOTHING.
     // The frontend then offers manual entry with this exact message.
     const apiKey = await getProviderKey(admin, lead.user_id as string);

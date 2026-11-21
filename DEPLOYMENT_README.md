@@ -664,6 +664,25 @@ New in this push (Slices 130–140 — status per row):
 | `20261117170000_slice138_rls_recursion_fix.sql` | Slice 138 — RLS infinite-recursion fix: SECURITY DEFINER helpers `requester_has_matching_iso_request(uuid, text[], text[])` + `lender_has_matching_box(uuid, text, text)` (boolean only, `set search_path = public`) + the three affected policies dropped and re-created to call them (matching semantics unchanged) + GRANT EXECUTE to `authenticated` in the same file; Applied + verified Nov 17, 2026 (15:59–16:01 EST) |
 | `20261117180000_slice139_connect_ccp_url.sql` | Slice 139 — Amazon Connect softphone (BYOK): `wholesaler_provider_settings.connect_ccp_url` (text, nullable); no new policies/grants/tables; Applied + verified Nov 17, 2026 (16:14–16:16 EST) |
 | `20261117190000_slice140_founder_billing_exemption.sql` | Slice 140 — founder billing exemption: `saas_subscriptions.is_founder_exempt` (boolean, NOT NULL DEFAULT false) + UPDATE setting it true on the founder's row only (profiles email literal matching `is_operator()`); no new policies/grants/tables; Applied + verified Nov 17, 2026 (16:23–16:26 EST) |
+| `20261119090000_slice141_pof_self_verify_guard.sql` | Slice 141 — BEFORE UPDATE trigger `guard_buyer_pof_status()`: a signed-in non-operator can never set buyer POF status to 'verified'/'rejected' or leave verified_at/verified_by non-null; operator + service-role pass; Applied + verified Nov 19, 2026 (17:07–17:12 EST) |
+| `20261119090100_slice141_offer_self_accept_guard.sql` | Slice 141 — buyer INSERT policy re-created WITH CHECK status='pending'; BEFORE UPDATE trigger `guard_deal_offer_status()`: only status changes gated, terminal states final, 'withdrawn' only by the offering buyer (or operator), 'accepted'/'declined' only by the deal owner or operator; Applied + verified Nov 19, 2026 (17:07–17:12 EST) |
+| `20261119090200_slice141_contact_reveal_forge_guard.sql` | Slice 141 — BEFORE UPDATE trigger `guard_deal_response_contact_flags()`: the owner may change only owner_contact_shared, the responder only responder_contact_shared; Applied + verified Nov 19, 2026 (17:07–17:12 EST) |
+| `20261119090300_slice141_billing_self_exempt_guard.sql` | Slice 141 — BEFORE UPDATE trigger `guard_subscription_billing_fields()`: a signed-in non-operator may not change is_founder_exempt, plan_status, or monthly_rate; `handle_new_wholesaler_signup()` re-created so a new founder row is created exempt + backfill; operator-only UPDATE policy on saas_subscriptions; Applied + verified Nov 19, 2026 (17:07–17:12 EST) |
+| `20261119100000_legacy_buy_boxes.sql` | Legacy schema — `buy_boxes` as it exists live (13 columns, verified by live re-dump Nov 19, 2026); CREATE TABLE IF NOT EXISTS + RLS + the live policies + GRANTs; Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100100_legacy_buyers.sql` | Legacy schema — `buyers` as it exists live (10 columns; buyer_type NOT NULL default 'cash' — the live CHECK requires hedge_fund/cash_buyer/landlord/builder, so an insert omitting buyer_type would fail the CHECK; recorded as-is); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100200_legacy_call_logs.sql` | Legacy schema — `call_logs` as it exists live (9 columns); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100300_legacy_title_companies.sql` | Legacy schema — `title_companies` as it exists live (10 columns; owner_id nullable, `states` text[], `portal_user`); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100400_legacy_disbursements.sql` | Legacy schema — `disbursements` as it exists live (11 columns); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100500_legacy_marketplace_listings.sql` | Legacy schema — `marketplace_listings` as it exists live (10 columns); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100600_legacy_deals.sql` | Legacy schema — `deals` as it exists live (22 columns); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100700_legacy_offers.sql` | Legacy schema — `offers` as it exists live (10 columns; `buyer_user` / `wholesaler_user`); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100800_legacy_escrow_files.sql` | Legacy schema — `escrow_files` as it exists live (16 columns); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119100900_legacy_escrow_milestones.sql` | Legacy schema — `escrow_milestones` as it exists live (6 columns; `file_id`, `milestone_name`, `logged_at`); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119101000_legacy_referrals.sql` | Legacy schema — `referrals` as it exists live (14 columns; `referrer_id` / `referrer_email`); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119101100_legacy_kpi_daily.sql` | Legacy schema — `kpi_daily` as it exists live (10 columns; no created_at/updated_at); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119101200_legacy_functions.sql` | Legacy schema — the 4 live functions verbatim from the dump: `admin_aggregates`, `admin_roster`, `admin_set_suspended`, `buyer_record` (buyer_record's missing caller-side gate recorded in a comment, no gate added); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119101300_legacy_subscriptions.sql` | Legacy schema — `subscriptions` as it exists live (6 columns; profile_id NOT NULL, stripe_subscription_id NOT NULL, status NOT NULL, current_period_end nullable); Applied + verified Nov 19, 2026 (17:56–18:08 EST) |
+| `20261119140000_slice134_provider_store.sql` | Slice 134 — BYOK integrations: 22 provider columns added to `wholesaler_provider_settings` (BatchData, Resend, SendGrid, SES incl. region + from email, Twilio incl. from number, Telnyx incl. from number + public key, TextBee incl. device ID, httpSMS incl. from number + device ID, `email_provider` / `sms_provider` preferences; plain TEXT, nullable, no defaults) + new table `sms_messages` (owner-only SELECT, service-role writes) + `cash_buyers.sms_opt_out` + `wholesaler_buy_boxes.sms_opt_in` + SECURITY DEFINER RPC `get_provider_key_status()` (masked keys only); NOT applied, NOT live — file only, local until push + migrate |
 
 Slice 126 needs **no migration** (code-only CO_NO fix).
 
@@ -712,10 +731,11 @@ would violate BYOK.
   table created by Slice 137's migration
   (`20261117160000_slice137_provider_settings.sql`, applied Nov 17, 2026 —
   see §2). Its keys are plain TEXT columns, never claimed "encrypted".
-  The skip-trace columns (`batchdata_api_key`, `google_api_key`,
-  `google_cse_id`) are NOT in that migration — Slice 134 adds them to
-  this same table. Until Slice 134 lands, no skip-trace provider is
-  connected, so the function returns
+  The skip-trace columns (`batchdata_api_key`) are in the Slice 134
+  migration on this same table; the Google columns (`google_api_key`,
+  `google_cse_id`) were NOT added — Google Custom Search is closed to
+  new customers, so no Google skip-trace provider is connected, and
+  the function returns
   `{ success: false, mode: 'not_configured' }` and writes **nothing**.
   The UI falls back to manual entry.
 - Outreach and the deal blast already open the wholesaler's own mail/SMS
@@ -745,9 +765,10 @@ would violate BYOK.
   only when the lead belongs to the caller or the caller is the operator
   (403 otherwise). Keys resolve **per calling wholesaler** via
   `getGoogleKeys(userId)` (the `wholesaler_provider_settings` store
-  created by Slice 137's migration — NOT yet applied, and its
-  `google_api_key` / `google_cse_id` columns come with Slice 134, so
-  the lookup returns null today). It NEVER
+  created by Slice 137's migration — its `google_api_key` /
+  `google_cse_id` columns were NOT added by Slice 134 (Google Custom
+  Search is closed to new customers), so the lookup returns null
+  today). It NEVER
   reads a global `GOOGLE_SEARCH_API_KEY` / `GOOGLE_CSE_ID` secret. No
   provider → `{ success: false, mode: 'not_configured' }`, writes
   nothing; the modal falls back to the Google link + manual entry.
@@ -834,7 +855,7 @@ Honestly unset (features that stay off until they are set):
 Never write a real key or secret into this README, into chat, or into the
 repo. Do not commit `.env`.
 
-## 8. Go-live checklist (current state: Slices 135–140 live; Slice 141 audit fixes local only)
+## 8. Go-live checklist (current state: Slices 135–141 + legacy schema live; Slice 134 local only)
 
 1. Slices 135–140 are ALL LIVE on both `wholesalingos.thefeetwashers.com` and
    `wholesalingos.vercel.app` (deploy confirmed Nov 17, 2026 on both domains
@@ -1021,3 +1042,125 @@ billing model):**
    (events: `checkout.session.completed`,
    `customer.subscription.created` / `updated` / `deleted`,
    `invoice.payment_failed`).
+
+### Slice 134 — BYOK integrations: send-buyer-blast, send-invite-blast, sms-inbound Edge Functions (file only, NOT live)
+
+- `supabase/functions/send-buyer-blast/index.ts` — human-click-only
+  deal blast dispatcher. **verify_jwt is ON** (deployed with the
+  default JWT verification — do NOT deploy with
+  `--no-verify-jwt`). The caller's JWT is resolved with
+  `auth.getUser(token)` and the CALLER's own provider keys are read
+  from their own `wholesaler_provider_settings` row via the
+  service-role client — never a request param, never a shared key.
+  The caller's picked provider (`sms_provider` / `email_provider`
+  on their settings row) wins; a picked provider that is not fully
+  keyed answers `NOT_CONFIGURED`, never a silent switch. With no
+  preference, the first fully keyed provider wins, SMS: Twilio →
+  Telnyx → TextBee → httpSMS; Email: Resend → SendGrid → SES (SES
+  via SigV4-signed SendEmail API; IAM scope `ses:SendEmail` +
+  `ses:SendRawEmail` on the verified identity, NOT
+  `AmazonSESFullAccess`). Verified against migration
+  `20261119140000`: all seven providers are fully wired (key +
+  sender columns all exist — Twilio sid+token+from, Telnyx
+  key+from, TextBee key with optional device ID, httpSMS key+from,
+  Resend key+from email, SendGrid key+from email, SES keys+region+
+  from email). TextBee's device ID is optional — it pins which
+  phone sends when set, and is omitted from the send request when
+  blank. Body shapes: `{ channel, to | to_number |
+  to_numbers, subject?, body, dealId? }` (one recipient per
+  invoke from BatchBlaster / SmsInbox, `to_numbers` +
+  `audience: 'my-buyers'` broadcast from CashBuyersDealBlast) and
+  `{ test: true, test_phone?, test_email? }` for the My Providers
+  Send Test (one message to the caller's own phone/email, mode
+  `'test'`). SMS recipients are re-checked against the caller's
+  own `cash_buyers.sms_opt_out` at send time — opted-out buyers
+  are skipped and reported, never sent; if the opt-out lookup
+  errors, nothing is sent. Every send AND every skip is logged to
+  `public.sms_messages` (direction `outbound`; columns are the
+  migration's set — no `channel` column exists on that table); the
+  browser must NOT double-log. Per-recipient results (`sent` /
+  `skipped` / `failed` with reason); a provider HTTP error is
+  reported as failed with the status, never swallowed. No trigger,
+  no insert hook, no auto-send anywhere.
+- `supabase/functions/send-invite-blast/index.ts` — same dispatcher
+  pattern for buyer invites. **verify_jwt is ON** (same deploy rule
+  as above). The invite URL comes from the caller in the body (the
+  app's BuyerInviteLink) — never invented; if the caller's message
+  does not already carry it, it is appended on its own line.
+  Same provider-preference rule, opt-out re-check, endpoints,
+  logging, and `NOT_CONFIGURED` honesty as send-buyer-blast
+  (recipient shapes `to` / `to_number` / `to_numbers`).
+- `supabase/functions/sms-inbound/index.ts` — inbound SMS receiver.
+  **Deployed with `--no-verify-jwt`** — the ONE function where that
+  is correct (Twilio / Telnyx / TextBee / httpSMS POST with no user
+  token; signature validation is the auth instead). The owning
+  wholesaler is resolved from the incoming message (To number vs
+  `twilio_from_number` for Twilio, To number vs
+  `telnyx_from_number` for Telnyx, `deviceId` vs
+  `textbee_device_id` for TextBee, receiving number vs
+  `httpsms_from_number` / device vs `httpsms_device_id` for
+  httpSMS); no owner → 404, nothing stored. Signatures are verified
+  with the OWNER's own key (Twilio HMAC-SHA1, Telnyx Ed25519,
+  TextBee `t=…,v1=…` HMAC-SHA256 with a recent timestamp; httpSMS
+  has no documented verifiable signature — a header, when present,
+  is verified, otherwise the message is accepted only on known
+  owner + known receiving number and logged as NOT
+  signature-verified). Valid messages insert one row into
+  `public.sms_messages` (direction `inbound`, status `received`;
+  no `channel` column exists on that table).
+  STOP / UNSUBSCRIBE / CANCEL / END / QUIT (first word,
+  case-insensitive) sets `sms_opt_out = true` on that wholesaler's
+  matching `cash_buyers` rows only. No INTERESTED / SEND PHOTOS
+  keyword routing is built or claimed. Real webhook URL:
+  `https://nabztcwabkqhxyxcxarx.supabase.co/functions/v1/sms-inbound`
+  — never `https://supabase.co`.
+- `supabase/functions/skip-trace-decision-maker/index.ts` — header
+  only: the `batchdata_api_key` column now exists via Slice 134
+  migration `20261119140000`. No logic changed: the live branch
+  stays DISABLED (`BATCHDATA_LIVE_ENABLED = false`, mode
+  `unverified`) until the v3 response field names are verified.
+  Google Custom Search stays OFF.
+- `app/api/send/route.ts` — `resolveProvider` now reads the Slice
+  134 columns (SMS: `twilio_account_sid`, `twilio_auth_token`,
+  `twilio_from_number`, `telnyx_api_key`, `telnyx_from_number`,
+  `textbee_api_key`, `httpsms_api_key`, `httpsms_from_number`;
+  Email: `resend_api_key`, `resend_from_email`, `sendgrid_api_key`,
+  `sendgrid_from_email`, `ses_access_key_id`,
+  `ses_secret_access_key`, `ses_region`, `ses_from_email`) and
+  requires the sender identity too (a key without its from
+  number/email counts as not configured — same rule the
+  dispatchers use; TextBee needs its key only, device ID
+  optional). The stale copy is
+  fixed: the store exists, but the per-wholesaler transport
+  (dispatcher Edge Function) is file-only and NOT deployed, so
+  nothing sends from inside the app yet. The terminal fail-closed
+  503 is kept — no live send is wired in this slice, deliberately.
+- UI (all file-only until the migration applies + the functions
+  deploy): `components/MyProviders.tsx` gains BatchData
+  skip-trace, email provider toggle (Resend / SendGrid / SES,
+  unselected keys NULLed on save, dropdown-only change saves),
+  SMS provider picker (Twilio / Telnyx / TextBee / httpSMS) and
+  "Send Test Email & SMS" to the wholesaler's own email/phone
+  (own credits; honest not-connected / not-deployed states, never
+  a fake success); `components/SmsInbox.tsx` (two-way inbox,
+  Realtime, quick reply, no reply box on opted-out numbers,
+  webhook + A2P 10DLC help) + `components/BatchBlaster.tsx`
+  (paste numbers, E.164 + dedupe, opt-out filter, 1 text per 20s
+  configurable 5–120s, progress + Stop, browser-paced queue stops
+  if the tab closes) mounted in `CommsCenter`; "Broadcast to My
+  BYOK Buyers" in `components/CashBuyersDealBlast.tsx` (own
+  opted-in buyers only, explicit click); SMS opt-in checkbox on
+  the buy-box form (`components/BuyerNetworks.tsx`, persisted as
+  `wholesaler_buy_boxes.sms_opt_in` — records the preference
+  only, the matching SMS alert is not built). Shared escape
+  helper in `lib/sms.ts` — message bodies render as React text,
+  never innerHTML.
+
+**Owner steps (NOT DONE):** `supabase functions deploy
+send-buyer-blast` (verify_jwt ON), `supabase functions deploy
+send-invite-blast` (verify_jwt ON), `supabase functions deploy
+sms-inbound --no-verify-jwt`, then register the sms-inbound URL
+above with each provider. No provider keys exist anywhere in the
+app yet, so nothing here can send or receive live. Keys are plain
+TEXT in `wholesaler_provider_settings` — never claimed
+"encrypted".

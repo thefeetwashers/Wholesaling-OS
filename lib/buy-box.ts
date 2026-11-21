@@ -38,6 +38,11 @@ export interface BuyBox {
   // match-and-email Edge Function. False by default: the function
   // only emails published buy boxes with this flag true.
   email_alerts_opt_in: boolean;
+  // Slice 134 — SMS-alert opt-in for the match-and-text path.
+  // False by default. This records the preference only: the
+  // matching SMS alert is not built, so checking it sends nothing
+  // today and must never be shown as "alerts on".
+  sms_opt_in: boolean;
   // Slice 133 — OBL-style criteria FIELDS only (field names, never
   // OBL buyer data). All empty by default; empty = no constraint.
   // max_arv_pct: max % of ARV the buyer will pay (number or null).
@@ -67,7 +72,7 @@ export const STRATEGY_OPTIONS = ['Fix & Flip', 'Rental', 'BRRRR', 'Wholesale', '
 export const CLOSING_TIMELINE_OPTIONS = ['7 days or less', '8-14 days', '15-30 days', '30+ days'];
 
 const BUY_BOX_SELECT =
-  'id, user_id, markets, property_types, min_price, max_price, notes, published, zip_codes, rehab_tolerance, states, email_alerts_opt_in, max_arv_pct, min_profit, condition_preferences, strategy_preferences, closing_timeline, created_at, updated_at';
+  'id, user_id, markets, property_types, min_price, max_price, notes, published, zip_codes, rehab_tolerance, states, email_alerts_opt_in, sms_opt_in, max_arv_pct, min_profit, condition_preferences, strategy_preferences, closing_timeline, created_at, updated_at';
 
 export async function loadMyBuyBox(userId: string): Promise<BuyBox | null> {
   if (!supabaseConfigured || !supabase) return null;
@@ -76,7 +81,23 @@ export async function loadMyBuyBox(userId: string): Promise<BuyBox | null> {
     .select(BUY_BOX_SELECT)
     .eq('user_id', userId)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // Defensive read (Slice 134): the sms_opt_in column lands with
+    // the Slice 134 migration; before it is applied this select
+    // errors, so retry without that column and default it false
+    // rather than failing the whole buy-box load.
+    if (/sms_opt_in/.test(error.message || '')) {
+      const fallback = await supabase
+        .from('wholesaler_buy_boxes')
+        .select(BUY_BOX_SELECT.replace(', sms_opt_in', ''))
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (fallback.error) throw fallback.error;
+      if (!fallback.data) return null;
+      return { ...(fallback.data as unknown as BuyBox), sms_opt_in: false };
+    }
+    throw error;
+  }
   return (data || null) as BuyBox | null;
 }
 
@@ -96,7 +117,21 @@ export async function loadAllPublishedBuyBoxes(): Promise<BuyBox[]> {
     .eq('published', true)
     .order('created_at', { ascending: false })
     .limit(200);
-  if (error) throw error;
+  if (error) {
+    // Same Slice 134 defensive read as loadMyBuyBox above: before
+    // the sms_opt_in column is applied, retry without it.
+    if (/sms_opt_in/.test(error.message || '')) {
+      const fallback = await supabase
+        .from('wholesaler_buy_boxes')
+        .select(BUY_BOX_SELECT.replace(', sms_opt_in', ''))
+        .eq('published', true)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (fallback.error) throw fallback.error;
+      return ((fallback.data || []) as unknown as BuyBox[]).map((b) => ({ ...b, sms_opt_in: false }));
+    }
+    throw error;
+  }
   return (data || []) as BuyBox[];
 }
 
@@ -161,6 +196,8 @@ export async function saveMyBuyBox(
           : null,
         states: (box.states || []).map((s) => s.trim().toUpperCase()).filter(Boolean),
         email_alerts_opt_in: box.email_alerts_opt_in === true,
+        // Slice 134 — SMS-alert preference, false by default.
+        sms_opt_in: box.sms_opt_in === true,
         // Slice 133 criteria — stored only when set; a non-finite
         // number reads as empty, and a preference outside the
         // pinned lists is dropped, never stored as junk.
